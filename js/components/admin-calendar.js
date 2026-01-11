@@ -800,17 +800,23 @@ const AdminCalendar = {
    */
   generateTimeSlots() {
     const slots = [];
-    const workHours = CONFIG.WORK_HOURS;
+    const workHours = CONFIG.SCHEDULE.WORK_HOURS;
 
-    // Morning
-    for (let h = workHours.MORNING_START; h < workHours.MORNING_END; h++) {
+    // Parse work hours (format: "HH:MM")
+    const morningStart = parseInt(workHours.MORNING_START.split(':')[0]);
+    const morningEnd = parseInt(workHours.MORNING_END.split(':')[0]);
+    const afternoonStart = workHours.AFTERNOON_START; // "13:30"
+    const afternoonEnd = parseInt(workHours.AFTERNOON_END.split(':')[0]);
+
+    // Morning slots
+    for (let h = morningStart; h < morningEnd; h++) {
       slots.push(`${h.toString().padStart(2, '0')}:00`);
       slots.push(`${h.toString().padStart(2, '0')}:30`);
     }
 
-    // Afternoon
-    slots.push('13:30');
-    for (let h = 14; h < workHours.AFTERNOON_END; h++) {
+    // Afternoon slots
+    slots.push(afternoonStart); // 13:30
+    for (let h = 14; h < afternoonEnd; h++) {
       slots.push(`${h.toString().padStart(2, '0')}:00`);
       slots.push(`${h.toString().padStart(2, '0')}:30`);
     }
