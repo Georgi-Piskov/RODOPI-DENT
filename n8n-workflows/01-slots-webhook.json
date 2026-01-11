@@ -1,0 +1,134 @@
+{
+  "name": "Rodopi Dent - Slots Webhook",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "slots-webhook",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-slots",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "slots-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Appointments",
+          "mode": "list",
+          "cachedResultName": "Appointments"
+        },
+        "options": {
+          "outputFormatting": {
+            "values": {
+              "general": "TEXT"
+            }
+          }
+        }
+      },
+      "id": "sheets-read",
+      "name": "Read Appointments",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [470, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIALS_ID",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get date from query parameter\nconst requestDate = $('Webhook').first().json.query.date;\n\n// Work hours configuration\nconst WORK_HOURS = {\n  MORNING_START: '09:00',\n  MORNING_END: '12:00',\n  AFTERNOON_START: '13:30',\n  AFTERNOON_END: '17:00'\n};\n\nconst SLOT_DURATION = 60; // minutes\n\n// Generate all possible slots\nfunction generateSlots() {\n  const slots = [];\n  \n  // Morning slots: 09:00, 10:00, 11:00\n  for (let h = 9; h < 12; h++) {\n    slots.push(`${h.toString().padStart(2, '0')}:00`);\n  }\n  \n  // Afternoon slots: 13:30, 14:30, 15:30, 16:30\n  slots.push('13:30');\n  for (let h = 14; h < 17; h++) {\n    slots.push(`${h.toString().padStart(2, '0')}:30`);\n  }\n  \n  return slots;\n}\n\n// Get all appointments from sheets\nconst appointments = $('Read Appointments').all();\n\n// Filter appointments for the requested date\nconst bookedSlots = appointments\n  .filter(item => item.json.date === requestDate && item.json.status !== 'cancelled')\n  .map(item => item.json.startTime);\n\n// Generate available slots\nconst allSlots = generateSlots();\nconst availableSlots = allSlots.filter(slot => !bookedSlots.includes(slot));\n\nreturn {\n  success: true,\n  date: requestDate,\n  slots: availableSlots,\n  bookedSlots: bookedSlots,\n  workHours: WORK_HOURS,\n  slotDuration: SLOT_DURATION\n};"
+      },
+      "id": "code-slots",
+      "name": "Calculate Available Slots",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "GET, POST, OPTIONS"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type, Authorization"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-slots",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [910, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Read Appointments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Appointments": {
+      "main": [
+        [
+          {
+            "node": "Calculate Available Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Available Slots": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
