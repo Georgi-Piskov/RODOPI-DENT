@@ -50,8 +50,8 @@ const Router = {
       template: 'template-booking',
       title: 'Запази час - Родопи Дент',
       onEnter: () => {
-        if (typeof BookingPage !== 'undefined') {
-          BookingPage.init();
+        if (typeof Booking !== 'undefined') {
+          Booking.init();
         }
       }
     });
@@ -59,7 +59,12 @@ const Router = {
     // Admin routes
     this.register('/admin/login', {
       template: 'template-admin-login',
-      title: 'Вход - Родопи Дент'
+      title: 'Вход - Родопи Дент',
+      onEnter: () => {
+        if (typeof App !== 'undefined') {
+          App.initLoginPage();
+        }
+      }
     });
     
     this.register('/admin', {

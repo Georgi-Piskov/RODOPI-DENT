@@ -57,8 +57,12 @@ const App = {
     }
 
     try {
-      const registration = await navigator.serviceWorker.register('/sw.js', {
-        scope: '/'
+      // Get base path for GitHub Pages compatibility
+      const basePath = window.location.pathname.replace(/\/[^\/]*$/, '/');
+      const swPath = basePath + 'sw.js';
+      
+      const registration = await navigator.serviceWorker.register(swPath, {
+        scope: basePath
       });
 
       Utils.log('Service Worker registered:', registration.scope);
@@ -282,51 +286,13 @@ const App = {
    * Initialize login page
    */
   initLoginPage() {
-    const form = document.getElementById('admin-login-form');
     const googleBtn = document.getElementById('google-login-btn');
-    const devLogin = document.getElementById('dev-login');
 
-    // Google login
-    googleBtn?.addEventListener('click', async () => {
-      try {
-        googleBtn.disabled = true;
-        googleBtn.innerHTML = '<span class="loading__spinner loading__spinner--small"></span> Влизане...';
-
-        await Auth.loginWithGoogle();
-
-        // Redirect to intended page or dashboard
-        const redirect = Utils.storage.get('auth_redirect') || '#/admin/calendar';
-        Utils.storage.remove('auth_redirect');
-        window.location.hash = redirect;
-
-      } catch (error) {
-        Toast.error('Грешка при вход с Google');
-        Utils.error('Google login failed:', error);
-      } finally {
-        googleBtn.disabled = false;
-        googleBtn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"> Вход с Google';
-      }
-    });
-
-    // Dev login (only in dev mode)
-    if (CONFIG.DEV_MODE && devLogin) {
-      devLogin.hidden = false;
-      
-      form?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const password = form.querySelector('input[name="password"]')?.value;
-        
-        if (password === 'admin' || password === 'rodopi') {
-          // Dev mode login
-          Auth.setDevToken();
-          
-          const redirect = Utils.storage.get('auth_redirect') || '#/admin/calendar';
-          Utils.storage.remove('auth_redirect');
-          window.location.hash = redirect;
-        } else {
-          Toast.error('Грешна парола');
-        }
+    // Google login button
+    if (googleBtn) {
+      googleBtn.addEventListener('click', () => {
+        // Auth.login() handles both Google OAuth and dev mode
+        Auth.login();
       });
     }
   },

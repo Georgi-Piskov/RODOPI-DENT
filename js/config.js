@@ -111,24 +111,37 @@ const CONFIG = {
     { id: 'prosthetics', name: 'Протези' }
   ],
   
-  // Day Names (Bulgarian)
+  // Internationalization (Bulgarian)
+  I18N: {
+    DAYS_SHORT: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'],
+    DAYS: ['Понеделник', 'Вторник', 'Сряда', 'Четвъртък', 'Петък', 'Събота', 'Неделя'],
+    MONTHS: [
+      'Януари', 'Февруари', 'Март', 'Април', 'Май', 'Юни',
+      'Юли', 'Август', 'Септември', 'Октомври', 'Ноември', 'Декември'
+    ]
+  },
+  
+  // Day Names (Bulgarian) - legacy
   DAY_NAMES: ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
   DAY_NAMES_FULL: ['Неделя', 'Понеделник', 'Вторник', 'Сряда', 'Четвъртък', 'Петък', 'Събота'],
   
-  // Month Names (Bulgarian)
+  // Month Names (Bulgarian) - legacy
   MONTH_NAMES: [
     'Януари', 'Февруари', 'Март', 'Април', 'Май', 'Юни',
     'Юли', 'Август', 'Септември', 'Октомври', 'Ноември', 'Декември'
   ],
   
-  // Debug Mode
-  DEBUG: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  // Debug Mode - enabled for development (localhost, 127.0.0.1, or github.io pages)
+  DEBUG: window.location.hostname === 'localhost' || 
+         window.location.hostname === '127.0.0.1' ||
+         window.location.hostname.endsWith('.github.io')
 };
 
 // Freeze config to prevent modifications
 Object.freeze(CONFIG);
 Object.freeze(CONFIG.CLINIC);
 Object.freeze(CONFIG.API);
+Object.freeze(CONFIG.I18N);
 Object.freeze(CONFIG.API.ENDPOINTS);
 Object.freeze(CONFIG.OAUTH);
 Object.freeze(CONFIG.SCHEDULE);

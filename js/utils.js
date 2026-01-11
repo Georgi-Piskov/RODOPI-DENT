@@ -17,22 +17,33 @@ const Utils = {
   },
 
   /**
-   * Format date to Bulgarian format
+   * Format date to various formats
    * @param {Date|string} date - Date to format
-   * @param {boolean} includeWeekday - Include day name
+   * @param {string|boolean} format - Format type: 'iso', 'long', 'short', or boolean for includeWeekday
    * @returns {string} Formatted date string
    */
-  formatDate(date, includeWeekday = false) {
+  formatDate(date, format = 'short') {
     const d = new Date(date);
+    
+    // Handle ISO format
+    if (format === 'iso') {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    
     const day = d.getDate();
     const month = CONFIG.MONTH_NAMES[d.getMonth()];
     const year = d.getFullYear();
     
-    if (includeWeekday) {
+    // Handle 'long' format (with weekday)
+    if (format === 'long' || format === true) {
       const weekday = CONFIG.DAY_NAMES_FULL[d.getDay()];
       return `${weekday}, ${day} ${month} ${year}`;
     }
     
+    // Default 'short' format
     return `${day} ${month} ${year}`;
   },
 
@@ -42,11 +53,7 @@ const Utils = {
    * @returns {string} ISO date string
    */
   formatDateISO(date) {
-    const d = new Date(date);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return this.formatDate(date, 'iso');
   },
 
   /**

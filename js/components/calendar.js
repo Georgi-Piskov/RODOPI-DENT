@@ -122,7 +122,7 @@ const Calendar = {
     // Days of the month
     for (let day = 1; day <= totalDays; day++) {
       const date = new Date(year, month, day);
-      const dateStr = Utils.formatDate(date, 'iso');
+      const dateStr = Utils.formatDateISO(date);
       const isToday = date.getTime() === today.getTime();
       const isSelected = this.selectedDate && 
                          date.getTime() === new Date(this.selectedDate).setHours(0,0,0,0);
