@@ -1,0 +1,260 @@
+{
+  "name": "Rodopi Dent - Settings",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "={{$parameter.httpMethod}}",
+        "path": "settings",
+        "options": {}
+      },
+      "id": "webhook-settings",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "settings-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.method }}",
+              "value2": "GET"
+            }
+          ]
+        }
+      },
+      "id": "switch-method",
+      "name": "GET or POST?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Settings",
+          "mode": "list"
+        },
+        "options": {
+          "range": "A:C"
+        }
+      },
+      "id": "sheets-read-settings",
+      "name": "Get Settings",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [690, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $('Get Settings').all().map(r => r.json);\n\n// Convert rows to settings object\nconst settings = {};\nrows.forEach(row => {\n  const key = row.Setting_Key;\n  let value = row.Setting_Value;\n  \n  // Parse booleans\n  if (value === 'true') value = true;\n  else if (value === 'false') value = false;\n  // Parse numbers\n  else if (!isNaN(value) && value !== '') value = parseFloat(value);\n  \n  settings[key] = value;\n});\n\n// Structure for frontend\nconst result = {\n  clinicName: settings.clinic_name || 'Родопи Дент',\n  clinicPhone: settings.clinic_phone || '',\n  clinicAddress: settings.clinic_address || '',\n  doctorName: settings.doctor_name || '',\n  workHours: {\n    morningStart: settings.morning_start || '09:00',\n    morningEnd: settings.morning_end || '12:00',\n    afternoonStart: settings.afternoon_start || '13:30',\n    afternoonEnd: settings.afternoon_end || '17:00'\n  },\n  defaultDuration: settings.default_duration || 60,\n  allowOnlineBooking: settings.allow_online_booking !== false,\n  requireConfirmation: settings.require_confirmation !== false,\n  smsEnabled: settings.sms_enabled !== false,\n  smsConfirmation: settings.sms_confirmation !== false,\n  smsReminder: settings.sms_reminder !== false,\n  reminderHours: settings.reminder_hours || 24\n};\n\nreturn [{\n  json: {\n    success: true,\n    settings: result\n  }\n}];"
+      },
+      "id": "transform-settings",
+      "name": "Transform to Object",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [910, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\n\n// Convert settings object to rows\nconst settingsMap = {\n  clinic_name: body.clinicName,\n  clinic_phone: body.clinicPhone,\n  clinic_address: body.clinicAddress,\n  doctor_name: body.doctorName,\n  morning_start: body.workHours?.morningStart,\n  morning_end: body.workHours?.morningEnd,\n  afternoon_start: body.workHours?.afternoonStart,\n  afternoon_end: body.workHours?.afternoonEnd,\n  default_duration: body.defaultDuration,\n  allow_online_booking: body.allowOnlineBooking,\n  require_confirmation: body.requireConfirmation,\n  sms_enabled: body.smsEnabled,\n  sms_confirmation: body.smsConfirmation,\n  sms_reminder: body.smsReminder,\n  reminder_hours: body.reminderHours\n};\n\n// Filter out undefined values\nconst rows = Object.entries(settingsMap)\n  .filter(([key, value]) => value !== undefined)\n  .map(([key, value]) => ({\n    Setting_Key: key,\n    Setting_Value: String(value),\n    Description: ''\n  }));\n\nreturn rows.map(row => ({ json: row }));"
+      },
+      "id": "prepare-settings",
+      "name": "Prepare Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 400]
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Settings",
+          "mode": "list"
+        },
+        "options": {}
+      },
+      "id": "sheets-clear",
+      "name": "Clear Settings",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [910, 400]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Settings",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Setting_Key": "={{ $json.Setting_Key }}",
+            "Setting_Value": "={{ $json.Setting_Value }}",
+            "Description": "={{ $json.Description }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-append-settings",
+      "name": "Save Settings",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [1130, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-get",
+      "name": "Respond GET",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1130, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Settings updated\"\n}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-post",
+      "name": "Respond POST",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1350, 400]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "GET or POST?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET or POST?": {
+      "main": [
+        [
+          {
+            "node": "Get Settings",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Settings": {
+      "main": [
+        [
+          {
+            "node": "Transform to Object",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform to Object": {
+      "main": [
+        [
+          {
+            "node": "Respond GET",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Rows": {
+      "main": [
+        [
+          {
+            "node": "Clear Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Settings": {
+      "main": [
+        [
+          {
+            "node": "Save Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Settings": {
+      "main": [
+        [
+          {
+            "node": "Respond POST",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": ["rodopi-dent"]
+}

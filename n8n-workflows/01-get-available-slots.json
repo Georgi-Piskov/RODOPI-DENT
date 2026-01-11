@@ -1,0 +1,109 @@
+{
+  "name": "Rodopi Dent - Get Available Slots",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "webhook-trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "slots-webhook",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Appointments",
+          "mode": "list"
+        },
+        "options": {
+          "range": "A:K"
+        }
+      },
+      "id": "sheets-read",
+      "name": "Get Appointments",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get requested date from query params\nconst requestedDate = $input.first().json.query?.date || new Date().toISOString().split('T')[0];\n\n// Get existing appointments for this date\nconst appointments = $('Get Appointments').all();\nconst bookedSlots = appointments\n  .filter(apt => apt.json.Date === requestedDate && \n                 ['pending', 'confirmed'].includes(apt.json.Status))\n  .map(apt => apt.json.Start_Time);\n\n// Work hours configuration\nconst workHours = {\n  morningStart: 9,\n  morningEnd: 12,\n  afternoonStart: 13.5, // 13:30\n  afternoonEnd: 17\n};\n\n// Generate all possible slots\nconst allSlots = [];\n\n// Morning slots\nfor (let hour = workHours.morningStart; hour < workHours.morningEnd; hour++) {\n  allSlots.push(`${hour.toString().padStart(2, '0')}:00`);\n}\n\n// Afternoon slots\nallSlots.push('13:30');\nfor (let hour = 14; hour < workHours.afternoonEnd; hour++) {\n  allSlots.push(`${hour.toString().padStart(2, '0')}:00`);\n}\n\n// Check if date is in the past\nconst today = new Date();\ntoday.setHours(0, 0, 0, 0);\nconst reqDate = new Date(requestedDate);\nreqDate.setHours(0, 0, 0, 0);\n\nif (reqDate < today) {\n  return [{ json: { success: true, slots: [], message: 'Date is in the past' } }];\n}\n\n// Check if weekend\nconst dayOfWeek = reqDate.getDay();\nif (dayOfWeek === 0 || dayOfWeek === 6) {\n  return [{ json: { success: true, slots: [], message: 'Weekend - clinic closed' } }];\n}\n\n// Filter out booked slots\nconst availableSlots = allSlots.map(time => ({\n  time,\n  available: !bookedSlots.includes(time)\n}));\n\nreturn [{\n  json: {\n    success: true,\n    date: requestedDate,\n    slots: availableSlots\n  }\n}];"
+      },
+      "id": "code-slots",
+      "name": "Calculate Available Slots",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [910, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Appointments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Appointments": {
+      "main": [
+        [
+          {
+            "node": "Calculate Available Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Available Slots": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": ["rodopi-dent"]
+}

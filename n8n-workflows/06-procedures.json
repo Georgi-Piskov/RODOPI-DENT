@@ -1,0 +1,111 @@
+{
+  "name": "Rodopi Dent - Procedures CRUD",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "={{$parameter.httpMethod}}",
+        "path": "procedures",
+        "options": {}
+      },
+      "id": "webhook-procedures",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "procedures-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Procedures",
+          "mode": "list"
+        },
+        "options": {
+          "range": "A:E"
+        }
+      },
+      "id": "sheets-read-procedures",
+      "name": "Get Procedures",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const procedures = $('Get Procedures').all().map(p => p.json);\n\n// Transform for frontend\nconst result = procedures.map(p => ({\n  nhifCode: p.NHIF_Code,\n  code: p.KSMP_Code,\n  description: p.Description,\n  price: parseFloat(p.Price_EUR) || 0,\n  category: p.Category || 'Други'\n}));\n\nreturn [{\n  json: {\n    success: true,\n    procedures: result,\n    total: result.length\n  }\n}];"
+      },
+      "id": "transform-procedures",
+      "name": "Transform Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [910, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Procedures",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Procedures": {
+      "main": [
+        [
+          {
+            "node": "Transform Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform Data": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": ["rodopi-dent"]
+}

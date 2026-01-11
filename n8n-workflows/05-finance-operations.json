@@ -1,0 +1,234 @@
+{
+  "name": "Rodopi Dent - Finance Operations",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "={{$parameter.httpMethod}}",
+        "path": "finance",
+        "options": {}
+      },
+      "id": "webhook-finance",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "finance-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.method }}",
+              "value2": "GET"
+            }
+          ]
+        }
+      },
+      "id": "switch-method",
+      "name": "GET or POST?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Finance",
+          "mode": "list"
+        },
+        "options": {
+          "range": "A:I"
+        }
+      },
+      "id": "sheets-read-finance",
+      "name": "Get Transactions",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [690, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const query = $input.first().json.query || {};\nconst transactions = $('Get Transactions').all().map(t => t.json);\n\nlet filtered = transactions;\n\n// Filter by date range\nif (query.startDate && query.endDate) {\n  filtered = filtered.filter(t => t.Date >= query.startDate && t.Date <= query.endDate);\n}\n\n// Filter by type\nif (query.type) {\n  filtered = filtered.filter(t => t.Type === query.type);\n}\n\n// Transform\nconst result = filtered.map(t => ({\n  id: t.ID,\n  date: t.Date,\n  type: t.Type,\n  amount: parseFloat(t.Amount_EUR) || 0,\n  procedureCode: t.Procedure_Code,\n  patientName: t.Patient_Name,\n  appointmentId: t.Appointment_ID,\n  notes: t.Notes,\n  createdAt: t.Created_At\n}));\n\nreturn [{\n  json: {\n    success: true,\n    transactions: result,\n    total: result.length\n  }\n}];"
+      },
+      "id": "filter-transactions",
+      "name": "Filter Transactions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [910, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\n\n// Generate unique ID\nconst id = 'TRX-' + Date.now().toString(36).toUpperCase();\n\nconst transaction = {\n  ID: id,\n  Date: body.date || new Date().toISOString().split('T')[0],\n  Type: body.type || 'income',\n  Amount_EUR: body.amount || 0,\n  Procedure_Code: body.procedureCode || '',\n  Patient_Name: body.patientName || '',\n  Appointment_ID: body.appointmentId || '',\n  Notes: body.notes || '',\n  Created_At: new Date().toISOString()\n};\n\nreturn [{ json: transaction }];"
+      },
+      "id": "prepare-transaction",
+      "name": "Prepare Transaction",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 400]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Finance",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ID": "={{ $json.ID }}",
+            "Date": "={{ $json.Date }}",
+            "Type": "={{ $json.Type }}",
+            "Amount_EUR": "={{ $json.Amount_EUR }}",
+            "Procedure_Code": "={{ $json.Procedure_Code }}",
+            "Patient_Name": "={{ $json.Patient_Name }}",
+            "Appointment_ID": "={{ $json.Appointment_ID }}",
+            "Notes": "={{ $json.Notes }}",
+            "Created_At": "={{ $json.Created_At }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-append-finance",
+      "name": "Save Transaction",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [910, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-get",
+      "name": "Respond GET",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1130, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"transactionId\": \"{{ $('Prepare Transaction').item.json.ID }}\",\n  \"message\": \"Transaction created\"\n}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-post",
+      "name": "Respond POST",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1130, 400]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "GET or POST?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET or POST?": {
+      "main": [
+        [
+          {
+            "node": "Get Transactions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Transaction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Transactions": {
+      "main": [
+        [
+          {
+            "node": "Filter Transactions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Transactions": {
+      "main": [
+        [
+          {
+            "node": "Respond GET",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Transaction": {
+      "main": [
+        [
+          {
+            "node": "Save Transaction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Transaction": {
+      "main": [
+        [
+          {
+            "node": "Respond POST",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": ["rodopi-dent"]
+}
