@@ -39,6 +39,8 @@ const API = {
     try {
       const response = await fetch(url, fetchOptions);
       
+      Utils.log('API Response status:', response.status, 'Headers:', [...response.headers.entries()]);
+      
       // Handle non-JSON responses
       const contentType = response.headers.get('content-type');
       let data;

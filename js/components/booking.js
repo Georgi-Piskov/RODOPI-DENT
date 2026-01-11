@@ -106,7 +106,7 @@ const Booking = {
    * @param {string} dateStr - Date string
    */
   async loadTimeSlots(dateStr) {
-    const container = document.getElementById('booking-time-slots');
+    const container = document.getElementById('time-slots');
     if (!container) return;
 
     // Show loading
@@ -124,7 +124,7 @@ const Booking = {
       }
 
       // Fetch available slots from API
-      const response = await API.getAvailableSlots(dateStr);
+      const response = await API.getAvailability(dateStr);
       
       if (response.success && response.slots) {
         TimeSlots.init(container, {
