@@ -21,7 +21,7 @@ const API = {
     
     // Add auth token if available and not a public endpoint
     const token = Auth.getToken();
-    if (token && !endpoint.includes('booking') && !endpoint.includes('availability')) {
+    if (token && !endpoint.includes('booking') && !endpoint.includes('slots') && !endpoint.includes('cancel')) {
       defaultOptions.headers['Authorization'] = `Bearer ${token}`;
     }
     
@@ -149,7 +149,7 @@ const API = {
    * @returns {Promise<Object>} Available slots and settings
    */
   async getAvailability(date) {
-    return this.get(CONFIG.API.ENDPOINTS.PUBLIC_AVAILABILITY, { date });
+    return this.get(CONFIG.API.ENDPOINTS.PUBLIC_SLOTS, { date });
   },
 
   /**

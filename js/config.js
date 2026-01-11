@@ -20,22 +20,22 @@ const CONFIG = {
   // Google Sheets ID
   GOOGLE_SHEETS_ID: '1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g',
   
-  // n8n Webhook URLs (to be configured)
+  // n8n Webhook URLs
   API: {
-    BASE_URL: '', // Will be set to n8n webhook base URL
+    BASE_URL: 'https://n8n.simeontsvetanovn8nworkflows.site',
     ENDPOINTS: {
       // Public endpoints
-      PUBLIC_BOOKING: '/webhook/rodopi-booking',
-      PUBLIC_AVAILABILITY: '/webhook/rodopi-availability',
-      PUBLIC_CANCEL: '/webhook/rodopi-cancel',
+      PUBLIC_SLOTS: '/webhook/slots-webhook',
+      PUBLIC_BOOKING: '/webhook/booking-webhook',
+      PUBLIC_CANCEL: '/webhook/cancel-webhook',
       
       // Admin endpoints
-      ADMIN_AUTH: '/webhook/rodopi-admin-auth',
-      ADMIN_APPOINTMENTS: '/webhook/rodopi-admin-appointments',
-      ADMIN_CONFIRM: '/webhook/rodopi-admin-confirm',
-      ADMIN_FINANCE: '/webhook/rodopi-admin-finance',
-      ADMIN_SETTINGS: '/webhook/rodopi-admin-settings',
-      ADMIN_PROCEDURES: '/webhook/rodopi-admin-procedures'
+      ADMIN_AUTH: '/webhook/auth-webhook',
+      ADMIN_APPOINTMENTS: '/webhook/appointments-webhook',
+      ADMIN_CONFIRM: '/webhook/confirm-webhook',
+      ADMIN_FINANCE: '/webhook/finance-webhook',
+      ADMIN_SETTINGS: '/webhook/settings-webhook',
+      ADMIN_PROCEDURES: '/webhook/procedures-webhook'
     }
   },
   
