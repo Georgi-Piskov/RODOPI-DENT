@@ -56,6 +56,31 @@ const Auth = {
   },
 
   /**
+   * Verify if current token is still valid
+   * @returns {Promise<boolean>}
+   */
+  async verifyToken() {
+    const token = this.getToken();
+    if (!token) return false;
+    
+    const user = this.getUser();
+    if (!user) return false;
+    
+    // Check if token is expired
+    if (user.expiresAt && Date.now() > user.expiresAt) {
+      return false;
+    }
+    
+    // For dev tokens, just check they exist
+    if (token === 'dev-token') {
+      return true;
+    }
+    
+    // Token exists and not expired
+    return true;
+  },
+
+  /**
    * Clear authentication data
    */
   logout() {
