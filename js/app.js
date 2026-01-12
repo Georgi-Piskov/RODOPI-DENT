@@ -376,7 +376,9 @@ const App = {
     });
 
     // Handle PWA install
-    Auth.setupPWAInstall();
+    if (typeof PWAInstall !== 'undefined') {
+      PWAInstall.init();
+    }
   },
 
   /**

@@ -151,7 +151,35 @@ const API = {
    * @returns {Promise<Object>} Available slots and settings
    */
   async getAvailability(date) {
-    return this.get(CONFIG.API.ENDPOINTS.PUBLIC_SLOTS, { date });
+    try {
+      return await this.get(CONFIG.API.ENDPOINTS.PUBLIC_SLOTS, { date });
+    } catch (error) {
+      // Fallback to demo slots if API fails (CORS or network issues)
+      if (CONFIG.DEBUG) {
+        Utils.log('API failed, using demo slots');
+        return this.getDemoSlots(date);
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * Generate demo slots for testing
+   * @param {string} date - Date in YYYY-MM-DD format
+   * @returns {Object} Demo slots data
+   */
+  getDemoSlots(date) {
+    const slots = ['09:00', '10:00', '11:00', '13:30', '14:30', '15:30', '16:30'];
+    // Randomly remove some slots to simulate bookings
+    const available = slots.filter(() => Math.random() > 0.3);
+    return {
+      success: true,
+      date: date,
+      slots: available,
+      workHours: CONFIG.SCHEDULE.WORK_HOURS,
+      slotDuration: CONFIG.SCHEDULE.DEFAULT_SLOT_DURATION,
+      demo: true
+    };
   },
 
   /**
@@ -160,14 +188,34 @@ const API = {
    * @returns {Promise<Object>} Booking confirmation
    */
   async createBooking(bookingData) {
-    return this.post(CONFIG.API.ENDPOINTS.PUBLIC_BOOKING, {
-      patientName: bookingData.patientName,
-      patientPhone: Utils.normalizePhone(bookingData.patientPhone),
-      date: bookingData.date,
-      startTime: bookingData.time,
-      duration: CONFIG.SCHEDULE.DEFAULT_SLOT_DURATION,
-      reason: bookingData.reason || ''
-    });
+    try {
+      return await this.post(CONFIG.API.ENDPOINTS.PUBLIC_BOOKING, {
+        patientName: bookingData.patientName,
+        patientPhone: Utils.normalizePhone(bookingData.patientPhone),
+        date: bookingData.date,
+        startTime: bookingData.time,
+        duration: CONFIG.SCHEDULE.DEFAULT_SLOT_DURATION,
+        reason: bookingData.reason || ''
+      });
+    } catch (error) {
+      // Fallback for demo mode
+      if (CONFIG.DEBUG) {
+        Utils.log('API failed, using demo booking');
+        return {
+          success: true,
+          message: 'Демо: Заявката е приета!',
+          booking: {
+            id: 'demo-' + Date.now(),
+            patientName: bookingData.patientName,
+            date: bookingData.date,
+            time: bookingData.time,
+            status: 'pending'
+          },
+          demo: true
+        };
+      }
+      throw error;
+    }
   },
 
   /**
@@ -193,7 +241,34 @@ const API = {
    * @returns {Promise<Array>} Appointments list
    */
   async getAppointments(filters = {}) {
-    return this.get(CONFIG.API.ENDPOINTS.ADMIN_APPOINTMENTS, filters);
+    try {
+      return await this.get(CONFIG.API.ENDPOINTS.ADMIN_APPOINTMENTS, filters);
+    } catch (error) {
+      if (CONFIG.DEBUG) {
+        Utils.log('API failed, using demo appointments');
+        return this.getDemoAppointments(filters);
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * Generate demo appointments for testing
+   * @param {Object} filters - Filter options
+   * @returns {Object} Demo appointments data
+   */
+  getDemoAppointments(filters = {}) {
+    const today = filters.date || Utils.formatDate(new Date(), 'iso');
+    return {
+      success: true,
+      appointments: [
+        { id: 'demo-1', patientName: 'Иван Петров', patientPhone: '+359888123456', date: today, startTime: '09:00', duration: 60, status: 'confirmed', reason: 'Преглед' },
+        { id: 'demo-2', patientName: 'Мария Иванова', patientPhone: '+359888654321', date: today, startTime: '10:00', duration: 60, status: 'pending', reason: 'Пломба' },
+        { id: 'demo-3', patientName: 'Георги Димитров', patientPhone: '+359888111222', date: today, startTime: '14:30', duration: 60, status: 'confirmed', reason: 'Почистване' }
+      ],
+      total: 3,
+      demo: true
+    };
   },
 
   /**
@@ -211,16 +286,33 @@ const API = {
    * @returns {Promise<Object>} Created appointment
    */
   async createAppointment(appointmentData) {
-    return this.post(CONFIG.API.ENDPOINTS.ADMIN_APPOINTMENTS, {
-      patientName: appointmentData.patientName,
-      patientPhone: Utils.normalizePhone(appointmentData.patientPhone),
-      date: appointmentData.date,
-      startTime: appointmentData.startTime,
-      duration: appointmentData.duration || CONFIG.SCHEDULE.DEFAULT_SLOT_DURATION,
-      reason: appointmentData.reason || '',
-      status: 'confirmed', // Admin-created appointments are auto-confirmed
-      sendSms: appointmentData.sendSms !== false
-    });
+    try {
+      return await this.post(CONFIG.API.ENDPOINTS.ADMIN_APPOINTMENTS, {
+        patientName: appointmentData.patientName,
+        patientPhone: Utils.normalizePhone(appointmentData.patientPhone),
+        date: appointmentData.date,
+        startTime: appointmentData.startTime,
+        duration: appointmentData.duration || CONFIG.SCHEDULE.DEFAULT_SLOT_DURATION,
+        reason: appointmentData.reason || '',
+        status: 'confirmed', // Admin-created appointments are auto-confirmed
+        sendSms: appointmentData.sendSms !== false
+      });
+    } catch (error) {
+      if (CONFIG.DEBUG) {
+        Utils.log('API failed, using demo createAppointment');
+        return {
+          success: true,
+          message: 'Демо: Записът е създаден!',
+          appointment: {
+            id: 'demo-' + Date.now(),
+            ...appointmentData,
+            status: 'confirmed'
+          },
+          demo: true
+        };
+      }
+      throw error;
+    }
   },
 
   /**
@@ -326,15 +418,41 @@ const API = {
       return cached.data;
     }
     
-    const data = await this.get(CONFIG.API.ENDPOINTS.ADMIN_PROCEDURES);
-    
-    // Cache the result
-    Utils.storage.set('procedures_cache', {
-      data,
-      timestamp: Date.now()
-    });
-    
-    return data;
+    try {
+      const data = await this.get(CONFIG.API.ENDPOINTS.ADMIN_PROCEDURES);
+      
+      // Cache the result
+      Utils.storage.set('procedures_cache', {
+        data,
+        timestamp: Date.now()
+      });
+      
+      return data;
+    } catch (error) {
+      if (CONFIG.DEBUG) {
+        Utils.log('API failed, using demo procedures');
+        return this.getDemoProcedures();
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * Generate demo procedures for testing
+   * @returns {Object} Demo procedures data
+   */
+  getDemoProcedures() {
+    return {
+      success: true,
+      procedures: [
+        { id: '1', name: 'Преглед', category: 'exams', duration: 30, price: 40, active: true },
+        { id: '2', name: 'Почистване на зъбен камък', category: 'exams', duration: 60, price: 80, active: true },
+        { id: '3', name: 'Пломба (амалгама)', category: 'fillings', duration: 60, price: 60, active: true },
+        { id: '4', name: 'Пломба (фотополимер)', category: 'fillings', duration: 60, price: 100, active: true },
+        { id: '5', name: 'Екстракция', category: 'extractions', duration: 45, price: 70, active: true }
+      ],
+      demo: true
+    };
   },
 
   /**
@@ -368,15 +486,43 @@ const API = {
       return cached.data;
     }
     
-    const data = await this.get(CONFIG.API.ENDPOINTS.ADMIN_SETTINGS);
-    
-    // Cache the result
-    Utils.storage.set('settings_cache', {
-      data,
-      timestamp: Date.now()
-    });
-    
-    return data;
+    try {
+      const data = await this.get(CONFIG.API.ENDPOINTS.ADMIN_SETTINGS);
+      
+      // Cache the result
+      Utils.storage.set('settings_cache', {
+        data,
+        timestamp: Date.now()
+      });
+      
+      return data;
+    } catch (error) {
+      if (CONFIG.DEBUG) {
+        Utils.log('API failed, using demo settings');
+        return this.getDemoSettings();
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * Generate demo settings for testing
+   * @returns {Object} Demo settings data
+   */
+  getDemoSettings() {
+    return {
+      success: true,
+      settings: {
+        clinicName: 'Родопи Дент',
+        doctorName: 'Д-р Демо',
+        phone: '+359 00 000 0000',
+        address: 'Демо адрес',
+        workHours: CONFIG.SCHEDULE.WORK_HOURS,
+        slotDuration: CONFIG.SCHEDULE.DEFAULT_SLOT_DURATION,
+        workingDays: CONFIG.SCHEDULE.WORKING_DAYS
+      },
+      demo: true
+    };
   },
 
   /**
