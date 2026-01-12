@@ -23,6 +23,7 @@ const CONFIG = {
   // n8n Webhook URLs
   API: {
     BASE_URL: 'https://n8n.simeontsvetanovn8nworkflows.site',
+    USE_CORS_PROXY: true, // Enable CORS proxy to bypass CORS restrictions
     ENDPOINTS: {
       // Public endpoints
       PUBLIC_SLOTS: '/webhook/slots-webhook',

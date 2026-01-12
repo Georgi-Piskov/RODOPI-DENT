@@ -4,6 +4,9 @@
  */
 
 const API = {
+  // CORS proxy for bypassing CORS restrictions
+  CORS_PROXY: 'https://corsproxy.io/?',
+  
   /**
    * Base fetch wrapper with error handling
    * @param {string} endpoint - API endpoint
@@ -11,7 +14,12 @@ const API = {
    * @returns {Promise<Object>} Response data
    */
   async request(endpoint, options = {}) {
-    const url = CONFIG.API.BASE_URL + endpoint;
+    let url = CONFIG.API.BASE_URL + endpoint;
+    
+    // Use CORS proxy if configured and not localhost
+    if (CONFIG.API.USE_CORS_PROXY && !window.location.hostname.includes('localhost')) {
+      url = this.CORS_PROXY + encodeURIComponent(url);
+    }
     
     const defaultOptions = {
       headers: {
