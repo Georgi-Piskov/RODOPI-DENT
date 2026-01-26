@@ -795,11 +795,14 @@ const App = {
     try {
       const response = await API.getAppointments({ date });
       
-      if (response.success && response.data && response.data.length > 0) {
+      // API returns { success, count, appointments }
+      const appointments = response.data?.appointments || [];
+      
+      if (response.success && appointments.length > 0) {
         let html = '';
-        response.data.sort((a, b) => a.startTime.localeCompare(b.startTime));
+        appointments.sort((a, b) => a.startTime.localeCompare(b.startTime));
         
-        response.data.forEach(apt => {
+        appointments.forEach(apt => {
           html += `
             <div class="workday-appointment" data-id="${apt.id}" onclick="App.openPaymentModal('${apt.id}', '${apt.patientName}', '${apt.patientPhone}')">
               <div class="appointment-time">${Utils.formatTime(apt.startTime)}</div>
@@ -1044,13 +1047,16 @@ const App = {
 
     const response = await API.getAppointments({ date });
     
-    if (response.success && response.data && response.data.length > 0) {
+    // API returns { success, count, appointments }
+    const appointments = response.data?.appointments || [];
+    
+    if (response.success && appointments.length > 0) {
       let html = `<h3>Записи за ${Utils.formatDateBG(date)}</h3>`;
       html += '<div class="appointments-list">';
       
-      response.data.sort((a, b) => a.startTime.localeCompare(b.startTime));
+      appointments.sort((a, b) => a.startTime.localeCompare(b.startTime));
       
-      response.data.forEach(apt => {
+      appointments.forEach(apt => {
         html += `
           <div class="appointment-card" data-id="${apt.id}">
             <div class="appointment-card__time">${Utils.formatTime(apt.startTime)}</div>
