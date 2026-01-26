@@ -221,23 +221,25 @@ const App = {
     });
     document.querySelector(`[data-date="${date}"]`)?.classList.add('calendar__day--selected');
 
-    // Generate slots locally (30-minute intervals)
-    const allSlots = Utils.getTimeSlots();
-    
-    // Try to get booked slots from API to filter them out
+    // Show loading state
+    slotsEl.innerHTML = '<p class="text-muted">Зареждане на свободни часове...</p>';
+
+    // Get available slots from API (already filtered for booked appointments)
     try {
       const response = await API.getSlots(date);
-      if (response.success && response.data && response.data.bookedSlots) {
-        const bookedTimes = response.data.bookedSlots.map(s => s.startTime);
-        const availableSlots = allSlots.filter(slot => !bookedTimes.includes(slot));
-        this.renderTimeSlots(slotsEl, date, availableSlots);
+      if (response.success && response.data && response.data.slots) {
+        // API returns pre-filtered available slots
+        this.renderTimeSlots(slotsEl, date, response.data.slots);
+      } else if (response.success && response.data && response.data.message) {
+        // Non-working day or other message
+        slotsEl.innerHTML = `<p class="text-muted">${response.data.message}</p>`;
       } else {
-        // Show all slots if API fails
-        this.renderTimeSlots(slotsEl, date, allSlots);
+        // API error - show message, don't show all slots (prevents double booking)
+        slotsEl.innerHTML = '<p class="text-error">⚠️ Грешка при зареждане. Моля, опитайте отново.</p>';
       }
     } catch (error) {
-      console.log('Using local slots:', error);
-      this.renderTimeSlots(slotsEl, date, allSlots);
+      console.error('Error loading slots:', error);
+      slotsEl.innerHTML = '<p class="text-error">⚠️ Грешка при зареждане. Моля, опитайте отново.</p>';
     }
   },
 

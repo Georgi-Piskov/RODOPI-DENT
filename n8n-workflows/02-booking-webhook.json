@@ -19,10 +19,10 @@
     },
     {
       "parameters": {
-        "jsCode": "// Validate incoming booking data\nconst body = $input.first().json.body;\n\nconst required = ['patientName', 'patientPhone', 'date', 'startTime'];\nconst missing = required.filter(field => !body[field]);\n\nif (missing.length > 0) {\n  return [{\n    json: {\n      success: false,\n      error: `Липсващи полета: ${missing.join(', ')}`,\n      valid: false\n    }\n  }];\n}\n\n// Validate phone number (Bulgarian format)\nconst phone = body.patientPhone.replace(/\\s/g, '');\nconst phoneRegex = /^(\\+359|0)[0-9]{9}$/;\nif (!phoneRegex.test(phone)) {\n  return [{\n    json: {\n      success: false,\n      error: 'Невалиден телефонен номер',\n      valid: false\n    }\n  }];\n}\n\n// Generate unique ID\nconst id = 'apt_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 8);\nconst now = new Date().toISOString();\n\n// Prepare appointment data\nconst appointment = {\n  id: id,\n  patientName: body.patientName.trim(),\n  patientPhone: phone,\n  date: body.date,\n  startTime: body.startTime,\n  duration: body.duration || 60,\n  reason: body.reason || '',\n  status: 'pending',\n  createdAt: now,\n  updatedAt: now\n};\n\nreturn [{ json: { ...appointment, valid: true } }];"
+        "jsCode": "// Validate incoming booking data\nconst body = $input.first().json.body;\n\nconst required = ['patientName', 'patientPhone', 'date', 'startTime'];\nconst missing = required.filter(field => !body[field]);\n\nif (missing.length > 0) {\n  return [{\n    json: {\n      success: false,\n      error: `Липсващи полета: ${missing.join(', ')}`,\n      valid: false\n    }\n  }];\n}\n\n// Validate phone number (Bulgarian format)\nconst phone = body.patientPhone.replace(/\\s/g, '');\nconst phoneRegex = /^(\\+359|0)[0-9]{9}$/;\nif (!phoneRegex.test(phone)) {\n  return [{\n    json: {\n      success: false,\n      error: 'Невалиден телефонен номер',\n      valid: false\n    }\n  }];\n}\n\n// Prepare data for conflict check\nreturn [{\n  json: {\n    patientName: body.patientName.trim(),\n    patientPhone: phone,\n    date: body.date,\n    startTime: body.startTime,\n    duration: parseInt(body.duration) || 30,\n    reason: body.reason || '',\n    valid: true\n  }\n}];"
       },
       "id": "validate",
-      "name": "Validate Booking",
+      "name": "Validate Input",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [220, 0]
@@ -43,6 +43,62 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Appointments"
+        },
+        "options": {
+          "returnAllMatches": true
+        }
+      },
+      "id": "sheets-read",
+      "name": "Get Existing Appointments",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [660, -100],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the new booking request\nconst booking = $('Validate Input').first().json;\nconst newDate = booking.date;\nconst newStartTime = booking.startTime;\nconst newDuration = booking.duration;\n\n// Helper function to convert time to minutes\nfunction timeToMinutes(time) {\n  const [hours, minutes] = time.split(':').map(Number);\n  return hours * 60 + minutes;\n}\n\nconst newStart = timeToMinutes(newStartTime);\nconst newEnd = newStart + newDuration;\n\n// Get existing appointments for the same date\nconst appointments = $('Get Existing Appointments').all();\n\n// Check for conflicts\nlet hasConflict = false;\nlet conflictWith = null;\n\nfor (const apt of appointments) {\n  // Skip cancelled appointments\n  if (apt.json.status === 'cancelled') continue;\n  \n  // Only check same date\n  if (apt.json.date !== newDate) continue;\n  \n  const existingStart = timeToMinutes(apt.json.startTime);\n  const existingDuration = parseInt(apt.json.duration) || 30;\n  const existingEnd = existingStart + existingDuration;\n  \n  // Check for overlap:\n  // Conflict if: newStart < existingEnd AND newEnd > existingStart\n  if (newStart < existingEnd && newEnd > existingStart) {\n    hasConflict = true;\n    conflictWith = apt.json.startTime;\n    break;\n  }\n}\n\nif (hasConflict) {\n  return [{\n    json: {\n      success: false,\n      error: `Този час е вече зает (конфликт с ${conflictWith})`,\n      conflict: true\n    }\n  }];\n}\n\n// No conflict - generate ID and prepare for save\nconst id = 'apt_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 8);\nconst now = new Date().toISOString();\n\nreturn [{\n  json: {\n    id: id,\n    patientName: booking.patientName,\n    patientPhone: booking.patientPhone,\n    date: booking.date,\n    startTime: booking.startTime,\n    duration: booking.duration,\n    reason: booking.reason,\n    status: 'pending',\n    createdAt: now,\n    updatedAt: now,\n    conflict: false\n  }\n}];"
+      },
+      "id": "check-conflicts",
+      "name": "Check Conflicts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, -100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.conflict }}",
+              "value2": false
+            }
+          ]
+        }
+      },
+      "id": "if-no-conflict",
+      "name": "No Conflict?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, -100]
     },
     {
       "parameters": {
@@ -78,7 +134,7 @@
       "name": "Save to Sheets",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [660, -100],
+      "position": [1320, -200],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "",
@@ -89,7 +145,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Резервацията е успешна!\",\n  \"appointmentId\": \"{{ $json.id }}\",\n  \"date\": \"{{ $json.date }}\",\n  \"time\": \"{{ $json.startTime }}\"\n}",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Часът е успешно запазен!\",\n  \"appointmentId\": \"{{ $json.id }}\",\n  \"date\": \"{{ $json.date }}\",\n  \"time\": \"{{ $json.startTime }}\"\n}",
         "options": {
           "responseHeaders": {
             "entries": [
@@ -105,7 +161,29 @@
       "name": "Respond Success",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [880, -100]
+      "position": [1540, -200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": false,\n  \"error\": \"{{ $json.error }}\"\n}",
+        "options": {
+          "responseCode": "409",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "response-conflict",
+      "name": "Respond Conflict",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1320, 0]
     },
     {
       "parameters": {
@@ -123,8 +201,8 @@
           }
         }
       },
-      "id": "response-error",
-      "name": "Respond Error",
+      "id": "response-invalid",
+      "name": "Respond Invalid",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [660, 100]
@@ -132,14 +210,14 @@
     {
       "parameters": {
         "from": "",
-        "to": "={{ $('Validate Booking').item.json.patientPhone }}",
-        "message": "=Здравейте, {{ $('Validate Booking').item.json.patientName }}!\n\nВашият час в Родопи Дент е запазен:\n📅 Дата: {{ $('Validate Booking').item.json.date }}\n🕐 Час: {{ $('Validate Booking').item.json.startTime }}\n\nОчакваме Ви!\nРодопи Дент"
+        "to": "={{ $('Check Conflicts').item.json.patientPhone }}",
+        "message": "=Здравейте, {{ $('Check Conflicts').item.json.patientName }}!\n\nВашият час в Родопи Дент е запазен:\n📅 Дата: {{ $('Check Conflicts').item.json.date }}\n🕐 Час: {{ $('Check Conflicts').item.json.startTime }}\n⏱️ Продължителност: {{ $('Check Conflicts').item.json.duration }} мин.\n\nОчакваме Ви!\nРодопи Дент"
       },
       "id": "twilio-sms",
       "name": "Send SMS Confirmation",
       "type": "n8n-nodes-base.twilio",
       "typeVersion": 1,
-      "position": [880, 0],
+      "position": [1540, -100],
       "credentials": {
         "twilioApi": {
           "id": "",
@@ -154,14 +232,14 @@
       "main": [
         [
           {
-            "node": "Validate Booking",
+            "node": "Validate Input",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Validate Booking": {
+    "Validate Input": {
       "main": [
         [
           {
@@ -176,6 +254,46 @@
       "main": [
         [
           {
+            "node": "Get Existing Appointments",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Existing Appointments": {
+      "main": [
+        [
+          {
+            "node": "Check Conflicts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conflicts": {
+      "main": [
+        [
+          {
+            "node": "No Conflict?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Conflict?": {
+      "main": [
+        [
+          {
             "node": "Save to Sheets",
             "type": "main",
             "index": 0
@@ -183,7 +301,7 @@
         ],
         [
           {
-            "node": "Respond Error",
+            "node": "Respond Conflict",
             "type": "main",
             "index": 0
           }
