@@ -1,20 +1,20 @@
 // Service Worker for Rodopi Dent PWA
-const CACHE_VERSION = 'v1.0.0';
+const CACHE_VERSION = 'v1.1.0';
 const CACHE_NAME = `rodopi-dent-${CACHE_VERSION}`;
 
 // Files to cache for offline use
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/css/main.css',
-  '/js/config.js',
-  '/js/utils.js',
-  '/js/api.js',
-  '/js/router.js',
-  '/js/auth.js',
-  '/js/app.js',
-  '/manifest.json',
-  '/assets/icons/favicon.svg'
+  './',
+  './index.html',
+  './css/main.css',
+  './js/config.js',
+  './js/utils.js',
+  './js/api.js',
+  './js/router.js',
+  './js/auth.js',
+  './js/app.js',
+  './manifest.json',
+  './assets/icons/favicon.svg'
 ];
 
 // Install event - cache static assets
