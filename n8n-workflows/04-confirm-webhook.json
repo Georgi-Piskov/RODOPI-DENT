@@ -30,9 +30,7 @@
           "mode": "name",
           "value": "Appointments"
         },
-        "options": {
-          "returnAllMatches": true
-        }
+        "options": {}
       },
       "id": "sheets-read",
       "name": "Read Appointments",
@@ -48,7 +46,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Get request body\nconst body = $('Webhook - Confirm').first().json.body;\nconst appointmentId = body.appointmentId;\nconst newStatus = body.status;\nconst newDuration = body.duration; // Optional - only for confirmation\n\nif (!appointmentId || !newStatus) {\n  return [{\n    json: {\n      success: false,\n      error: 'appointmentId and status are required',\n      found: false\n    }\n  }];\n}\n\n// Valid statuses\nconst validStatuses = ['pending', 'confirmed', 'completed', 'cancelled', 'expired'];\nif (!validStatuses.includes(newStatus)) {\n  return [{\n    json: {\n      success: false,\n      error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`,\n      found: false\n    }\n  }];\n}\n\n// Find the appointment\nconst appointments = $('Read Appointments').all();\nlet appointment = null;\n\nfor (const apt of appointments) {\n  if (apt.json.id === appointmentId) {\n    appointment = apt.json;\n    break;\n  }\n}\n\nif (!appointment) {\n  return [{\n    json: {\n      success: false,\n      error: 'Appointment not found',\n      found: false\n    }\n  }];\n}\n\n// Check for conflicts if confirming with a longer duration\nlet hasConflict = false;\nlet conflictWith = null;\n\nif (newStatus === 'confirmed' && newDuration) {\n  function timeToMinutes(time) {\n    const [hours, minutes] = time.split(':').map(Number);\n    return hours * 60 + minutes;\n  }\n  \n  const aptStart = timeToMinutes(appointment.startTime);\n  const aptEnd = aptStart + parseInt(newDuration);\n  \n  for (const other of appointments) {\n    if (other.json.id === appointment.id) continue;\n    if (other.json.date !== appointment.date) continue;\n    if (other.json.status === 'cancelled' || other.json.status === 'expired') continue;\n    \n    const otherStart = timeToMinutes(other.json.startTime);\n    const otherDuration = other.json.status === 'pending' ? 30 : (parseInt(other.json.duration) || 30);\n    const otherEnd = otherStart + otherDuration;\n    \n    if (aptStart < otherEnd && aptEnd > otherStart) {\n      hasConflict = true;\n      conflictWith = { time: other.json.startTime, name: other.json.patientName };\n      break;\n    }\n  }\n}\n\nif (hasConflict) {\n  return [{\n    json: {\n      success: false,\n      error: `Конфликт с ${conflictWith.name} в ${conflictWith.time}. Изберете по-кратка продължителност.`,\n      found: true,\n      conflict: true\n    }\n  }];\n}\n\n// Prepare update data\nconst updateData = {\n  id: appointmentId,\n  status: newStatus,\n  updatedAt: new Date().toISOString(),\n  patientName: appointment.patientName,\n  patientPhone: appointment.patientPhone,\n  date: appointment.date,\n  startTime: appointment.startTime,\n  oldStatus: appointment.status,\n  found: true,\n  success: true\n};\n\n// Add duration if confirming\nif (newStatus === 'confirmed' && newDuration) {\n  updateData.duration = parseInt(newDuration);\n}\n\nreturn [{ json: updateData }];"
+        "jsCode": "const body = $('Webhook - Confirm').first().json.body;\nconst appointmentId = body.appointmentId;\nconst newStatus = body.status;\nconst newDuration = body.duration;\n\nif (!appointmentId || !newStatus) {\n  return [{ json: { success: false, error: 'appointmentId and status are required', found: false } }];\n}\n\nconst validStatuses = ['pending', 'confirmed', 'completed', 'cancelled', 'expired'];\nif (!validStatuses.includes(newStatus)) {\n  return [{ json: { success: false, error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`, found: false } }];\n}\n\nconst appointments = $('Read Appointments').all();\nlet appointment = null;\n\nfor (const apt of appointments) {\n  if (apt.json.id === appointmentId) {\n    appointment = apt.json;\n    break;\n  }\n}\n\nif (!appointment) {\n  return [{ json: { success: false, error: 'Appointment not found', found: false } }];\n}\n\nlet hasConflict = false;\nlet conflictWith = null;\n\nif (newStatus === 'confirmed' && newDuration) {\n  function timeToMinutes(time) {\n    const [hours, minutes] = time.split(':').map(Number);\n    return hours * 60 + minutes;\n  }\n  \n  const aptStart = timeToMinutes(appointment.startTime);\n  const aptEnd = aptStart + parseInt(newDuration);\n  \n  for (const other of appointments) {\n    if (other.json.id === appointment.id) continue;\n    if (other.json.date !== appointment.date) continue;\n    if (other.json.status === 'cancelled' || other.json.status === 'expired') continue;\n    \n    const otherStart = timeToMinutes(other.json.startTime);\n    const otherDuration = other.json.status === 'pending' ? 30 : (parseInt(other.json.duration) || 30);\n    const otherEnd = otherStart + otherDuration;\n    \n    if (aptStart < otherEnd && aptEnd > otherStart) {\n      hasConflict = true;\n      conflictWith = { time: other.json.startTime, name: other.json.patientName };\n      break;\n    }\n  }\n}\n\nif (hasConflict) {\n  return [{ json: { success: false, error: `Конфликт с ${conflictWith.name} в ${conflictWith.time}`, found: true, conflict: true } }];\n}\n\nreturn [{\n  json: {\n    id: appointmentId,\n    status: newStatus,\n    duration: newDuration ? String(newDuration) : appointment.duration,\n    updatedAt: new Date().toISOString(),\n    patientName: appointment.patientName,\n    patientPhone: appointment.patientPhone,\n    date: appointment.date,\n    startTime: appointment.startTime,\n    reason: appointment.reason || '',\n    createdAt: appointment.createdAt,\n    oldStatus: appointment.status,\n    found: true,\n    success: true\n  }\n}];"
       },
       "id": "code-find",
       "name": "Find and Validate",
@@ -59,19 +57,41 @@
     {
       "parameters": {
         "conditions": {
-          "boolean": [
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
             {
-              "value1": "={{ $json.success }}",
-              "value2": true
+              "id": "success-check",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
             }
-          ]
-        }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       },
       "id": "if-found",
       "name": "Valid?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare clean data for Google Sheets update\nconst data = $input.first().json;\nreturn [{\n  json: {\n    id: data.id,\n    patientName: data.patientName,\n    patientPhone: data.patientPhone,\n    date: data.date,\n    startTime: data.startTime,\n    duration: data.duration,\n    reason: data.reason,\n    status: data.status,\n    createdAt: data.createdAt,\n    updatedAt: data.updatedAt\n  }\n}];"
+      },
+      "id": "prepare-update",
+      "name": "Prepare Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, -100]
     },
     {
       "parameters": {
@@ -87,23 +107,17 @@
           "value": "Appointments"
         },
         "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "id": "={{ $json.id }}",
-            "status": "={{ $json.status }}",
-            "duration": "={{ $json.duration }}",
-            "updatedAt": "={{ $json.updatedAt }}"
-          }
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": ["id"]
         },
-        "options": {
-          "cellFormat": "USER_ENTERED"
-        }
+        "options": {}
       },
       "id": "sheets-update",
       "name": "Update Appointment",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [880, -100],
+      "position": [1100, -100],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "",
@@ -114,7 +128,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Статусът е обновен\",\n  \"appointmentId\": \"{{ $('Find and Validate').item.json.id }}\",\n  \"oldStatus\": \"{{ $('Find and Validate').item.json.oldStatus }}\",\n  \"newStatus\": \"{{ $('Find and Validate').item.json.status }}\",\n  \"duration\": {{ $('Find and Validate').item.json.duration || 30 }}\n}",
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'Статусът е обновен', appointmentId: $('Find and Validate').item.json.id, newStatus: $('Find and Validate').item.json.status }) }}",
         "options": {
           "responseHeaders": {
             "entries": [
@@ -130,14 +144,14 @@
       "name": "Respond Success",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1100, -100]
+      "position": [1320, -100]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"success\": false,\n  \"error\": \"{{ $json.error }}\"\n}",
+        "responseBody": "={{ JSON.stringify({ success: false, error: $json.error }) }}",
         "options": {
-          "responseCode": "400",
+          "responseCode": 400,
           "responseHeaders": {
             "entries": [
               {
@@ -153,25 +167,6 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [880, 100]
-    },
-    {
-      "parameters": {
-        "from": "",
-        "to": "={{ $json.patientPhone }}",
-        "message": "=Здравейте, {{ $json.patientName }}!\n\n{{ $json.status === 'confirmed' ? '✅ Вашият час е ПОТВЪРДЕН!' : $json.status === 'cancelled' ? '❌ Вашият час е отказан.' : $json.status === 'completed' ? '✅ Благодарим за посещението!' : '' }}\n\n📅 {{ $json.date }}\n🕐 {{ $json.startTime }}\n{{ $json.duration ? '⏱️ ' + $json.duration + ' минути' : '' }}\n\nРодопи Дент"
-      },
-      "id": "sms-notify",
-      "name": "Send SMS",
-      "type": "n8n-nodes-base.twilio",
-      "typeVersion": 1,
-      "position": [1100, 0],
-      "credentials": {
-        "twilioApi": {
-          "id": "",
-          "name": "Twilio"
-        }
-      },
-      "continueOnFail": true
     }
   ],
   "connections": {
@@ -212,7 +207,7 @@
       "main": [
         [
           {
-            "node": "Update Appointment",
+            "node": "Prepare Update",
             "type": "main",
             "index": 0
           }
@@ -226,16 +221,22 @@
         ]
       ]
     },
+    "Prepare Update": {
+      "main": [
+        [
+          {
+            "node": "Update Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Update Appointment": {
       "main": [
         [
           {
             "node": "Respond Success",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Send SMS",
             "type": "main",
             "index": 0
           }

@@ -21,7 +21,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parse callback data\nconst callback = $input.first().json;\nconst callbackData = callback.callback_query.data;\nconst messageId = callback.callback_query.message.message_id;\nconst chatId = callback.callback_query.message.chat.id;\n\n// Expected format: confirm_30_apt_xxx or cancel_apt_xxx\nlet action, duration, appointmentId;\n\nif (callbackData.startsWith('confirm_')) {\n  // confirm_30_apt_xxx\n  const parts = callbackData.split('_');\n  action = 'confirm';\n  duration = parseInt(parts[1]);\n  appointmentId = parts.slice(2).join('_'); // apt_xxx\n} else if (callbackData.startsWith('cancel_')) {\n  // cancel_apt_xxx\n  action = 'cancel';\n  duration = 0;\n  appointmentId = callbackData.replace('cancel_', '');\n} else {\n  return [{ json: { error: 'Unknown action', valid: false } }];\n}\n\nreturn [{\n  json: {\n    action: action,\n    duration: duration,\n    appointmentId: appointmentId,\n    messageId: messageId,\n    chatId: chatId,\n    valid: true\n  }\n}];"
+        "jsCode": "const callback = $input.first().json;\nconst callbackData = callback.callback_query.data;\nconst messageId = callback.callback_query.message.message_id;\nconst chatId = callback.callback_query.message.chat.id;\n\nlet action, duration, appointmentId;\n\nif (callbackData.startsWith('confirm_')) {\n  const parts = callbackData.split('_');\n  action = 'confirm';\n  duration = parseInt(parts[1]);\n  appointmentId = parts.slice(2).join('_');\n} else if (callbackData.startsWith('cancel_')) {\n  action = 'cancel';\n  duration = 0;\n  appointmentId = callbackData.replace('cancel_', '');\n} else {\n  return [{ json: { error: 'Unknown action', valid: false } }];\n}\n\nreturn [{\n  json: {\n    action: action,\n    duration: duration,\n    appointmentId: appointmentId,\n    messageId: messageId,\n    chatId: chatId,\n    valid: true\n  }\n}];"
       },
       "id": "parse-callback",
       "name": "Parse Callback",
@@ -42,12 +42,10 @@
           "mode": "name",
           "value": "Appointments"
         },
-        "options": {
-          "returnAllMatches": true
-        }
+        "options": {}
       },
       "id": "sheets-read",
-      "name": "Get Appointment",
+      "name": "Get Appointments",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [440, 0],
@@ -60,7 +58,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Find the appointment and check for conflicts if confirming with longer duration\nconst parsed = $('Parse Callback').first().json;\nconst appointments = $('Get Appointment').all();\n\n// Find target appointment\nconst apt = appointments.find(a => a.json.id === parsed.appointmentId);\n\nif (!apt) {\n  return [{ json: { error: 'Записът не е намерен', valid: false, action: 'error' } }];\n}\n\nif (apt.json.status !== 'pending') {\n  return [{ json: { error: 'Записът вече е обработен', valid: false, action: 'already_processed' } }];\n}\n\n// If cancelling, no need to check conflicts\nif (parsed.action === 'cancel') {\n  return [{\n    json: {\n      ...apt.json,\n      action: 'cancel',\n      newStatus: 'cancelled',\n      messageId: parsed.messageId,\n      chatId: parsed.chatId,\n      valid: true\n    }\n  }];\n}\n\n// Confirming - check if new duration causes conflicts\nconst newDuration = parsed.duration;\n\nfunction timeToMinutes(time) {\n  const [hours, minutes] = time.split(':').map(Number);\n  return hours * 60 + minutes;\n}\n\nconst aptStart = timeToMinutes(apt.json.startTime);\nconst aptEnd = aptStart + newDuration;\n\n// Check conflicts with other appointments\nlet hasConflict = false;\nlet conflictWith = null;\n\nfor (const other of appointments) {\n  if (other.json.id === apt.json.id) continue;\n  if (other.json.date !== apt.json.date) continue;\n  if (other.json.status === 'cancelled' || other.json.status === 'expired') continue;\n  \n  const otherStart = timeToMinutes(other.json.startTime);\n  const otherDuration = other.json.status === 'pending' ? 30 : (parseInt(other.json.duration) || 30);\n  const otherEnd = otherStart + otherDuration;\n  \n  // Check overlap\n  if (aptStart < otherEnd && aptEnd > otherStart) {\n    hasConflict = true;\n    conflictWith = {\n      time: other.json.startTime,\n      name: other.json.patientName,\n      status: other.json.status\n    };\n    break;\n  }\n}\n\nif (hasConflict) {\n  return [{\n    json: {\n      ...apt.json,\n      action: 'conflict',\n      conflictWith: conflictWith,\n      requestedDuration: newDuration,\n      messageId: parsed.messageId,\n      chatId: parsed.chatId,\n      valid: false\n    }\n  }];\n}\n\n// No conflict - proceed with confirmation\nreturn [{\n  json: {\n    ...apt.json,\n    action: 'confirm',\n    newStatus: 'confirmed',\n    newDuration: newDuration,\n    messageId: parsed.messageId,\n    chatId: parsed.chatId,\n    valid: true\n  }\n}];"
+        "jsCode": "const parsed = $('Parse Callback').first().json;\nconst appointments = $('Get Appointments').all();\n\nconst apt = appointments.find(a => a.json.id === parsed.appointmentId);\n\nif (!apt) {\n  return [{ json: { error: 'Записът не е намерен', valid: false, action: 'error', chatId: parsed.chatId } }];\n}\n\nif (apt.json.status !== 'pending') {\n  return [{ json: { error: 'Записът вече е обработен', valid: false, action: 'already_processed', chatId: parsed.chatId } }];\n}\n\nif (parsed.action === 'cancel') {\n  return [{\n    json: {\n      id: apt.json.id,\n      patientName: apt.json.patientName,\n      patientPhone: apt.json.patientPhone,\n      date: apt.json.date,\n      startTime: apt.json.startTime,\n      duration: apt.json.duration,\n      reason: apt.json.reason || '',\n      status: 'cancelled',\n      createdAt: apt.json.createdAt,\n      updatedAt: new Date().toISOString(),\n      action: 'cancel',\n      messageId: parsed.messageId,\n      chatId: parsed.chatId,\n      valid: true\n    }\n  }];\n}\n\nconst newDuration = parsed.duration;\n\nfunction timeToMinutes(time) {\n  const [hours, minutes] = time.split(':').map(Number);\n  return hours * 60 + minutes;\n}\n\nconst aptStart = timeToMinutes(apt.json.startTime);\nconst aptEnd = aptStart + newDuration;\n\nlet hasConflict = false;\nlet conflictWith = null;\n\nfor (const other of appointments) {\n  if (other.json.id === apt.json.id) continue;\n  if (other.json.date !== apt.json.date) continue;\n  if (other.json.status === 'cancelled' || other.json.status === 'expired') continue;\n  \n  const otherStart = timeToMinutes(other.json.startTime);\n  const otherDuration = other.json.status === 'pending' ? 30 : (parseInt(other.json.duration) || 30);\n  const otherEnd = otherStart + otherDuration;\n  \n  if (aptStart < otherEnd && aptEnd > otherStart) {\n    hasConflict = true;\n    conflictWith = { time: other.json.startTime, name: other.json.patientName };\n    break;\n  }\n}\n\nif (hasConflict) {\n  return [{\n    json: {\n      action: 'conflict',\n      conflictWith: conflictWith,\n      requestedDuration: newDuration,\n      patientName: apt.json.patientName,\n      messageId: parsed.messageId,\n      chatId: parsed.chatId,\n      valid: false\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    id: apt.json.id,\n    patientName: apt.json.patientName,\n    patientPhone: apt.json.patientPhone,\n    date: apt.json.date,\n    startTime: apt.json.startTime,\n    duration: String(newDuration),\n    reason: apt.json.reason || '',\n    status: 'confirmed',\n    createdAt: apt.json.createdAt,\n    updatedAt: new Date().toISOString(),\n    action: 'confirm',\n    newDuration: newDuration,\n    messageId: parsed.messageId,\n    chatId: parsed.chatId,\n    valid: true\n  }\n}];"
       },
       "id": "process-action",
       "name": "Process Action",
@@ -95,7 +93,7 @@
       "name": "Is Confirm?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [880, 0]
+      "position": [880, -100]
     },
     {
       "parameters": {
@@ -124,7 +122,27 @@
       "name": "Is Cancel?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [880, 250]
+      "position": [880, 150]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare data for Google Sheets update (remove extra fields)\nconst data = $input.first().json;\nreturn [{\n  json: {\n    id: data.id,\n    patientName: data.patientName,\n    patientPhone: data.patientPhone,\n    date: data.date,\n    startTime: data.startTime,\n    duration: data.duration,\n    reason: data.reason,\n    status: data.status,\n    createdAt: data.createdAt,\n    updatedAt: data.updatedAt\n  }\n}];"
+      },
+      "id": "prepare-confirm",
+      "name": "Prepare Confirm Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, -200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare data for Google Sheets update (remove extra fields)\nconst data = $input.first().json;\nreturn [{\n  json: {\n    id: data.id,\n    patientName: data.patientName,\n    patientPhone: data.patientPhone,\n    date: data.date,\n    startTime: data.startTime,\n    duration: data.duration,\n    reason: data.reason,\n    status: data.status,\n    createdAt: data.createdAt,\n    updatedAt: data.updatedAt\n  }\n}];"
+      },
+      "id": "prepare-cancel",
+      "name": "Prepare Cancel Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 100]
     },
     {
       "parameters": {
@@ -140,13 +158,9 @@
           "value": "Appointments"
         },
         "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "id": "={{ $json.id }}",
-            "status": "confirmed",
-            "duration": "={{ $json.newDuration }}",
-            "updatedAt": "={{ $now.toISO() }}"
-          }
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": ["id"]
         },
         "options": {}
       },
@@ -154,7 +168,7 @@
       "name": "Update Confirmed",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [1100, -100],
+      "position": [1320, -200],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "",
@@ -176,12 +190,9 @@
           "value": "Appointments"
         },
         "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "id": "={{ $json.id }}",
-            "status": "cancelled",
-            "updatedAt": "={{ $now.toISO() }}"
-          }
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": ["id"]
         },
         "options": {}
       },
@@ -189,7 +200,7 @@
       "name": "Update Cancelled",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [1100, 200],
+      "position": [1320, 100],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "",
@@ -199,8 +210,8 @@
     },
     {
       "parameters": {
-        "chatId": "={{ $json.chatId }}",
-        "text": "=✅ *Потвърдено!*\n\n{{ $json.patientName }} - {{ $json.date }} в {{ $json.startTime }}\nПродължителност: {{ $json.newDuration }} мин.\n\nSMS ще бъде изпратен на пациента.",
+        "chatId": "={{ $('Process Action').item.json.chatId }}",
+        "text": "=✅ *Потвърдено!*\n\n{{ $('Process Action').item.json.patientName }} - {{ $('Process Action').item.json.date }} в {{ $('Process Action').item.json.startTime }}\nПродължителност: {{ $('Process Action').item.json.newDuration }} мин.",
         "additionalFields": {
           "parse_mode": "Markdown"
         }
@@ -209,7 +220,7 @@
       "name": "Reply Confirmed",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1320, -100],
+      "position": [1540, -200],
       "credentials": {
         "telegramApi": {
           "id": "",
@@ -219,8 +230,8 @@
     },
     {
       "parameters": {
-        "chatId": "={{ $json.chatId }}",
-        "text": "=❌ *Отказано!*\n\n{{ $json.patientName }} - {{ $json.date }} в {{ $json.startTime }}\n\nSMS ще бъде изпратен на пациента.",
+        "chatId": "={{ $('Process Action').item.json.chatId }}",
+        "text": "=❌ *Отказано!*\n\n{{ $('Process Action').item.json.patientName }} - {{ $('Process Action').item.json.date }} в {{ $('Process Action').item.json.startTime }}",
         "additionalFields": {
           "parse_mode": "Markdown"
         }
@@ -229,7 +240,7 @@
       "name": "Reply Cancelled",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1320, 200],
+      "position": [1540, 100],
       "credentials": {
         "telegramApi": {
           "id": "",
@@ -249,7 +260,7 @@
       "name": "Reply Conflict",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1100, 400],
+      "position": [1100, -50],
       "credentials": {
         "telegramApi": {
           "id": "",
@@ -274,14 +285,14 @@
       "main": [
         [
           {
-            "node": "Get Appointment",
+            "node": "Get Appointments",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Get Appointment": {
+    "Get Appointments": {
       "main": [
         [
           {
@@ -312,7 +323,7 @@
       "main": [
         [
           {
-            "node": "Update Confirmed",
+            "node": "Prepare Confirm Data",
             "type": "main",
             "index": 0
           }
@@ -330,12 +341,34 @@
       "main": [
         [
           {
-            "node": "Update Cancelled",
+            "node": "Prepare Cancel Data",
             "type": "main",
             "index": 0
           }
         ],
         []
+      ]
+    },
+    "Prepare Confirm Data": {
+      "main": [
+        [
+          {
+            "node": "Update Confirmed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Cancel Data": {
+      "main": [
+        [
+          {
+            "node": "Update Cancelled",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Update Confirmed": {

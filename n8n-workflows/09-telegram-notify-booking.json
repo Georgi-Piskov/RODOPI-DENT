@@ -30,13 +30,25 @@
     {
       "parameters": {
         "conditions": {
-          "boolean": [
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
             {
-              "value1": "={{ $json.valid }}",
-              "value2": true
+              "id": "valid-check",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
             }
-          ]
-        }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       },
       "id": "if-valid",
       "name": "Is Valid?",
@@ -57,9 +69,7 @@
           "mode": "name",
           "value": "Appointments"
         },
-        "options": {
-          "returnAllMatches": true
-        }
+        "options": {}
       },
       "id": "sheets-read",
       "name": "Get Existing Appointments",
@@ -75,7 +85,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Get the new booking request\nconst booking = $('Validate Input').first().json;\nconst newDate = booking.date;\nconst newStartTime = booking.startTime;\nconst pendingDefaultDuration = 30; // Pending винаги резервира 30 мин\n\n// Helper function\nfunction timeToMinutes(time) {\n  const [hours, minutes] = time.split(':').map(Number);\n  return hours * 60 + minutes;\n}\n\nconst newStart = timeToMinutes(newStartTime);\nconst newEnd = newStart + pendingDefaultDuration;\n\n// Get existing appointments\nconst appointments = $('Get Existing Appointments').all();\n\n// Check for conflicts with non-cancelled appointments\nlet hasConflict = false;\nlet conflictWith = null;\n\nfor (const apt of appointments) {\n  const status = apt.json.status;\n  if (status === 'cancelled' || status === 'expired') continue;\n  if (apt.json.date !== newDate) continue;\n  \n  const existingStart = timeToMinutes(apt.json.startTime);\n  // Pending uses 30 min, confirmed uses actual duration\n  const existingDuration = status === 'pending' ? 30 : (parseInt(apt.json.duration) || 30);\n  const existingEnd = existingStart + existingDuration;\n  \n  if (newStart < existingEnd && newEnd > existingStart) {\n    hasConflict = true;\n    conflictWith = apt.json.startTime;\n    break;\n  }\n}\n\nif (hasConflict) {\n  return [{\n    json: {\n      success: false,\n      error: `Този час е вече зает (конфликт с ${conflictWith})`,\n      conflict: true\n    }\n  }];\n}\n\n// No conflict - generate ID and prepare for save\nconst id = 'apt_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 8);\nconst now = new Date().toISOString();\n\nreturn [{\n  json: {\n    id: id,\n    patientName: booking.patientName,\n    patientPhone: booking.patientPhone,\n    date: booking.date,\n    startTime: booking.startTime,\n    duration: pendingDefaultDuration, // Винаги 30 за pending\n    requestedDuration: booking.duration, // Пожелана от пациента\n    reason: booking.reason,\n    status: 'pending',\n    createdAt: now,\n    updatedAt: now,\n    conflict: false\n  }\n}];"
+        "jsCode": "// Get the new booking request\nconst booking = $('Validate Input').first().json;\nconst newDate = booking.date;\nconst newStartTime = booking.startTime;\nconst pendingDefaultDuration = 30;\n\nfunction timeToMinutes(time) {\n  const [hours, minutes] = time.split(':').map(Number);\n  return hours * 60 + minutes;\n}\n\nconst newStart = timeToMinutes(newStartTime);\nconst newEnd = newStart + pendingDefaultDuration;\n\nconst appointments = $('Get Existing Appointments').all();\n\nlet hasConflict = false;\nlet conflictWith = null;\n\nfor (const apt of appointments) {\n  const status = apt.json.status;\n  if (status === 'cancelled' || status === 'expired') continue;\n  if (apt.json.date !== newDate) continue;\n  \n  const existingStart = timeToMinutes(apt.json.startTime);\n  const existingDuration = status === 'pending' ? 30 : (parseInt(apt.json.duration) || 30);\n  const existingEnd = existingStart + existingDuration;\n  \n  if (newStart < existingEnd && newEnd > existingStart) {\n    hasConflict = true;\n    conflictWith = apt.json.startTime;\n    break;\n  }\n}\n\nif (hasConflict) {\n  return [{\n    json: {\n      success: false,\n      error: `Този час е вече зает (конфликт с ${conflictWith})`,\n      conflict: true\n    }\n  }];\n}\n\nconst id = 'apt_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 8);\nconst now = new Date().toISOString();\n\nreturn [{\n  json: {\n    id: id,\n    patientName: booking.patientName,\n    patientPhone: booking.patientPhone,\n    date: booking.date,\n    startTime: booking.startTime,\n    duration: String(pendingDefaultDuration),\n    requestedDuration: String(booking.duration),\n    reason: booking.reason,\n    status: 'pending',\n    createdAt: now,\n    updatedAt: now,\n    conflict: false\n  }\n}];"
       },
       "id": "check-conflicts",
       "name": "Check Conflicts",
@@ -86,13 +96,25 @@
     {
       "parameters": {
         "conditions": {
-          "boolean": [
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
             {
-              "value1": "={{ $json.conflict }}",
-              "value2": false
+              "id": "conflict-check",
+              "leftValue": "={{ $json.conflict }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "false"
+              }
             }
-          ]
-        }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       },
       "id": "if-no-conflict",
       "name": "No Conflict?",
@@ -114,19 +136,8 @@
           "value": "Appointments"
         },
         "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "id": "={{ $json.id }}",
-            "patientName": "={{ $json.patientName }}",
-            "patientPhone": "={{ $json.patientPhone }}",
-            "date": "={{ $json.date }}",
-            "startTime": "={{ $json.startTime }}",
-            "duration": "={{ $json.duration }}",
-            "reason": "={{ $json.reason }}",
-            "status": "={{ $json.status }}",
-            "createdAt": "={{ $json.createdAt }}",
-            "updatedAt": "={{ $json.updatedAt }}"
-          }
+          "mappingMode": "autoMapInputData",
+          "value": {}
         },
         "options": {}
       },
@@ -144,27 +155,39 @@
     },
     {
       "parameters": {
+        "jsCode": "// Prepare data without 'conflict' field for Sheets\nconst data = $input.first().json;\nreturn [{\n  json: {\n    id: data.id,\n    patientName: data.patientName,\n    patientPhone: data.patientPhone,\n    date: data.date,\n    startTime: data.startTime,\n    duration: data.duration,\n    reason: data.reason,\n    status: data.status,\n    createdAt: data.createdAt,\n    updatedAt: data.updatedAt\n  }\n}];"
+      },
+      "id": "prepare-for-sheets",
+      "name": "Prepare for Sheets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, -100]
+    },
+    {
+      "parameters": {
         "chatId": "DOCTOR_CHAT_ID",
-        "text": "=🦷 *Нова резервация!*\n\n👤 *Име:* {{ $('Check Conflicts').item.json.patientName }}\n📞 *Тел:* {{ $('Check Conflicts').item.json.patientPhone }}\n📅 *Дата:* {{ $('Check Conflicts').item.json.date }}\n🕐 *Час:* {{ $('Check Conflicts').item.json.startTime }}\n📝 *Причина:* {{ $('Check Conflicts').item.json.reason || 'Не е посочена' }}\n\n⏱️ Пациентът иска: {{ $('Check Conflicts').item.json.requestedDuration || 30 }} мин.\n\n*Изберете продължителност:*",
+        "text": "=🦷 *Нова резервация!*\n\n👤 *Име:* {{ $json.patientName }}\n📞 *Тел:* {{ $json.patientPhone }}\n📅 *Дата:* {{ $json.date }}\n🕐 *Час:* {{ $json.startTime }}\n📝 *Причина:* {{ $json.reason || 'Не е посочена' }}\n\n*Изберете продължителност:*",
         "additionalFields": {
           "parse_mode": "Markdown",
           "reply_markup": {
             "inline_keyboard": [
               [
-                { "text": "30 мин", "callback_data": "confirm_30_{{ $('Check Conflicts').item.json.id }}" },
-                { "text": "45 мин", "callback_data": "confirm_45_{{ $('Check Conflicts').item.json.id }}" },
-                { "text": "60 мин", "callback_data": "confirm_60_{{ $('Check Conflicts').item.json.id }}" },
-                { "text": "90 мин", "callback_data": "confirm_90_{{ $('Check Conflicts').item.json.id }}" }
+                { "text": "30 мин", "callback_data": "confirm_30_{{ $json.id }}" },
+                { "text": "45 мин", "callback_data": "confirm_45_{{ $json.id }}" }
               ],
               [
-                { "text": "❌ Откажи", "callback_data": "cancel_{{ $('Check Conflicts').item.json.id }}" }
+                { "text": "60 мин", "callback_data": "confirm_60_{{ $json.id }}" },
+                { "text": "90 мин", "callback_data": "confirm_90_{{ $json.id }}" }
+              ],
+              [
+                { "text": "❌ Откажи", "callback_data": "cancel_{{ $json.id }}" }
               ]
             ]
           }
         }
       },
       "id": "telegram-notify",
-      "name": "Send Telegram Notification",
+      "name": "Notify Doctor Telegram",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [1540, -200],
@@ -178,19 +201,10 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Часът е заявен! Очаквайте потвърждение.\",\n  \"appointmentId\": \"{{ $('Check Conflicts').item.json.id }}\",\n  \"date\": \"{{ $('Check Conflicts').item.json.date }}\",\n  \"time\": \"{{ $('Check Conflicts').item.json.startTime }}\",\n  \"status\": \"pending\"\n}",
-        "options": {
-          "responseHeaders": {
-            "entries": [
-              {
-                "name": "Access-Control-Allow-Origin",
-                "value": "*"
-              }
-            ]
-          }
-        }
+        "responseBody": "={{ JSON.stringify({ success: true, id: $('Check Conflicts').item.json.id, message: 'Записът е създаден и очаква потвърждение' }) }}",
+        "options": {}
       },
-      "id": "response-success",
+      "id": "respond-success",
       "name": "Respond Success",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -199,46 +213,30 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"success\": false,\n  \"error\": \"{{ $json.error }}\"\n}",
+        "responseBody": "={{ JSON.stringify({ success: false, error: $json.error }) }}",
         "options": {
-          "responseCode": "409",
-          "responseHeaders": {
-            "entries": [
-              {
-                "name": "Access-Control-Allow-Origin",
-                "value": "*"
-              }
-            ]
-          }
+          "responseCode": 400
         }
       },
-      "id": "response-conflict",
-      "name": "Respond Conflict",
+      "id": "respond-error",
+      "name": "Respond Error",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1320, 0]
+      "position": [660, 100]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"success\": false,\n  \"error\": \"{{ $json.error }}\"\n}",
+        "responseBody": "={{ JSON.stringify({ success: false, error: $json.error }) }}",
         "options": {
-          "responseCode": "400",
-          "responseHeaders": {
-            "entries": [
-              {
-                "name": "Access-Control-Allow-Origin",
-                "value": "*"
-              }
-            ]
-          }
+          "responseCode": 409
         }
       },
-      "id": "response-invalid",
-      "name": "Respond Invalid",
+      "id": "respond-conflict",
+      "name": "Respond Conflict",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [660, 100]
+      "position": [1320, 0]
     }
   ],
   "connections": {
@@ -275,7 +273,7 @@
         ],
         [
           {
-            "node": "Respond Invalid",
+            "node": "Respond Error",
             "type": "main",
             "index": 0
           }
@@ -308,7 +306,7 @@
       "main": [
         [
           {
-            "node": "Save to Sheets",
+            "node": "Prepare for Sheets",
             "type": "main",
             "index": 0
           }
@@ -322,18 +320,29 @@
         ]
       ]
     },
-    "Save to Sheets": {
+    "Prepare for Sheets": {
       "main": [
         [
           {
-            "node": "Send Telegram Notification",
+            "node": "Save to Sheets",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Send Telegram Notification": {
+    "Save to Sheets": {
+      "main": [
+        [
+          {
+            "node": "Notify Doctor Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Doctor Telegram": {
       "main": [
         [
           {
