@@ -1,0 +1,124 @@
+{
+  "name": "Rodopi Dent - Get Available Slots",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "slots-webhook",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-slots",
+      "name": "Webhook - Get Slots",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "slots-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Appointments"
+        },
+        "options": {
+          "returnAllMatches": true
+        }
+      },
+      "id": "sheets-read",
+      "name": "Get Appointments",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [220, 0],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get date from query parameter\nconst queryDate = $('Webhook - Get Slots').first().json.query.date;\n\nif (!queryDate) {\n  return [{ json: { error: 'Date parameter is required', slots: [] } }];\n}\n\n// Parse the requested date\nconst requestedDate = new Date(queryDate);\nconst dayOfWeek = requestedDate.getDay();\n\n// Check if it's a working day (Monday-Friday = 1-5)\nconst workingDays = [1, 2, 3, 4, 5];\nif (!workingDays.includes(dayOfWeek)) {\n  return [{ json: { date: queryDate, slots: [], message: 'Неработен ден' } }];\n}\n\n// Working hours configuration\nconst workingHours = {\n  morning: { start: '09:00', end: '12:00' },\n  afternoon: { start: '13:30', end: '17:00' }\n};\n\nconst duration = 60; // Default appointment duration in minutes\n\n// Helper function to convert time to minutes\nfunction timeToMinutes(time) {\n  const [hours, minutes] = time.split(':').map(Number);\n  return hours * 60 + minutes;\n}\n\n// Helper function to convert minutes to time\nfunction minutesToTime(mins) {\n  const hours = Math.floor(mins / 60);\n  const minutes = mins % 60;\n  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;\n}\n\n// Generate all possible slots\nconst allSlots = [];\n\n// Morning slots\nlet current = timeToMinutes(workingHours.morning.start);\nconst morningEnd = timeToMinutes(workingHours.morning.end);\nwhile (current + duration <= morningEnd) {\n  allSlots.push(minutesToTime(current));\n  current += duration;\n}\n\n// Afternoon slots\ncurrent = timeToMinutes(workingHours.afternoon.start);\nconst afternoonEnd = timeToMinutes(workingHours.afternoon.end);\nwhile (current + duration <= afternoonEnd) {\n  allSlots.push(minutesToTime(current));\n  current += duration;\n}\n\n// Get booked appointments for this date\nconst appointments = $('Get Appointments').all();\nconst bookedTimes = appointments\n  .filter(apt => {\n    const aptDate = apt.json.date;\n    const status = apt.json.status;\n    return aptDate === queryDate && status !== 'cancelled';\n  })\n  .map(apt => apt.json.startTime);\n\n// Filter out booked slots\nconst availableSlots = allSlots.filter(slot => !bookedTimes.includes(slot));\n\nreturn [{\n  json: {\n    date: queryDate,\n    slots: availableSlots,\n    totalSlots: allSlots.length,\n    bookedSlots: bookedTimes.length\n  }\n}];"
+      },
+      "id": "code-filter",
+      "name": "Calculate Available Slots",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "response",
+      "name": "Respond with Slots",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [660, 0]
+    }
+  ],
+  "connections": {
+    "Webhook - Get Slots": {
+      "main": [
+        [
+          {
+            "node": "Get Appointments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Appointments": {
+      "main": [
+        [
+          {
+            "node": "Calculate Available Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Available Slots": {
+      "main": [
+        [
+          {
+            "node": "Respond with Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "Rodopi Dent"
+    }
+  ]
+}

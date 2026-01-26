@@ -1,0 +1,309 @@
+{
+  "name": "Rodopi Dent - Finance",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "={{$parameter.httpMethod}}",
+        "path": "finance-webhook",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-finance",
+      "name": "Webhook - Finance",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "finance-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.method }}",
+              "value2": "GET"
+            }
+          ]
+        }
+      },
+      "id": "if-get",
+      "name": "GET or POST?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Finance"
+        },
+        "options": {
+          "returnAllMatches": true
+        }
+      },
+      "id": "sheets-read-finance",
+      "name": "Read Finance",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [440, -100],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get query parameters\nconst query = $('Webhook - Finance').first().json.query || {};\nlet records = $('Read Finance').all().map(item => item.json);\n\n// Filter by date range\nif (query.startDate && query.endDate) {\n  records = records.filter(rec => {\n    return rec.date >= query.startDate && rec.date <= query.endDate;\n  });\n}\n\n// Filter by type (official/custom)\nif (query.type) {\n  records = records.filter(rec => rec.type === query.type);\n}\n\n// Calculate totals\nconst totalOfficial = records\n  .filter(r => r.type === 'official')\n  .reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);\n\nconst totalCustom = records\n  .filter(r => r.type === 'custom')\n  .reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);\n\n// Sort by date descending\nrecords.sort((a, b) => b.date.localeCompare(a.date));\n\nreturn [{\n  json: {\n    success: true,\n    count: records.length,\n    totalOfficial: totalOfficial,\n    totalCustom: totalCustom,\n    total: totalOfficial + totalCustom,\n    records: records\n  }\n}];"
+      },
+      "id": "code-filter-finance",
+      "name": "Filter & Calculate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, -100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "response-get",
+      "name": "Respond GET",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [880, -100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Handle POST - add new finance record\nconst body = $('Webhook - Finance').first().json.body;\n\nconst required = ['date', 'type', 'amount'];\nconst missing = required.filter(field => !body[field]);\n\nif (missing.length > 0) {\n  return [{\n    json: {\n      success: false,\n      error: `Липсващи полета: ${missing.join(', ')}`,\n      valid: false\n    }\n  }];\n}\n\n// Validate type\nif (!['official', 'custom'].includes(body.type)) {\n  return [{\n    json: {\n      success: false,\n      error: 'type must be official or custom',\n      valid: false\n    }\n  }];\n}\n\nconst id = 'fin_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 8);\n\nreturn [{\n  json: {\n    id: id,\n    date: body.date,\n    type: body.type,\n    amount: parseFloat(body.amount),\n    description: body.description || '',\n    paymentMethod: body.paymentMethod || 'cash',\n    appointmentId: body.appointmentId || '',\n    createdAt: new Date().toISOString(),\n    valid: true\n  }\n}];"
+      },
+      "id": "code-prepare-finance",
+      "name": "Prepare Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.valid }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-valid",
+      "name": "Is Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 100]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Finance"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "date": "={{ $json.date }}",
+            "type": "={{ $json.type }}",
+            "amount": "={{ $json.amount }}",
+            "description": "={{ $json.description }}",
+            "paymentMethod": "={{ $json.paymentMethod }}",
+            "appointmentId": "={{ $json.appointmentId }}",
+            "createdAt": "={{ $json.createdAt }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-append-finance",
+      "name": "Save Finance",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [880, 50],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Записът е добавен\",\n  \"id\": \"{{ $json.id }}\"\n}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "response-post-success",
+      "name": "Respond POST Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1100, 50]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": false,\n  \"error\": \"{{ $json.error }}\"\n}",
+        "options": {
+          "responseCode": "400",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "response-post-error",
+      "name": "Respond POST Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [880, 200]
+    }
+  ],
+  "connections": {
+    "Webhook - Finance": {
+      "main": [
+        [
+          {
+            "node": "GET or POST?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET or POST?": {
+      "main": [
+        [
+          {
+            "node": "Read Finance",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Finance": {
+      "main": [
+        [
+          {
+            "node": "Filter & Calculate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter & Calculate": {
+      "main": [
+        [
+          {
+            "node": "Respond GET",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Record": {
+      "main": [
+        [
+          {
+            "node": "Is Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Valid?": {
+      "main": [
+        [
+          {
+            "node": "Save Finance",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond POST Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Finance": {
+      "main": [
+        [
+          {
+            "node": "Respond POST Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "Rodopi Dent"
+    }
+  ]
+}

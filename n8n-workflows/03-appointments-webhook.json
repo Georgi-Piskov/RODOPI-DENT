@@ -1,0 +1,124 @@
+{
+  "name": "Rodopi Dent - Get Appointments",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "appointments-webhook",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-appointments",
+      "name": "Webhook - Get Appointments",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "appointments-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Appointments"
+        },
+        "options": {
+          "returnAllMatches": true
+        }
+      },
+      "id": "sheets-read",
+      "name": "Read Appointments",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [220, 0],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get query parameters\nconst query = $('Webhook - Get Appointments').first().json.query || {};\nlet appointments = $('Read Appointments').all().map(item => item.json);\n\n// Filter by date if provided\nif (query.date) {\n  appointments = appointments.filter(apt => apt.date === query.date);\n}\n\n// Filter by status if provided\nif (query.status) {\n  appointments = appointments.filter(apt => apt.status === query.status);\n}\n\n// Filter by date range\nif (query.startDate && query.endDate) {\n  appointments = appointments.filter(apt => {\n    return apt.date >= query.startDate && apt.date <= query.endDate;\n  });\n}\n\n// Sort by date and time\nappointments.sort((a, b) => {\n  const dateCompare = a.date.localeCompare(b.date);\n  if (dateCompare !== 0) return dateCompare;\n  return a.startTime.localeCompare(b.startTime);\n});\n\nreturn [{\n  json: {\n    success: true,\n    count: appointments.length,\n    appointments: appointments\n  }\n}];"
+      },
+      "id": "code-filter",
+      "name": "Filter Appointments",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "response",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [660, 0]
+    }
+  ],
+  "connections": {
+    "Webhook - Get Appointments": {
+      "main": [
+        [
+          {
+            "node": "Read Appointments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Appointments": {
+      "main": [
+        [
+          {
+            "node": "Filter Appointments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Appointments": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "Rodopi Dent"
+    }
+  ]
+}
