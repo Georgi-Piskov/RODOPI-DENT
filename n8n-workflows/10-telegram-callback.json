@@ -71,41 +71,60 @@
     {
       "parameters": {
         "conditions": {
-          "string": [
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
             {
-              "value1": "={{ $json.action }}",
-              "value2": "confirm"
+              "id": "confirm-check",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "confirm",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             }
-          ]
-        }
-      },
-      "id": "switch-action",
-      "name": "Switch Action",
-      "type": "n8n-nodes-base.switch",
-      "typeVersion": 3,
-      "position": [880, 0],
-      "parameters": {
-        "rules": {
-          "rules": [
-            {
-              "value": "confirm",
-              "value2": "={{ $json.action }}",
-              "operation": "equals"
-            },
-            {
-              "value": "cancel",
-              "value2": "={{ $json.action }}",
-              "operation": "equals"
-            },
-            {
-              "value": "conflict",
-              "value2": "={{ $json.action }}",
-              "operation": "equals"
-            }
-          ]
+          ],
+          "combinator": "and"
         },
-        "fallbackOutput": "extra"
-      }
+        "options": {}
+      },
+      "id": "if-confirm",
+      "name": "Is Confirm?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cancel-check",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "cancel",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-cancel",
+      "name": "Is Cancel?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [880, 250]
     },
     {
       "parameters": {
@@ -135,7 +154,7 @@
       "name": "Update Confirmed",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [1100, -200],
+      "position": [1100, -100],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "",
@@ -170,7 +189,7 @@
       "name": "Update Cancelled",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [1100, 0],
+      "position": [1100, 200],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "",
@@ -180,46 +199,8 @@
     },
     {
       "parameters": {
-        "from": "",
-        "to": "={{ $json.patientPhone }}",
-        "message": "=Здравейте, {{ $json.patientName }}!\n\n✅ Вашият час е ПОТВЪРДЕН:\n📅 {{ $json.date }}\n🕐 {{ $json.startTime }}\n⏱️ {{ $json.newDuration }} минути\n\nОчакваме Ви!\nРодопи Дент"
-      },
-      "id": "sms-confirm",
-      "name": "SMS Confirmed",
-      "type": "n8n-nodes-base.twilio",
-      "typeVersion": 1,
-      "position": [1320, -200],
-      "credentials": {
-        "twilioApi": {
-          "id": "",
-          "name": "Twilio"
-        }
-      },
-      "continueOnFail": true
-    },
-    {
-      "parameters": {
-        "from": "",
-        "to": "={{ $json.patientPhone }}",
-        "message": "=Здравейте, {{ $json.patientName }}!\n\n❌ За съжаление, заявеният час за {{ $json.date }} в {{ $json.startTime }} не може да бъде потвърден.\n\nМоля, изберете друг час или се обадете.\n\nРодопи Дент"
-      },
-      "id": "sms-cancel",
-      "name": "SMS Cancelled",
-      "type": "n8n-nodes-base.twilio",
-      "typeVersion": 1,
-      "position": [1320, 0],
-      "credentials": {
-        "twilioApi": {
-          "id": "",
-          "name": "Twilio"
-        }
-      },
-      "continueOnFail": true
-    },
-    {
-      "parameters": {
         "chatId": "={{ $json.chatId }}",
-        "text": "=✅ *Потвърдено!*\n\n{{ $json.patientName }} - {{ $json.date }} в {{ $json.startTime }}\nПродължителност: {{ $json.newDuration }} мин.\n\nSMS изпратен на пациента.",
+        "text": "=✅ *Потвърдено!*\n\n{{ $json.patientName }} - {{ $json.date }} в {{ $json.startTime }}\nПродължителност: {{ $json.newDuration }} мин.\n\nSMS ще бъде изпратен на пациента.",
         "additionalFields": {
           "parse_mode": "Markdown"
         }
@@ -228,7 +209,7 @@
       "name": "Reply Confirmed",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1540, -200],
+      "position": [1320, -100],
       "credentials": {
         "telegramApi": {
           "id": "",
@@ -239,7 +220,7 @@
     {
       "parameters": {
         "chatId": "={{ $json.chatId }}",
-        "text": "=❌ *Отказано!*\n\n{{ $json.patientName }} - {{ $json.date }} в {{ $json.startTime }}\n\nSMS изпратен на пациента.",
+        "text": "=❌ *Отказано!*\n\n{{ $json.patientName }} - {{ $json.date }} в {{ $json.startTime }}\n\nSMS ще бъде изпратен на пациента.",
         "additionalFields": {
           "parse_mode": "Markdown"
         }
@@ -248,7 +229,7 @@
       "name": "Reply Cancelled",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1540, 0],
+      "position": [1320, 200],
       "credentials": {
         "telegramApi": {
           "id": "",
@@ -259,7 +240,7 @@
     {
       "parameters": {
         "chatId": "={{ $json.chatId }}",
-        "text": "=⚠️ *Конфликт!*\n\nНе може да потвърдите {{ $json.newDuration }} мин., защото има конфликт с:\n{{ $json.conflictWith.name }} в {{ $json.conflictWith.time }}\n\nИзберете по-кратка продължителност.",
+        "text": "=⚠️ *Конфликт!*\n\nНе може да потвърдите {{ $json.requestedDuration }} мин., защото има конфликт с:\n{{ $json.conflictWith.name }} в {{ $json.conflictWith.time }}\n\nИзберете по-кратка продължителност.",
         "additionalFields": {
           "parse_mode": "Markdown"
         }
@@ -268,7 +249,7 @@
       "name": "Reply Conflict",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1100, 200],
+      "position": [1100, 400],
       "credentials": {
         "telegramApi": {
           "id": "",
@@ -315,25 +296,23 @@
       "main": [
         [
           {
-            "node": "Switch Action",
+            "node": "Is Confirm?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Is Cancel?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Switch Action": {
+    "Is Confirm?": {
       "main": [
         [
           {
             "node": "Update Confirmed",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Update Cancelled",
             "type": "main",
             "index": 0
           }
@@ -347,29 +326,19 @@
         ]
       ]
     },
+    "Is Cancel?": {
+      "main": [
+        [
+          {
+            "node": "Update Cancelled",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
     "Update Confirmed": {
-      "main": [
-        [
-          {
-            "node": "SMS Confirmed",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Update Cancelled": {
-      "main": [
-        [
-          {
-            "node": "SMS Cancelled",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "SMS Confirmed": {
       "main": [
         [
           {
@@ -380,7 +349,7 @@
         ]
       ]
     },
-    "SMS Cancelled": {
+    "Update Cancelled": {
       "main": [
         [
           {
