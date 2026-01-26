@@ -113,33 +113,44 @@
   <!-- Booking Page Template -->
   <template id="page-booking">
     <div class="page page--booking">
-      <h1>Запазете час</h1>
+      <div class="booking-header">
+        <h1>📅 Запазете час</h1>
+        <p class="booking-subtitle">Изберете удобна за вас дата и час</p>
+      </div>
       <div class="booking-container">
         <div class="booking-calendar" id="booking-calendar">
           <!-- Calendar will be rendered here -->
         </div>
         <div class="booking-slots" id="booking-slots">
-          <p class="text-muted">Изберете дата от календара</p>
+          <div class="slots-placeholder">
+            <span class="slots-icon">📆</span>
+            <p>Изберете дата от календара</p>
+          </div>
         </div>
-        <form id="booking-form" class="booking-form" hidden>
-          <h3>Вашите данни</h3>
+      </div>
+      <form id="booking-form" class="booking-form" hidden>
+        <h3>📝 Вашите данни</h3>
+        <div class="form-row">
           <div class="form-group">
-            <label for="patient-name">Име *</label>
-            <input type="text" id="patient-name" name="patientName" required>
+            <label for="patient-name">Име и фамилия *</label>
+            <input type="text" id="patient-name" name="patientName" placeholder="Иван Петров" required>
           </div>
           <div class="form-group">
             <label for="patient-phone">Телефон *</label>
-            <input type="tel" id="patient-phone" name="patientPhone" required>
+            <input type="tel" id="patient-phone" name="patientPhone" placeholder="0888 123 456" required>
           </div>
-          <div class="form-group">
-            <label for="patient-reason">Причина (по избор)</label>
-            <textarea id="patient-reason" name="reason" rows="2"></textarea>
-          </div>
-          <button type="submit" class="btn btn--primary btn--block">
-            Потвърди резервацията
-          </button>
-        </form>
-      </div>
+        </div>
+        <div class="form-group">
+          <label for="patient-reason">Причина за посещението</label>
+          <textarea id="patient-reason" name="reason" rows="2" placeholder="Преглед, болка, почистване..."></textarea>
+        </div>
+        <div class="booking-summary" id="booking-summary">
+          <!-- Summary will appear here -->
+        </div>
+        <button type="submit" class="btn btn--primary btn--lg btn--block">
+          ✓ Потвърди резервацията
+        </button>
+      </form>
     </div>
   </template>
 

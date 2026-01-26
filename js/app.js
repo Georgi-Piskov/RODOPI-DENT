@@ -279,6 +279,19 @@ const App = {
       form.dataset.date = date;
       form.dataset.time = time;
       
+      // Show booking summary
+      const summary = document.getElementById('booking-summary');
+      if (summary) {
+        summary.innerHTML = `
+          <p><strong>📅 Дата:</strong> ${Utils.formatDateBG(date)}</p>
+          <p><strong>🕐 Час:</strong> ${Utils.formatTime(time)}</p>
+          <p><strong>⏱️ Продължителност:</strong> ${CONFIG.DEFAULT_DURATION} минути</p>
+        `;
+      }
+      
+      // Scroll to form
+      form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      
       // Setup form submission
       form.onsubmit = (e) => this.handleBookingSubmit(e);
     }
