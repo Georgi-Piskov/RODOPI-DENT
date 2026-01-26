@@ -708,14 +708,12 @@ const App = {
       if (response.success) {
         Utils.showToast('Приходът е записан', 'success');
       } else {
-        // Fallback to local storage
-        this.addLocalFinanceRecord(data);
-        Utils.showToast('Записано локално', 'warning');
+        Utils.showToast('Грешка при запис', 'error');
+        console.error('Finance save error:', response);
       }
     } catch (error) {
-      // Fallback to local storage
-      this.addLocalFinanceRecord(data);
-      Utils.showToast('Записано локално', 'warning');
+      Utils.showToast('Грешка при запис', 'error');
+      console.error('Finance save error:', error);
     }
     
     this.closeModal('income-modal');
@@ -742,12 +740,12 @@ const App = {
       if (response.success) {
         Utils.showToast('Разходът е записан', 'success');
       } else {
-        this.addLocalFinanceRecord(data);
-        Utils.showToast('Записано локално', 'warning');
+        Utils.showToast('Грешка при запис', 'error');
+        console.error('Finance save error:', response);
       }
     } catch (error) {
-      this.addLocalFinanceRecord(data);
-      Utils.showToast('Записано локално', 'warning');
+      Utils.showToast('Грешка при запис', 'error');
+      console.error('Finance save error:', error);
     }
     
     this.closeModal('expense-modal');
@@ -767,7 +765,6 @@ const App = {
       description: `Плащане от ${formData.get('patientName')}`,
       paymentMethod: formData.get('paymentMethod'),
       appointmentId: formData.get('appointmentId'),
-      note: formData.get('note'),
       category: 'patient_payment'
     };
 
@@ -777,12 +774,12 @@ const App = {
       if (response.success) {
         Utils.showToast('Плащането е записано', 'success');
       } else {
-        this.addLocalFinanceRecord(data);
-        Utils.showToast('Записано локално', 'warning');
+        Utils.showToast('Грешка при запис', 'error');
+        console.error('Finance save error:', response);
       }
     } catch (error) {
-      this.addLocalFinanceRecord(data);
-      Utils.showToast('Записано локално', 'warning');
+      Utils.showToast('Грешка при запис', 'error');
+      console.error('Finance save error:', error);
     }
     
     this.closeModal('payment-modal');
@@ -894,51 +891,63 @@ const App = {
     const balanceEl = document.getElementById('day-balance');
     
     if (!container) return;
+    
+    container.innerHTML = '<p class="text-muted">Зареждане...</p>';
 
-    // Get local records
-    const records = this.getLocalFinanceRecords(date);
-    
-    // Calculate totals
-    let income = 0, expense = 0;
-    records.forEach(r => {
-      const amount = parseFloat(r.amount) || 0;
-      if (amount >= 0) income += amount;
-      else expense += Math.abs(amount);
-    });
-    
-    // Update summary
-    if (incomeEl) incomeEl.textContent = `${income.toFixed(2)} лв.`;
-    if (expenseEl) expenseEl.textContent = `${expense.toFixed(2)} лв.`;
-    if (balanceEl) {
-      const balance = income - expense;
-      balanceEl.textContent = `${balance.toFixed(2)} лв.`;
-      balanceEl.style.color = balance >= 0 ? 'var(--color-success)' : 'var(--color-danger)';
-    }
-    
-    // Render records
-    if (records.length === 0) {
-      container.innerHTML = '<p class="text-muted">Няма записи за деня</p>';
-      return;
-    }
-    
-    let html = '';
-    records.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    
-    records.forEach(r => {
-      const amount = parseFloat(r.amount);
-      const isIncome = amount >= 0;
-      const icon = isIncome ? '💰' : '💸';
+    try {
+      // Get records from n8n API
+      const response = await API.getFinance({ date });
+      const records = response.data?.records || [];
       
-      html += `
-        <div class="finance-record ${isIncome ? 'income' : 'expense'}">
-          <span class="icon">${icon}</span>
-          <span class="desc">${r.description}</span>
-          <span class="amount">${isIncome ? '+' : ''}${amount.toFixed(2)} лв.</span>
-        </div>
-      `;
-    });
-    
-    container.innerHTML = html;
+      // Calculate totals
+      let income = 0, expense = 0;
+      records.forEach(r => {
+        const amount = parseFloat(r.amount) || 0;
+        if (amount >= 0) income += amount;
+        else expense += Math.abs(amount);
+      });
+      
+      // Update summary
+      if (incomeEl) incomeEl.textContent = `${income.toFixed(2)} лв.`;
+      if (expenseEl) expenseEl.textContent = `${expense.toFixed(2)} лв.`;
+      if (balanceEl) {
+        const balance = income - expense;
+        balanceEl.textContent = `${balance.toFixed(2)} лв.`;
+        balanceEl.style.color = balance >= 0 ? 'var(--color-success)' : 'var(--color-danger)';
+      }
+      
+      // Render records
+      if (records.length === 0) {
+        container.innerHTML = '<p class="text-muted">Няма записи за деня</p>';
+        return;
+      }
+      
+      let html = '';
+      records.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      
+      records.forEach(r => {
+        const amount = parseFloat(r.amount);
+        const isIncome = amount >= 0;
+        const icon = isIncome ? '💰' : '💸';
+        
+        html += `
+          <div class="finance-record ${isIncome ? 'income' : 'expense'}">
+            <span class="icon">${icon}</span>
+            <span class="desc">${r.description || 'Без описание'}</span>
+            <span class="amount">${isIncome ? '+' : ''}${amount.toFixed(2)} лв.</span>
+          </div>
+        `;
+      });
+      
+      container.innerHTML = html;
+      
+    } catch (error) {
+      console.error('Finance load error:', error);
+      container.innerHTML = '<p class="text-muted">Грешка при зареждане</p>';
+      if (incomeEl) incomeEl.textContent = '0.00 лв.';
+      if (expenseEl) expenseEl.textContent = '0.00 лв.';
+      if (balanceEl) balanceEl.textContent = '0.00 лв.';
+    }
   },
 
   /**
