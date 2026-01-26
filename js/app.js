@@ -744,48 +744,57 @@ const App = {
     const endDate = document.getElementById('finance-end')?.value;
     const type = document.getElementById('finance-type')?.value;
 
-    const response = await API.getFinance({ startDate, endDate, type });
     const listEl = document.getElementById('finance-list');
+    
+    try {
+      const response = await API.getFinance({ startDate, endDate, type });
 
-    if (response.success && response.data) {
-      const records = response.data.records || response.data;
-      
-      // Update summary
-      let totalOfficial = 0, totalCustom = 0;
-      records.forEach(r => {
-        if (r.type === 'official') totalOfficial += parseFloat(r.amount) || 0;
-        else totalCustom += parseFloat(r.amount) || 0;
-      });
+      if (response.success && response.data) {
+        const records = response.data.records || response.data || [];
+        
+        // Update summary
+        let totalOfficial = 0, totalCustom = 0;
+        if (Array.isArray(records)) {
+          records.forEach(r => {
+            if (r.type === 'official') totalOfficial += parseFloat(r.amount) || 0;
+            else totalCustom += parseFloat(r.amount) || 0;
+          });
+        }
 
-      document.getElementById('total-amount').textContent = `${(totalOfficial + totalCustom).toFixed(2)} лв.`;
-      document.getElementById('official-amount').textContent = `${totalOfficial.toFixed(2)} лв.`;
-      document.getElementById('custom-amount').textContent = `${totalCustom.toFixed(2)} лв.`;
+        document.getElementById('total-amount').textContent = `${(totalOfficial + totalCustom).toFixed(2)} лв.`;
+        document.getElementById('official-amount').textContent = `${totalOfficial.toFixed(2)} лв.`;
+        document.getElementById('custom-amount').textContent = `${totalCustom.toFixed(2)} лв.`;
 
-      if (records.length === 0) {
+        if (!Array.isArray(records) || records.length === 0) {
+          listEl.innerHTML = '<p class="text-muted">Няма записи за избрания период</p>';
+          return;
+        }
+
+        let html = '<table class="finance-table"><thead><tr><th>Дата</th><th>Описание</th><th>Тип</th><th>Плащане</th><th>Сума</th></tr></thead><tbody>';
+        
+        records.forEach(r => {
+          const typeLabel = r.type === 'official' ? '📋 Официален' : '📝 Собствен';
+          const paymentLabel = { cash: 'В брой', card: 'Карта', bank_transfer: 'Превод' }[r.paymentMethod] || '-';
+          html += `
+            <tr>
+              <td>${Utils.formatDateBG(r.date)}</td>
+              <td>${r.description || '-'}</td>
+              <td>${typeLabel}</td>
+              <td>${paymentLabel}</td>
+              <td class="text-right"><strong>${parseFloat(r.amount).toFixed(2)} лв.</strong></td>
+            </tr>
+          `;
+        });
+
+        html += '</tbody></table>';
+        listEl.innerHTML = html;
+      } else {
+        console.log('Finance API response:', response);
         listEl.innerHTML = '<p class="text-muted">Няма записи за избрания период</p>';
-        return;
       }
-
-      let html = '<table class="finance-table"><thead><tr><th>Дата</th><th>Описание</th><th>Тип</th><th>Плащане</th><th>Сума</th></tr></thead><tbody>';
-      
-      records.forEach(r => {
-        const typeLabel = r.type === 'official' ? '📋 Официален' : '📝 Собствен';
-        const paymentLabel = { cash: 'В брой', card: 'Карта', bank_transfer: 'Превод' }[r.paymentMethod] || '-';
-        html += `
-          <tr>
-            <td>${Utils.formatDateBG(r.date)}</td>
-            <td>${r.description || '-'}</td>
-            <td>${typeLabel}</td>
-            <td>${paymentLabel}</td>
-            <td class="text-right"><strong>${parseFloat(r.amount).toFixed(2)} лв.</strong></td>
-          </tr>
-        `;
-      });
-
-      html += '</tbody></table>';
-      listEl.innerHTML = html;
-    } else {
-      listEl.innerHTML = '<p class="text-muted">Грешка при зареждане</p>';
+    } catch (error) {
+      console.error('Finance load error:', error);
+      listEl.innerHTML = '<p class="text-muted">Няма записи за избрания период</p>';
     }
   },
 
