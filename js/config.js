@@ -1,0 +1,104 @@
+// Configuration for Rodopi Dent PWA
+const CONFIG = {
+  // App info
+  APP_NAME: 'Родопи Дент',
+  APP_VERSION: '1.0.0',
+  
+  // API Configuration
+  API_BASE_URL: 'https://n8n.simeontsvetanovn8nworkflows.site/webhook',
+  
+  // Google Sheets ID
+  SHEETS_ID: '1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g',
+  
+  // API Endpoints
+  ENDPOINTS: {
+    SLOTS: '/slots-webhook',
+    BOOKING: '/booking-webhook',
+    CANCEL: '/cancel-webhook',
+    APPOINTMENTS: '/appointments-webhook',
+    CONFIRM: '/confirm-webhook',
+    PROCEDURES: '/procedures-webhook',
+    SETTINGS: '/settings-webhook',
+    FINANCE: '/finance-webhook',
+    NHIF_PRICES: '/nhif-prices-webhook'
+  },
+  
+  // Google OAuth2 Configuration
+  GOOGLE_CLIENT_ID: '', // TODO: Add your Google OAuth Client ID
+  
+  // Working hours
+  WORKING_HOURS: {
+    morning: { start: '09:00', end: '12:00' },
+    afternoon: { start: '13:30', end: '17:00' }
+  },
+  
+  // Working days (0 = Sunday, 1 = Monday, etc.)
+  WORKING_DAYS: [1, 2, 3, 4, 5], // Monday to Friday
+  
+  // Default appointment duration in minutes
+  DEFAULT_DURATION: 60,
+  
+  // Available durations
+  DURATIONS: [30, 60, 90, 120, 180],
+  
+  // Appointment statuses
+  STATUSES: {
+    PENDING: 'pending',
+    CONFIRMED: 'confirmed',
+    COMPLETED: 'completed',
+    CANCELLED: 'cancelled'
+  },
+  
+  // Status colors (for UI)
+  STATUS_COLORS: {
+    pending: '#fbbf24',
+    confirmed: '#22c55e',
+    completed: '#3b82f6',
+    cancelled: '#ef4444'
+  },
+  
+  // Status labels in Bulgarian
+  STATUS_LABELS: {
+    pending: 'Чакащ',
+    confirmed: 'Потвърден',
+    completed: 'Завършен',
+    cancelled: 'Отменен'
+  },
+  
+  // Finance types
+  FINANCE_TYPES: {
+    OFFICIAL: 'official',
+    CUSTOM: 'custom'
+  },
+  
+  // Payment methods
+  PAYMENT_METHODS: {
+    CASH: 'cash',
+    CARD: 'card',
+    BANK_TRANSFER: 'bank_transfer'
+  },
+  
+  // IndexedDB configuration for offline support
+  INDEXED_DB: {
+    NAME: 'RodopiDentDB',
+    VERSION: 1,
+    STORES: {
+      APPOINTMENTS: 'appointments',
+      FINANCE: 'finance',
+      SETTINGS: 'settings',
+      PENDING_SYNC: 'pendingSync'
+    }
+  },
+  
+  // Demo mode (when API is unavailable)
+  DEMO_MODE: false
+};
+
+// Freeze config to prevent modifications
+Object.freeze(CONFIG);
+Object.freeze(CONFIG.ENDPOINTS);
+Object.freeze(CONFIG.WORKING_HOURS);
+Object.freeze(CONFIG.STATUSES);
+Object.freeze(CONFIG.STATUS_COLORS);
+Object.freeze(CONFIG.STATUS_LABELS);
+Object.freeze(CONFIG.INDEXED_DB);

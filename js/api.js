@@ -1,0 +1,171 @@
+// API client for Rodopi Dent PWA
+
+const API = {
+  /**
+   * Base fetch wrapper with error handling
+   */
+  async request(endpoint, options = {}) {
+    const url = CONFIG.API_BASE_URL + endpoint;
+    
+    const defaultOptions = {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    };
+    
+    const mergedOptions = { ...defaultOptions, ...options };
+    
+    // Add auth token if available
+    const token = Auth.getToken();
+    if (token) {
+      mergedOptions.headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    try {
+      // Check if online
+      if (!Utils.isOnline()) {
+        throw new Error('OFFLINE');
+      }
+      
+      const response = await fetch(url, mergedOptions);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      return { success: true, data };
+      
+    } catch (error) {
+      console.error('API Error:', error);
+      
+      // Handle offline
+      if (error.message === 'OFFLINE' || !navigator.onLine) {
+        return { success: false, error: 'OFFLINE', message: 'Няма интернет връзка' };
+      }
+      
+      return { success: false, error: error.message, message: 'Грешка при заявката' };
+    }
+  },
+
+  // ============================================
+  // Public Endpoints
+  // ============================================
+
+  /**
+   * Get available time slots for a date
+   */
+  async getSlots(date) {
+    return this.request(`${CONFIG.ENDPOINTS.SLOTS}?date=${date}`);
+  },
+
+  /**
+   * Create a new booking
+   */
+  async createBooking(bookingData) {
+    return this.request(CONFIG.ENDPOINTS.BOOKING, {
+      method: 'POST',
+      body: JSON.stringify(bookingData)
+    });
+  },
+
+  /**
+   * Cancel a booking
+   */
+  async cancelBooking(appointmentId, phone) {
+    return this.request(CONFIG.ENDPOINTS.CANCEL, {
+      method: 'POST',
+      body: JSON.stringify({ appointmentId, phone })
+    });
+  },
+
+  // ============================================
+  // Admin Endpoints
+  // ============================================
+
+  /**
+   * Get appointments (with optional filters)
+   */
+  async getAppointments(filters = {}) {
+    const params = new URLSearchParams(filters).toString();
+    const endpoint = params 
+      ? `${CONFIG.ENDPOINTS.APPOINTMENTS}?${params}` 
+      : CONFIG.ENDPOINTS.APPOINTMENTS;
+    return this.request(endpoint);
+  },
+
+  /**
+   * Confirm an appointment
+   */
+  async confirmAppointment(appointmentId) {
+    return this.request(CONFIG.ENDPOINTS.CONFIRM, {
+      method: 'POST',
+      body: JSON.stringify({ appointmentId, status: 'confirmed' })
+    });
+  },
+
+  /**
+   * Update appointment status
+   */
+  async updateAppointmentStatus(appointmentId, status) {
+    return this.request(CONFIG.ENDPOINTS.CONFIRM, {
+      method: 'POST',
+      body: JSON.stringify({ appointmentId, status })
+    });
+  },
+
+  /**
+   * Get procedures list
+   */
+  async getProcedures() {
+    return this.request(CONFIG.ENDPOINTS.PROCEDURES);
+  },
+
+  /**
+   * Get NHIF prices
+   */
+  async getNHIFPrices() {
+    return this.request(CONFIG.ENDPOINTS.NHIF_PRICES);
+  },
+
+  /**
+   * Get settings
+   */
+  async getSettings() {
+    return this.request(CONFIG.ENDPOINTS.SETTINGS);
+  },
+
+  /**
+   * Update settings
+   */
+  async updateSettings(settings) {
+    return this.request(CONFIG.ENDPOINTS.SETTINGS, {
+      method: 'POST',
+      body: JSON.stringify(settings)
+    });
+  },
+
+  /**
+   * Get finance records
+   */
+  async getFinance(filters = {}) {
+    const params = new URLSearchParams(filters).toString();
+    const endpoint = params 
+      ? `${CONFIG.ENDPOINTS.FINANCE}?${params}` 
+      : CONFIG.ENDPOINTS.FINANCE;
+    return this.request(endpoint);
+  },
+
+  /**
+   * Add finance record
+   */
+  async addFinanceRecord(record) {
+    return this.request(CONFIG.ENDPOINTS.FINANCE, {
+      method: 'POST',
+      body: JSON.stringify(record)
+    });
+  }
+};
+
+// Export for use
+window.API = API;
