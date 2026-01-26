@@ -9,7 +9,8 @@
 | `03-appointments-webhook.json` | `/webhook/appointments-webhook` | GET | Връща списък записи |
 | `04-confirm-webhook.json` | `/webhook/confirm-webhook` | POST | Обновява статус на запис |
 | `05-settings-webhook.json` | `/webhook/settings-webhook` | GET/POST | Настройки на системата |
-| `06-finance-webhook.json` | `/webhook/finance-webhook` | GET/POST | Финансови записи |
+| `06a-finance-get.json` | `/webhook/finance-webhook` | GET | Чете финансови записи |
+| `06b-finance-add.json` | `/webhook/finance-add` | POST | Добавя финансов запис |
 | `07-daily-backup.json` | - | Schedule | Ежедневен backup в 23:00 |
 
 ---

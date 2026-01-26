@@ -1,0 +1,124 @@
+{
+  "name": "Rodopi Dent - Finance GET",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "finance-webhook",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-finance-get",
+      "name": "Webhook - Finance GET",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "finance-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Finance"
+        },
+        "options": {
+          "returnAllMatches": true
+        }
+      },
+      "id": "sheets-read-finance",
+      "name": "Read Finance",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [220, 0],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get query parameters\nconst query = $('Webhook - Finance GET').first().json.query || {};\nlet records = $('Read Finance').all().map(item => item.json);\n\n// Filter by date if provided\nif (query.date) {\n  records = records.filter(rec => rec.date === query.date);\n}\n\n// Filter by date range\nif (query.startDate && query.endDate) {\n  records = records.filter(rec => {\n    return rec.date >= query.startDate && rec.date <= query.endDate;\n  });\n}\n\n// Filter by type (official/custom)\nif (query.type) {\n  records = records.filter(rec => rec.type === query.type);\n}\n\n// Calculate totals\nconst totalIncome = records\n  .filter(r => parseFloat(r.amount) >= 0)\n  .reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);\n\nconst totalExpense = records\n  .filter(r => parseFloat(r.amount) < 0)\n  .reduce((sum, r) => sum + Math.abs(parseFloat(r.amount || 0)), 0);\n\n// Sort by date descending\nrecords.sort((a, b) => (b.date || '').localeCompare(a.date || ''));\n\nreturn [{\n  json: {\n    success: true,\n    count: records.length,\n    totalIncome: totalIncome,\n    totalExpense: totalExpense,\n    balance: totalIncome - totalExpense,\n    records: records\n  }\n}];"
+      },
+      "id": "code-filter-finance",
+      "name": "Filter & Calculate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "response-get",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [660, 0]
+    }
+  ],
+  "connections": {
+    "Webhook - Finance GET": {
+      "main": [
+        [
+          {
+            "node": "Read Finance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Finance": {
+      "main": [
+        [
+          {
+            "node": "Filter & Calculate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter & Calculate": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "Rodopi Dent"
+    }
+  ]
+}

@@ -1,0 +1,193 @@
+{
+  "name": "Rodopi Dent - Finance ADD",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "finance-add",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-finance-add",
+      "name": "Webhook - Finance ADD",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "finance-add"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Handle POST - add new finance record\nconst body = $('Webhook - Finance ADD').first().json.body;\n\nconst required = ['date', 'type', 'amount'];\nconst missing = required.filter(field => !body[field] && body[field] !== 0);\n\nif (missing.length > 0) {\n  return [{\n    json: {\n      success: false,\n      error: `Липсващи полета: ${missing.join(', ')}`,\n      valid: false\n    }\n  }];\n}\n\n// Validate type - accept official, custom, expense\nconst validTypes = ['official', 'custom', 'expense'];\nif (!validTypes.includes(body.type)) {\n  return [{\n    json: {\n      success: false,\n      error: 'type must be official, custom or expense',\n      valid: false\n    }\n  }];\n}\n\nconst id = 'fin_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 8);\n\nreturn [{\n  json: {\n    id: id,\n    date: body.date,\n    type: body.type,\n    amount: parseFloat(body.amount),\n    description: body.description || '',\n    paymentMethod: body.paymentMethod || 'cash',\n    category: body.category || '',\n    appointmentId: body.appointmentId || '',\n    createdAt: new Date().toISOString(),\n    valid: true\n  }\n}];"
+      },
+      "id": "code-prepare-finance",
+      "name": "Prepare Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.valid }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-valid",
+      "name": "Is Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Finance"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "date": "={{ $json.date }}",
+            "type": "={{ $json.type }}",
+            "amount": "={{ $json.amount }}",
+            "description": "={{ $json.description }}",
+            "paymentMethod": "={{ $json.paymentMethod }}",
+            "category": "={{ $json.category }}",
+            "appointmentId": "={{ $json.appointmentId }}",
+            "createdAt": "={{ $json.createdAt }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-append-finance",
+      "name": "Save Finance",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [660, -50],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Записът е добавен\",\n  \"id\": \"{{ $('Prepare Record').first().json.id }}\"\n}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "response-post-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [880, -50]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": false,\n  \"error\": \"{{ $json.error }}\"\n}",
+        "options": {
+          "responseCode": "400",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "response-post-error",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [660, 100]
+    }
+  ],
+  "connections": {
+    "Webhook - Finance ADD": {
+      "main": [
+        [
+          {
+            "node": "Prepare Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Record": {
+      "main": [
+        [
+          {
+            "node": "Is Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Valid?": {
+      "main": [
+        [
+          {
+            "node": "Save Finance",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Finance": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "Rodopi Dent"
+    }
+  ]
+}
