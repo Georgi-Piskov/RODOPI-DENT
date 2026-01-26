@@ -29,10 +29,11 @@ const App = {
     
     // Admin routes
     Router.register('/admin', () => this.renderAdminLogin());
-    Router.register('/admin/dashboard', Router.requireAuth(() => this.renderDashboard()));
-    Router.register('/admin/calendar', Router.requireAuth(() => this.renderCalendar()));
-    Router.register('/admin/finance', Router.requireAuth(() => this.renderFinance()));
-    Router.register('/admin/settings', Router.requireAuth(() => this.renderSettings()));
+    Router.register('/admin/login', () => this.renderAdminLogin());
+    Router.register('/admin/dashboard', Router.requireAuth(async () => await this.renderDashboard()));
+    Router.register('/admin/calendar', Router.requireAuth(async () => await this.renderCalendar()));
+    Router.register('/admin/finance', Router.requireAuth(async () => await this.renderFinance()));
+    Router.register('/admin/settings', Router.requireAuth(async () => await this.renderSettings()));
   },
 
   /**
@@ -365,12 +366,24 @@ const App = {
     this.setupAdminNav();
     this.setupLogout();
 
-    // Load today's appointments
-    const response = await API.getAppointments({ date: Utils.today() });
-    
     const todayList = document.getElementById('today-list');
-    if (todayList && response.success && response.data) {
-      this.renderAppointmentsList(todayList, response.data);
+    if (!todayList) return;
+
+    try {
+      // Load today's appointments
+      todayList.innerHTML = '<p style="padding: 1rem; color: var(--color-gray-500);">Зареждане...</p>';
+      
+      const response = await API.getAppointments({ date: Utils.today() });
+      
+      if (response.success && response.data) {
+        this.renderAppointmentsList(todayList, response.data);
+      } else {
+        console.log('Dashboard API response:', response);
+        todayList.innerHTML = '<p style="padding: 1rem; color: var(--color-gray-500);">Няма записи за днес</p>';
+      }
+    } catch (error) {
+      console.error('Dashboard error:', error);
+      todayList.innerHTML = '<p style="padding: 1rem; color: var(--color-gray-500);">Няма записи за днес</p>';
     }
   },
 

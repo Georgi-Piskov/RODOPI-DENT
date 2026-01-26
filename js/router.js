@@ -155,8 +155,9 @@ const Router = {
    * Show error page
    */
   showError(message) {
+    console.warn('Router showError called:', message);
     const main = document.getElementById('main-content');
-    if (main) {
+    if (main && main.innerHTML.trim() === '') {
       main.innerHTML = `
         <div class="page text-center">
           <h1>⚠️ Грешка</h1>
