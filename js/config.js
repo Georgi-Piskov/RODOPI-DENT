@@ -35,11 +35,14 @@ const CONFIG = {
   // Working days (0 = Sunday, 1 = Monday, etc.)
   WORKING_DAYS: [1, 2, 3, 4, 5], // Monday to Friday
   
-  // Default appointment duration in minutes
-  DEFAULT_DURATION: 60,
+  // Slot interval in minutes (how often slots appear)
+  SLOT_INTERVAL: 30,
   
-  // Available durations
-  DURATIONS: [30, 60, 90, 120, 180],
+  // Default appointment duration in minutes
+  DEFAULT_DURATION: 30,
+  
+  // Available durations for appointments
+  DURATIONS: [30, 45, 60, 90, 120],
   
   // Appointment statuses
   STATUSES: {

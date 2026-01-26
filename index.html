@@ -140,9 +140,21 @@
             <input type="tel" id="patient-phone" name="patientPhone" placeholder="0888 123 456" required>
           </div>
         </div>
-        <div class="form-group">
-          <label for="patient-reason">Причина за посещението</label>
-          <textarea id="patient-reason" name="reason" rows="2" placeholder="Преглед, болка, почистване..."></textarea>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="patient-reason">Причина за посещението</label>
+            <textarea id="patient-reason" name="reason" rows="2" placeholder="Преглед, болка, почистване..."></textarea>
+          </div>
+          <div class="form-group">
+            <label for="appointment-duration">Продължителност</label>
+            <select id="appointment-duration" name="duration">
+              <option value="30">30 минути</option>
+              <option value="45">45 минути</option>
+              <option value="60" selected>60 минути</option>
+              <option value="90">90 минути</option>
+              <option value="120">2 часа</option>
+            </select>
+          </div>
         </div>
         <div class="booking-summary" id="booking-summary">
           <!-- Summary will appear here -->
@@ -189,9 +201,8 @@
         <button id="logout-btn" class="btn btn--outline">Изход</button>
       </div>
       <nav class="admin-nav">
-        <a href="#/admin" class="admin-nav__link active">Табло</a>
-        <a href="#/admin/calendar" class="admin-nav__link">Календар</a>
-        <a href="#/admin/finance" class="admin-nav__link">Финанси</a>
+        <a href="#/admin/dashboard" class="admin-nav__link active">Табло</a>
+        <a href="#/admin/workday" class="admin-nav__link">Работен ден</a>
         <a href="#/admin/settings" class="admin-nav__link">Настройки</a>
       </nav>
       <div class="admin-content">

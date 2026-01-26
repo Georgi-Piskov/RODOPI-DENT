@@ -66,25 +66,26 @@ const Utils = {
 
   /**
    * Get available time slots for a given date
+   * Uses SLOT_INTERVAL for spacing between slots
    */
-  getTimeSlots(duration = CONFIG.DEFAULT_DURATION) {
+  getTimeSlots(interval = CONFIG.SLOT_INTERVAL || 30) {
     const slots = [];
     const { morning, afternoon } = CONFIG.WORKING_HOURS;
     
     // Morning slots
     let current = this.timeToMinutes(morning.start);
     const morningEnd = this.timeToMinutes(morning.end);
-    while (current + duration <= morningEnd) {
+    while (current < morningEnd) {
       slots.push(this.minutesToTime(current));
-      current += duration;
+      current += interval;
     }
     
     // Afternoon slots
     current = this.timeToMinutes(afternoon.start);
     const afternoonEnd = this.timeToMinutes(afternoon.end);
-    while (current + duration <= afternoonEnd) {
+    while (current < afternoonEnd) {
       slots.push(this.minutesToTime(current));
-      current += duration;
+      current += interval;
     }
     
     return slots;

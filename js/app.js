@@ -31,8 +31,9 @@ const App = {
     Router.register('/admin', () => this.renderAdminLogin());
     Router.register('/admin/login', () => this.renderAdminLogin());
     Router.register('/admin/dashboard', Router.requireAuth(async () => await this.renderDashboard()));
-    Router.register('/admin/calendar', Router.requireAuth(async () => await this.renderCalendar()));
-    Router.register('/admin/finance', Router.requireAuth(async () => await this.renderFinance()));
+    Router.register('/admin/workday', Router.requireAuth(async () => await this.renderWorkday()));
+    Router.register('/admin/calendar', Router.requireAuth(async () => await this.renderWorkday())); // Redirect to workday
+    Router.register('/admin/finance', Router.requireAuth(async () => await this.renderWorkday())); // Redirect to workday
     Router.register('/admin/settings', Router.requireAuth(async () => await this.renderSettings()));
   },
 
@@ -220,18 +221,23 @@ const App = {
     });
     document.querySelector(`[data-date="${date}"]`)?.classList.add('calendar__day--selected');
 
-    // Show loading
-    slotsEl.innerHTML = '<p>Зареждане на свободни часове...</p>';
-
-    // Get available slots
-    const response = await API.getSlots(date);
+    // Generate slots locally (30-minute intervals)
+    const allSlots = Utils.getTimeSlots();
     
-    if (response.success && response.data) {
-      this.renderTimeSlots(slotsEl, date, response.data);
-    } else {
-      // Show default slots in demo/offline mode
-      const defaultSlots = Utils.getTimeSlots();
-      this.renderTimeSlots(slotsEl, date, defaultSlots);
+    // Try to get booked slots from API to filter them out
+    try {
+      const response = await API.getSlots(date);
+      if (response.success && response.data && response.data.bookedSlots) {
+        const bookedTimes = response.data.bookedSlots.map(s => s.startTime);
+        const availableSlots = allSlots.filter(slot => !bookedTimes.includes(slot));
+        this.renderTimeSlots(slotsEl, date, availableSlots);
+      } else {
+        // Show all slots if API fails
+        this.renderTimeSlots(slotsEl, date, allSlots);
+      }
+    } catch (error) {
+      console.log('Using local slots:', error);
+      this.renderTimeSlots(slotsEl, date, allSlots);
     }
   },
 
@@ -280,14 +286,26 @@ const App = {
       form.dataset.date = date;
       form.dataset.time = time;
       
-      // Show booking summary
-      const summary = document.getElementById('booking-summary');
-      if (summary) {
-        summary.innerHTML = `
-          <p><strong>📅 Дата:</strong> ${Utils.formatDateBG(date)}</p>
-          <p><strong>🕐 Час:</strong> ${Utils.formatTime(time)}</p>
-          <p><strong>⏱️ Продължителност:</strong> ${CONFIG.DEFAULT_DURATION} минути</p>
-        `;
+      // Update booking summary based on duration selection
+      const updateSummary = () => {
+        const durationSelect = document.getElementById('appointment-duration');
+        const duration = durationSelect ? durationSelect.value : CONFIG.DEFAULT_DURATION;
+        const summary = document.getElementById('booking-summary');
+        if (summary) {
+          summary.innerHTML = `
+            <p><strong>📅 Дата:</strong> ${Utils.formatDateBG(date)}</p>
+            <p><strong>🕐 Час:</strong> ${Utils.formatTime(time)}</p>
+            <p><strong>⏱️ Продължителност:</strong> ${duration} минути</p>
+          `;
+        }
+      };
+      
+      updateSummary();
+      
+      // Listen for duration changes
+      const durationSelect = document.getElementById('appointment-duration');
+      if (durationSelect) {
+        durationSelect.onchange = updateSummary;
       }
       
       // Scroll to form
@@ -313,7 +331,7 @@ const App = {
       reason: formData.get('reason') || '',
       date: form.dataset.date,
       startTime: form.dataset.time,
-      duration: CONFIG.DEFAULT_DURATION
+      duration: parseInt(formData.get('duration')) || CONFIG.DEFAULT_DURATION
     };
 
     // Validate phone
@@ -438,6 +456,455 @@ const App = {
     container.innerHTML = html;
   },
 
+  // ============================================
+  // WORKDAY PAGE - Combined Calendar + Finance
+  // ============================================
+
+  /**
+   * Render combined Workday page (Calendar + Finance)
+   */
+  async renderWorkday() {
+    const main = document.getElementById('main-content');
+    const today = Utils.today();
+    
+    main.innerHTML = `
+      <div class="page page--admin page--workday">
+        <div class="admin-header">
+          <h1>📅 Работен ден</h1>
+          <div class="header-actions">
+            <button id="add-income-btn" class="btn btn--success">💰 Приход</button>
+            <button id="add-expense-btn" class="btn btn--danger">💸 Разход</button>
+            <button id="logout-btn" class="btn btn--outline">Изход</button>
+          </div>
+        </div>
+        <nav class="admin-nav">
+          <a href="#/admin/dashboard" class="admin-nav__link">Табло</a>
+          <a href="#/admin/workday" class="admin-nav__link active">Работен ден</a>
+          <a href="#/admin/settings" class="admin-nav__link">Настройки</a>
+        </nav>
+        
+        <div class="workday-layout">
+          <!-- Left: Calendar -->
+          <div class="workday-calendar">
+            <div id="admin-calendar" class="admin-calendar"></div>
+          </div>
+          
+          <!-- Center: Day Appointments -->
+          <div class="workday-appointments">
+            <div class="workday-section-header">
+              <h3 id="appointments-date-title">Пациенти за ${Utils.formatDateBG(today)}</h3>
+            </div>
+            <div id="day-appointments-list" class="appointments-list">
+              <p class="text-muted">Зареждане...</p>
+            </div>
+          </div>
+          
+          <!-- Right: Day Finance -->
+          <div class="workday-finance">
+            <div class="workday-section-header">
+              <h3>💰 Финанси за деня</h3>
+            </div>
+            <div class="finance-day-summary">
+              <div class="finance-mini-stat income">
+                <span class="label">Приходи:</span>
+                <span class="value" id="day-income">0.00 лв.</span>
+              </div>
+              <div class="finance-mini-stat expense">
+                <span class="label">Разходи:</span>
+                <span class="value" id="day-expense">0.00 лв.</span>
+              </div>
+              <div class="finance-mini-stat total">
+                <span class="label">Баланс:</span>
+                <span class="value" id="day-balance">0.00 лв.</span>
+              </div>
+            </div>
+            <div id="day-finance-list" class="finance-day-list">
+              <p class="text-muted">Няма записи</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Income Modal -->
+      <div id="income-modal" class="modal" hidden>
+        <div class="modal__backdrop"></div>
+        <div class="modal__content">
+          <h2>💰 Добави приход</h2>
+          <form id="income-form">
+            <div class="form-group">
+              <label>Сума (лв.)</label>
+              <input type="number" name="amount" step="0.01" min="0" required autofocus>
+            </div>
+            <div class="form-group">
+              <label>Описание</label>
+              <input type="text" name="description" placeholder="Пациент, процедура...">
+            </div>
+            <div class="form-group">
+              <label>Плащане</label>
+              <select name="paymentMethod">
+                <option value="cash">В брой</option>
+                <option value="card">С карта</option>
+                <option value="bank">Банков превод</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Тип</label>
+              <select name="type">
+                <option value="official">Официален (с касов бон)</option>
+                <option value="custom">Неофициален</option>
+              </select>
+            </div>
+            <input type="hidden" name="date" value="${today}">
+            <div class="form-actions">
+              <button type="button" class="btn btn--secondary" onclick="App.closeModal('income-modal')">Отказ</button>
+              <button type="submit" class="btn btn--success">Запази</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Expense Modal -->
+      <div id="expense-modal" class="modal" hidden>
+        <div class="modal__backdrop"></div>
+        <div class="modal__content">
+          <h2>💸 Добави разход</h2>
+          <form id="expense-form">
+            <div class="form-group">
+              <label>Сума (лв.)</label>
+              <input type="number" name="amount" step="0.01" min="0" required autofocus>
+            </div>
+            <div class="form-group">
+              <label>Описание</label>
+              <input type="text" name="description" placeholder="Материали, фактура, куриер..." required>
+            </div>
+            <div class="form-group">
+              <label>Категория</label>
+              <select name="category">
+                <option value="materials">Материали</option>
+                <option value="lab">Лаборатория</option>
+                <option value="utilities">Комунални</option>
+                <option value="courier">Куриер</option>
+                <option value="other">Друго</option>
+              </select>
+            </div>
+            <input type="hidden" name="date" value="${today}">
+            <div class="form-actions">
+              <button type="button" class="btn btn--secondary" onclick="App.closeModal('expense-modal')">Отказ</button>
+              <button type="submit" class="btn btn--danger">Запази</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Payment Modal (for clicking on appointment) -->
+      <div id="payment-modal" class="modal" hidden>
+        <div class="modal__backdrop"></div>
+        <div class="modal__content">
+          <h2>💳 Запиши плащане</h2>
+          <div id="payment-patient-info"></div>
+          <form id="payment-form">
+            <div class="form-group">
+              <label>Сума (лв.)</label>
+              <input type="number" name="amount" step="0.01" min="0" required autofocus>
+            </div>
+            <div class="form-group">
+              <label>Плащане</label>
+              <select name="paymentMethod">
+                <option value="cash">В брой</option>
+                <option value="card">С карта</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Бележка</label>
+              <input type="text" name="note" placeholder="Допълнителна информация...">
+            </div>
+            <input type="hidden" name="appointmentId" value="">
+            <input type="hidden" name="patientName" value="">
+            <input type="hidden" name="date" value="${today}">
+            <div class="form-actions">
+              <button type="button" class="btn btn--secondary" onclick="App.closeModal('payment-modal')">Отказ</button>
+              <button type="submit" class="btn btn--success">Запиши плащане</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    this.setupLogout();
+    this.setupWorkdayListeners();
+    this.initAdminCalendar();
+    
+    // Store current selected date
+    this.selectedDate = today;
+  },
+
+  /**
+   * Setup workday page event listeners
+   */
+  setupWorkdayListeners() {
+    // Income button
+    document.getElementById('add-income-btn')?.addEventListener('click', () => {
+      document.getElementById('income-modal').hidden = false;
+      document.querySelector('#income-form input[name="amount"]').focus();
+    });
+
+    // Expense button
+    document.getElementById('add-expense-btn')?.addEventListener('click', () => {
+      document.getElementById('expense-modal').hidden = false;
+      document.querySelector('#expense-form input[name="amount"]').focus();
+    });
+
+    // Modal backdrops
+    document.querySelectorAll('.modal__backdrop').forEach(backdrop => {
+      backdrop.addEventListener('click', () => {
+        backdrop.closest('.modal').hidden = true;
+      });
+    });
+
+    // Income form
+    document.getElementById('income-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await this.handleIncomeSubmit(e.target);
+    });
+
+    // Expense form
+    document.getElementById('expense-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await this.handleExpenseSubmit(e.target);
+    });
+
+    // Payment form
+    document.getElementById('payment-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await this.handlePaymentSubmit(e.target);
+    });
+  },
+
+  /**
+   * Close a modal by ID
+   */
+  closeModal(modalId) {
+    document.getElementById(modalId).hidden = true;
+  },
+
+  /**
+   * Handle income form submission
+   */
+  async handleIncomeSubmit(form) {
+    const formData = new FormData(form);
+    const data = {
+      date: this.selectedDate || Utils.today(),
+      type: formData.get('type'),
+      amount: parseFloat(formData.get('amount')),
+      description: formData.get('description') || 'Приход',
+      paymentMethod: formData.get('paymentMethod'),
+      category: 'income'
+    };
+
+    // Save locally for now (will sync to n8n later)
+    this.addLocalFinanceRecord(data);
+    
+    Utils.showToast('Приходът е записан', 'success');
+    this.closeModal('income-modal');
+    form.reset();
+    this.loadWorkdayFinance(this.selectedDate);
+  },
+
+  /**
+   * Handle expense form submission
+   */
+  async handleExpenseSubmit(form) {
+    const formData = new FormData(form);
+    const data = {
+      date: this.selectedDate || Utils.today(),
+      type: 'expense',
+      amount: -Math.abs(parseFloat(formData.get('amount'))), // Negative for expenses
+      description: formData.get('description'),
+      category: formData.get('category')
+    };
+
+    // Save locally
+    this.addLocalFinanceRecord(data);
+    
+    Utils.showToast('Разходът е записан', 'success');
+    this.closeModal('expense-modal');
+    form.reset();
+    this.loadWorkdayFinance(this.selectedDate);
+  },
+
+  /**
+   * Handle payment from appointment
+   */
+  async handlePaymentSubmit(form) {
+    const formData = new FormData(form);
+    const data = {
+      date: this.selectedDate || Utils.today(),
+      type: 'official',
+      amount: parseFloat(formData.get('amount')),
+      description: `Плащане от ${formData.get('patientName')}`,
+      paymentMethod: formData.get('paymentMethod'),
+      appointmentId: formData.get('appointmentId'),
+      note: formData.get('note'),
+      category: 'patient_payment'
+    };
+
+    // Save locally
+    this.addLocalFinanceRecord(data);
+    
+    Utils.showToast('Плащането е записано', 'success');
+    this.closeModal('payment-modal');
+    form.reset();
+    this.loadWorkdayFinance(this.selectedDate);
+  },
+
+  /**
+   * Add finance record to local storage
+   */
+  addLocalFinanceRecord(data) {
+    const key = 'rodopi_finance_records';
+    const records = JSON.parse(localStorage.getItem(key) || '[]');
+    data.id = Date.now().toString();
+    data.createdAt = new Date().toISOString();
+    records.push(data);
+    localStorage.setItem(key, JSON.stringify(records));
+  },
+
+  /**
+   * Get local finance records for a date
+   */
+  getLocalFinanceRecords(date) {
+    const key = 'rodopi_finance_records';
+    const records = JSON.parse(localStorage.getItem(key) || '[]');
+    return records.filter(r => r.date === date);
+  },
+
+  /**
+   * Load workday appointments for selected date
+   */
+  async loadWorkdayAppointments(date) {
+    const container = document.getElementById('day-appointments-list');
+    const titleEl = document.getElementById('appointments-date-title');
+    
+    if (titleEl) {
+      titleEl.textContent = `Пациенти за ${Utils.formatDateBG(date)}`;
+    }
+    
+    if (!container) return;
+    container.innerHTML = '<p class="text-muted">Зареждане...</p>';
+
+    try {
+      const response = await API.getAppointments({ date });
+      
+      if (response.success && response.data && response.data.length > 0) {
+        let html = '';
+        response.data.sort((a, b) => a.startTime.localeCompare(b.startTime));
+        
+        response.data.forEach(apt => {
+          html += `
+            <div class="workday-appointment" data-id="${apt.id}" onclick="App.openPaymentModal('${apt.id}', '${apt.patientName}', '${apt.patientPhone}')">
+              <div class="appointment-time">${Utils.formatTime(apt.startTime)}</div>
+              <div class="appointment-info">
+                <strong>${apt.patientName}</strong>
+                <span class="phone">${apt.patientPhone}</span>
+                ${apt.reason ? `<small>${apt.reason}</small>` : ''}
+              </div>
+              <div class="appointment-actions">
+                <span class="status-badge status-badge--${apt.status}">${Utils.getStatusLabel(apt.status)}</span>
+              </div>
+            </div>
+          `;
+        });
+        
+        container.innerHTML = html;
+      } else {
+        container.innerHTML = '<p class="text-muted">Няма записани пациенти</p>';
+      }
+    } catch (error) {
+      console.log('Appointments load error:', error);
+      container.innerHTML = '<p class="text-muted">Няма записани пациенти</p>';
+    }
+  },
+
+  /**
+   * Open payment modal for an appointment
+   */
+  openPaymentModal(appointmentId, patientName, patientPhone) {
+    const modal = document.getElementById('payment-modal');
+    const infoEl = document.getElementById('payment-patient-info');
+    const form = document.getElementById('payment-form');
+    
+    infoEl.innerHTML = `
+      <div class="patient-info-card">
+        <strong>${patientName}</strong>
+        <span>${patientPhone}</span>
+      </div>
+    `;
+    
+    form.querySelector('[name="appointmentId"]').value = appointmentId;
+    form.querySelector('[name="patientName"]').value = patientName;
+    form.querySelector('[name="date"]').value = this.selectedDate;
+    
+    modal.hidden = false;
+    form.querySelector('[name="amount"]').focus();
+  },
+
+  /**
+   * Load workday finance for selected date
+   */
+  async loadWorkdayFinance(date) {
+    const container = document.getElementById('day-finance-list');
+    const incomeEl = document.getElementById('day-income');
+    const expenseEl = document.getElementById('day-expense');
+    const balanceEl = document.getElementById('day-balance');
+    
+    if (!container) return;
+
+    // Get local records
+    const records = this.getLocalFinanceRecords(date);
+    
+    // Calculate totals
+    let income = 0, expense = 0;
+    records.forEach(r => {
+      const amount = parseFloat(r.amount) || 0;
+      if (amount >= 0) income += amount;
+      else expense += Math.abs(amount);
+    });
+    
+    // Update summary
+    if (incomeEl) incomeEl.textContent = `${income.toFixed(2)} лв.`;
+    if (expenseEl) expenseEl.textContent = `${expense.toFixed(2)} лв.`;
+    if (balanceEl) {
+      const balance = income - expense;
+      balanceEl.textContent = `${balance.toFixed(2)} лв.`;
+      balanceEl.style.color = balance >= 0 ? 'var(--color-success)' : 'var(--color-danger)';
+    }
+    
+    // Render records
+    if (records.length === 0) {
+      container.innerHTML = '<p class="text-muted">Няма записи за деня</p>';
+      return;
+    }
+    
+    let html = '';
+    records.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    
+    records.forEach(r => {
+      const amount = parseFloat(r.amount);
+      const isIncome = amount >= 0;
+      const icon = isIncome ? '💰' : '💸';
+      
+      html += `
+        <div class="finance-record ${isIncome ? 'income' : 'expense'}">
+          <span class="icon">${icon}</span>
+          <span class="desc">${r.description}</span>
+          <span class="amount">${isIncome ? '+' : ''}${amount.toFixed(2)} лв.</span>
+        </div>
+      `;
+    });
+    
+    container.innerHTML = html;
+  },
+
   /**
    * Render calendar page - full appointments calendar
    */
@@ -525,7 +992,16 @@ const App = {
       day.addEventListener('click', (e) => {
         document.querySelectorAll('.calendar__day').forEach(d => d.classList.remove('calendar__day--selected'));
         e.target.classList.add('calendar__day--selected');
-        this.loadDayAppointments(e.target.dataset.date);
+        const selectedDate = e.target.dataset.date;
+        
+        // Check if on workday page
+        if (window.location.hash.includes('workday')) {
+          this.selectedDate = selectedDate;
+          this.loadWorkdayAppointments(selectedDate);
+          this.loadWorkdayFinance(selectedDate);
+        } else {
+          this.loadDayAppointments(selectedDate);
+        }
       });
     });
 
@@ -546,7 +1022,14 @@ const App = {
     const todayEl = container.querySelector('.calendar__day--today');
     if (todayEl) {
       todayEl.classList.add('calendar__day--selected');
-      this.loadDayAppointments(today);
+      
+      if (window.location.hash.includes('workday')) {
+        this.selectedDate = today;
+        this.loadWorkdayAppointments(today);
+        this.loadWorkdayFinance(today);
+      } else {
+        this.loadDayAppointments(today);
+      }
     }
   },
 

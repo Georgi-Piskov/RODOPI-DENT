@@ -1358,3 +1358,281 @@ button {
     align-items: center;
   }
 }
+
+/* ================================================
+   WORKDAY PAGE - Combined Calendar + Finance
+   ================================================ */
+
+.page--workday {
+  max-width: 100%;
+  padding: var(--spacing-4);
+}
+
+.page--workday .admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-3);
+}
+
+.header-actions {
+  display: flex;
+  gap: var(--spacing-2);
+  flex-wrap: wrap;
+}
+
+.workday-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr 320px;
+  gap: var(--spacing-4);
+  margin-top: var(--spacing-4);
+}
+
+/* Workday Calendar */
+.workday-calendar {
+  background: var(--color-white);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-4);
+  box-shadow: var(--shadow-sm);
+}
+
+.workday-calendar .calendar {
+  max-width: 100%;
+}
+
+.workday-calendar .calendar__days {
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.workday-calendar .calendar__day {
+  aspect-ratio: 1;
+  font-size: var(--font-size-sm);
+}
+
+/* Workday Appointments */
+.workday-appointments {
+  background: var(--color-white);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-4);
+  box-shadow: var(--shadow-sm);
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+}
+
+.workday-section-header {
+  border-bottom: 2px solid var(--color-primary);
+  padding-bottom: var(--spacing-2);
+  margin-bottom: var(--spacing-3);
+}
+
+.workday-section-header h3 {
+  margin: 0;
+  font-size: var(--font-size-lg);
+}
+
+.workday-appointment {
+  display: grid;
+  grid-template-columns: 60px 1fr auto;
+  gap: var(--spacing-3);
+  padding: var(--spacing-3);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-2);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.workday-appointment:hover {
+  background: var(--color-gray-50);
+  border-color: var(--color-primary);
+  transform: translateX(4px);
+}
+
+.appointment-time {
+  font-weight: 700;
+  color: var(--color-primary);
+  font-size: var(--font-size-lg);
+}
+
+.appointment-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.appointment-info strong {
+  font-size: var(--font-size-base);
+}
+
+.appointment-info .phone {
+  color: var(--color-gray-500);
+  font-size: var(--font-size-sm);
+}
+
+.appointment-info small {
+  color: var(--color-gray-400);
+  font-size: var(--font-size-xs);
+}
+
+.appointment-actions {
+  display: flex;
+  align-items: center;
+}
+
+/* Workday Finance */
+.workday-finance {
+  background: var(--color-white);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-4);
+  box-shadow: var(--shadow-sm);
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+}
+
+.finance-day-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-4);
+  padding: var(--spacing-3);
+  background: var(--color-gray-50);
+  border-radius: var(--radius-md);
+}
+
+.finance-mini-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.finance-mini-stat .label {
+  color: var(--color-gray-600);
+  font-size: var(--font-size-sm);
+}
+
+.finance-mini-stat .value {
+  font-weight: 700;
+  font-size: var(--font-size-lg);
+}
+
+.finance-mini-stat.income .value {
+  color: var(--color-success);
+}
+
+.finance-mini-stat.expense .value {
+  color: var(--color-danger);
+}
+
+.finance-mini-stat.total .value {
+  color: var(--color-primary);
+}
+
+.finance-day-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.finance-record {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+}
+
+.finance-record.income {
+  background: rgba(34, 197, 94, 0.1);
+  border-left: 3px solid var(--color-success);
+}
+
+.finance-record.expense {
+  background: rgba(239, 68, 68, 0.1);
+  border-left: 3px solid var(--color-danger);
+}
+
+.finance-record .icon {
+  font-size: var(--font-size-lg);
+}
+
+.finance-record .desc {
+  flex: 1;
+  color: var(--color-gray-700);
+}
+
+.finance-record .amount {
+  font-weight: 700;
+}
+
+.finance-record.income .amount {
+  color: var(--color-success);
+}
+
+.finance-record.expense .amount {
+  color: var(--color-danger);
+}
+
+/* Patient info card in modal */
+.patient-info-card {
+  background: var(--color-gray-50);
+  padding: var(--spacing-3);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+
+.patient-info-card strong {
+  font-size: var(--font-size-lg);
+  color: var(--color-gray-800);
+}
+
+.patient-info-card span {
+  color: var(--color-gray-500);
+}
+
+/* Responsive Workday */
+@media (max-width: 1200px) {
+  .workday-layout {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .workday-calendar {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 768px) {
+  .workday-layout {
+    grid-template-columns: 1fr;
+  }
+  
+  .page--workday .admin-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .workday-appointments,
+  .workday-finance {
+    max-height: none;
+  }
+  
+  .workday-appointment {
+    grid-template-columns: 50px 1fr;
+  }
+  
+  .appointment-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+    padding-top: var(--spacing-2);
+    border-top: 1px dashed var(--color-gray-200);
+  }
+}
