@@ -413,42 +413,538 @@ const App = {
   },
 
   /**
-   * Render calendar page (placeholder)
+   * Render calendar page - full appointments calendar
    */
-  renderCalendar() {
+  async renderCalendar() {
     const main = document.getElementById('main-content');
     main.innerHTML = `
       <div class="page page--admin">
-        <h1>📅 Календар</h1>
-        <p class="text-muted">Календарът ще бъде имплементиран в следваща версия.</p>
+        <div class="admin-header">
+          <h1>📅 Календар</h1>
+        </div>
+        <div class="admin-content">
+          <div class="calendar-container">
+            <div id="admin-calendar" class="admin-calendar"></div>
+            <div id="day-appointments" class="day-appointments">
+              <h3>Записи</h3>
+              <p class="text-muted">Изберете дата от календара</p>
+            </div>
+          </div>
+        </div>
       </div>
     `;
+    this.initAdminCalendar();
   },
 
   /**
-   * Render finance page (placeholder)
+   * Initialize admin calendar
    */
-  renderFinance() {
-    const main = document.getElementById('main-content');
-    main.innerHTML = `
-      <div class="page page--admin">
-        <h1>💰 Финанси</h1>
-        <p class="text-muted">Финансовият модул ще бъде имплементиран в следваща версия.</p>
-      </div>
-    `;
+  initAdminCalendar() {
+    const calendarEl = document.getElementById('admin-calendar');
+    if (!calendarEl) return;
+
+    const today = new Date();
+    this.renderAdminCalendarMonth(calendarEl, today.getFullYear(), today.getMonth());
   },
 
   /**
-   * Render settings page (placeholder)
+   * Render admin calendar month
    */
-  renderSettings() {
+  renderAdminCalendarMonth(container, year, month) {
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDay = firstDay.getDay() || 7;
+
+    const monthNames = [
+      'Януари', 'Февруари', 'Март', 'Април', 'Май', 'Юни',
+      'Юли', 'Август', 'Септември', 'Октомври', 'Ноември', 'Декември'
+    ];
+
+    let html = `
+      <div class="calendar calendar--admin">
+        <div class="calendar__header">
+          <button class="calendar__nav btn btn--icon" data-action="prev">◀</button>
+          <span class="calendar__title">${monthNames[month]} ${year}</span>
+          <button class="calendar__nav btn btn--icon" data-action="next">▶</button>
+        </div>
+        <div class="calendar__weekdays">
+          <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Нд</span>
+        </div>
+        <div class="calendar__days">
+    `;
+
+    for (let i = 1; i < startingDay; i++) {
+      html += '<span class="calendar__day calendar__day--empty"></span>';
+    }
+
+    const today = Utils.today();
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const isToday = date === today;
+      const isWorkingDay = Utils.isWorkingDay(date);
+      
+      let classes = 'calendar__day';
+      if (isToday) classes += ' calendar__day--today';
+      if (!isWorkingDay) classes += ' calendar__day--weekend';
+      
+      html += `<span class="${classes}" data-date="${date}">${day}</span>`;
+    }
+
+    html += '</div></div>';
+    container.innerHTML = html;
+
+    // Event listeners
+    container.querySelectorAll('.calendar__day:not(.calendar__day--empty)').forEach(day => {
+      day.addEventListener('click', (e) => {
+        document.querySelectorAll('.calendar__day').forEach(d => d.classList.remove('calendar__day--selected'));
+        e.target.classList.add('calendar__day--selected');
+        this.loadDayAppointments(e.target.dataset.date);
+      });
+    });
+
+    container.querySelectorAll('.calendar__nav').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const action = e.target.dataset.action;
+        let newMonth = month + (action === 'prev' ? -1 : 1);
+        let newYear = year;
+        
+        if (newMonth < 0) { newMonth = 11; newYear--; }
+        if (newMonth > 11) { newMonth = 0; newYear++; }
+        
+        this.renderAdminCalendarMonth(container, newYear, newMonth);
+      });
+    });
+
+    // Auto-select today
+    const todayEl = container.querySelector('.calendar__day--today');
+    if (todayEl) {
+      todayEl.classList.add('calendar__day--selected');
+      this.loadDayAppointments(today);
+    }
+  },
+
+  /**
+   * Load appointments for a specific day
+   */
+  async loadDayAppointments(date) {
+    const container = document.getElementById('day-appointments');
+    if (!container) return;
+
+    container.innerHTML = `<h3>Записи за ${Utils.formatDateBG(date)}</h3><p>Зареждане...</p>`;
+
+    const response = await API.getAppointments({ date });
+    
+    if (response.success && response.data && response.data.length > 0) {
+      let html = `<h3>Записи за ${Utils.formatDateBG(date)}</h3>`;
+      html += '<div class="appointments-list">';
+      
+      response.data.sort((a, b) => a.startTime.localeCompare(b.startTime));
+      
+      response.data.forEach(apt => {
+        html += `
+          <div class="appointment-card" data-id="${apt.id}">
+            <div class="appointment-card__time">${Utils.formatTime(apt.startTime)}</div>
+            <div class="appointment-card__info">
+              <strong>${apt.patientName}</strong>
+              <span>${apt.patientPhone}</span>
+              ${apt.reason ? `<small>${apt.reason}</small>` : ''}
+            </div>
+            <div class="appointment-card__status">
+              <span class="status-badge status-badge--${apt.status}">${Utils.getStatusLabel(apt.status)}</span>
+              <div class="appointment-card__actions">
+                ${apt.status === 'pending' ? `<button class="btn btn--sm btn--success" onclick="App.updateStatus('${apt.id}', 'confirmed')">✓</button>` : ''}
+                ${apt.status === 'confirmed' ? `<button class="btn btn--sm btn--primary" onclick="App.updateStatus('${apt.id}', 'completed')">✓✓</button>` : ''}
+                ${apt.status !== 'cancelled' && apt.status !== 'completed' ? `<button class="btn btn--sm btn--danger" onclick="App.updateStatus('${apt.id}', 'cancelled')">✗</button>` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      
+      html += '</div>';
+      container.innerHTML = html;
+    } else {
+      container.innerHTML = `<h3>Записи за ${Utils.formatDateBG(date)}</h3><p class="text-muted">Няма записи за тази дата</p>`;
+    }
+  },
+
+  /**
+   * Update appointment status
+   */
+  async updateStatus(appointmentId, status) {
+    const response = await API.updateAppointmentStatus(appointmentId, status);
+    
+    if (response.success) {
+      Utils.showToast('Статусът е обновен', 'success');
+      // Reload current day
+      const selectedDate = document.querySelector('.calendar__day--selected')?.dataset.date;
+      if (selectedDate) {
+        this.loadDayAppointments(selectedDate);
+      }
+    } else {
+      Utils.showToast('Грешка при обновяване', 'error');
+    }
+  },
+
+  /**
+   * Render finance page
+   */
+  async renderFinance() {
     const main = document.getElementById('main-content');
     main.innerHTML = `
       <div class="page page--admin">
-        <h1>⚙️ Настройки</h1>
-        <p class="text-muted">Настройките ще бъдат имплементирани в следваща версия.</p>
+        <div class="admin-header">
+          <h1>💰 Финанси</h1>
+          <button id="add-finance-btn" class="btn btn--primary">+ Добави запис</button>
+        </div>
+        
+        <div class="finance-filters">
+          <div class="filter-group">
+            <label>От дата:</label>
+            <input type="date" id="finance-start" value="${Utils.formatDateISO(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}">
+          </div>
+          <div class="filter-group">
+            <label>До дата:</label>
+            <input type="date" id="finance-end" value="${Utils.today()}">
+          </div>
+          <div class="filter-group">
+            <label>Тип:</label>
+            <select id="finance-type">
+              <option value="">Всички</option>
+              <option value="official">Официални</option>
+              <option value="custom">Собствени</option>
+            </select>
+          </div>
+          <button id="filter-finance-btn" class="btn btn--secondary">Филтрирай</button>
+        </div>
+
+        <div class="finance-summary" id="finance-summary">
+          <div class="summary-card">
+            <span class="summary-label">Общо:</span>
+            <span class="summary-value" id="total-amount">0.00 лв.</span>
+          </div>
+          <div class="summary-card">
+            <span class="summary-label">Официални:</span>
+            <span class="summary-value" id="official-amount">0.00 лв.</span>
+          </div>
+          <div class="summary-card">
+            <span class="summary-label">Собствени:</span>
+            <span class="summary-value" id="custom-amount">0.00 лв.</span>
+          </div>
+        </div>
+
+        <div id="finance-list" class="finance-list">
+          <p>Зареждане...</p>
+        </div>
+      </div>
+
+      <!-- Add Finance Modal -->
+      <div id="finance-modal" class="modal" hidden>
+        <div class="modal__backdrop"></div>
+        <div class="modal__content">
+          <h2>Добави финансов запис</h2>
+          <form id="finance-form">
+            <div class="form-group">
+              <label>Дата</label>
+              <input type="date" name="date" value="${Utils.today()}" required>
+            </div>
+            <div class="form-group">
+              <label>Тип</label>
+              <select name="type" required>
+                <option value="official">Официален</option>
+                <option value="custom">Собствен</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Сума (лв.)</label>
+              <input type="number" name="amount" step="0.01" min="0" required>
+            </div>
+            <div class="form-group">
+              <label>Описание</label>
+              <input type="text" name="description" placeholder="Процедура, пациент...">
+            </div>
+            <div class="form-group">
+              <label>Метод на плащане</label>
+              <select name="paymentMethod">
+                <option value="cash">В брой</option>
+                <option value="card">С карта</option>
+                <option value="bank_transfer">Банков превод</option>
+              </select>
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn btn--secondary" onclick="App.closeFinanceModal()">Отказ</button>
+              <button type="submit" class="btn btn--primary">Запази</button>
+            </div>
+          </form>
+        </div>
       </div>
     `;
+
+    this.setupFinanceListeners();
+    this.loadFinanceData();
+  },
+
+  /**
+   * Setup finance page listeners
+   */
+  setupFinanceListeners() {
+    document.getElementById('add-finance-btn')?.addEventListener('click', () => {
+      document.getElementById('finance-modal').hidden = false;
+    });
+
+    document.getElementById('finance-modal')?.querySelector('.modal__backdrop')?.addEventListener('click', () => {
+      this.closeFinanceModal();
+    });
+
+    document.getElementById('finance-form')?.addEventListener('submit', (e) => this.handleFinanceSubmit(e));
+
+    document.getElementById('filter-finance-btn')?.addEventListener('click', () => this.loadFinanceData());
+  },
+
+  /**
+   * Close finance modal
+   */
+  closeFinanceModal() {
+    document.getElementById('finance-modal').hidden = true;
+    document.getElementById('finance-form')?.reset();
+  },
+
+  /**
+   * Load finance data
+   */
+  async loadFinanceData() {
+    const startDate = document.getElementById('finance-start')?.value;
+    const endDate = document.getElementById('finance-end')?.value;
+    const type = document.getElementById('finance-type')?.value;
+
+    const response = await API.getFinance({ startDate, endDate, type });
+    const listEl = document.getElementById('finance-list');
+
+    if (response.success && response.data) {
+      const records = response.data.records || response.data;
+      
+      // Update summary
+      let totalOfficial = 0, totalCustom = 0;
+      records.forEach(r => {
+        if (r.type === 'official') totalOfficial += parseFloat(r.amount) || 0;
+        else totalCustom += parseFloat(r.amount) || 0;
+      });
+
+      document.getElementById('total-amount').textContent = `${(totalOfficial + totalCustom).toFixed(2)} лв.`;
+      document.getElementById('official-amount').textContent = `${totalOfficial.toFixed(2)} лв.`;
+      document.getElementById('custom-amount').textContent = `${totalCustom.toFixed(2)} лв.`;
+
+      if (records.length === 0) {
+        listEl.innerHTML = '<p class="text-muted">Няма записи за избрания период</p>';
+        return;
+      }
+
+      let html = '<table class="finance-table"><thead><tr><th>Дата</th><th>Описание</th><th>Тип</th><th>Плащане</th><th>Сума</th></tr></thead><tbody>';
+      
+      records.forEach(r => {
+        const typeLabel = r.type === 'official' ? '📋 Официален' : '📝 Собствен';
+        const paymentLabel = { cash: 'В брой', card: 'Карта', bank_transfer: 'Превод' }[r.paymentMethod] || '-';
+        html += `
+          <tr>
+            <td>${Utils.formatDateBG(r.date)}</td>
+            <td>${r.description || '-'}</td>
+            <td>${typeLabel}</td>
+            <td>${paymentLabel}</td>
+            <td class="text-right"><strong>${parseFloat(r.amount).toFixed(2)} лв.</strong></td>
+          </tr>
+        `;
+      });
+
+      html += '</tbody></table>';
+      listEl.innerHTML = html;
+    } else {
+      listEl.innerHTML = '<p class="text-muted">Грешка при зареждане</p>';
+    }
+  },
+
+  /**
+   * Handle finance form submit
+   */
+  async handleFinanceSubmit(e) {
+    e.preventDefault();
+    const form = e.target;
+    const formData = new FormData(form);
+
+    const data = {
+      date: formData.get('date'),
+      type: formData.get('type'),
+      amount: parseFloat(formData.get('amount')),
+      description: formData.get('description'),
+      paymentMethod: formData.get('paymentMethod')
+    };
+
+    const response = await API.addFinance(data);
+
+    if (response.success) {
+      Utils.showToast('Записът е добавен', 'success');
+      this.closeFinanceModal();
+      this.loadFinanceData();
+    } else {
+      Utils.showToast('Грешка при добавяне', 'error');
+    }
+  },
+
+  /**
+   * Render settings page
+   */
+  async renderSettings() {
+    const main = document.getElementById('main-content');
+    main.innerHTML = `
+      <div class="page page--admin">
+        <div class="admin-header">
+          <h1>⚙️ Настройки</h1>
+        </div>
+        
+        <div class="settings-container">
+          <form id="settings-form" class="settings-form">
+            <div class="settings-section">
+              <h3>📍 Информация за клиниката</h3>
+              <div class="form-group">
+                <label>Име на клиниката</label>
+                <input type="text" name="clinicName" id="s-clinicName" value="Родопи Дент">
+              </div>
+              <div class="form-group">
+                <label>Адрес</label>
+                <input type="text" name="clinicAddress" id="s-clinicAddress" value="">
+              </div>
+              <div class="form-group">
+                <label>Телефон</label>
+                <input type="text" name="clinicPhone" id="s-clinicPhone" value="">
+              </div>
+              <div class="form-group">
+                <label>Email</label>
+                <input type="email" name="clinicEmail" id="s-clinicEmail" value="">
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <h3>🕐 Работно време</h3>
+              <div class="time-row">
+                <div class="form-group">
+                  <label>Сутрин от:</label>
+                  <input type="time" name="morningStart" id="s-morningStart" value="09:00">
+                </div>
+                <div class="form-group">
+                  <label>до:</label>
+                  <input type="time" name="morningEnd" id="s-morningEnd" value="12:00">
+                </div>
+              </div>
+              <div class="time-row">
+                <div class="form-group">
+                  <label>Следобед от:</label>
+                  <input type="time" name="afternoonStart" id="s-afternoonStart" value="13:30">
+                </div>
+                <div class="form-group">
+                  <label>до:</label>
+                  <input type="time" name="afternoonEnd" id="s-afternoonEnd" value="17:00">
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Продължителност на час (мин):</label>
+                <input type="number" name="defaultDuration" id="s-defaultDuration" value="60" min="15" step="15">
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <h3>📱 SMS Известия</h3>
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" name="smsEnabled" id="s-smsEnabled">
+                  <span>Изпращай SMS при резервация</span>
+                </label>
+              </div>
+              <div class="form-group">
+                <label>Twilio телефон</label>
+                <input type="text" name="twilioPhone" id="s-twilioPhone" placeholder="+359...">
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn--primary btn--lg">💾 Запази настройките</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    this.loadSettings();
+    document.getElementById('settings-form')?.addEventListener('submit', (e) => this.handleSettingsSave(e));
+  },
+
+  /**
+   * Load settings from API
+   */
+  async loadSettings() {
+    const response = await API.getSettings();
+    
+    if (response.success && response.data) {
+      const settings = response.data;
+      
+      // Fill form fields
+      if (settings.clinicName) document.getElementById('s-clinicName').value = settings.clinicName;
+      if (settings.clinicAddress) document.getElementById('s-clinicAddress').value = settings.clinicAddress;
+      if (settings.clinicPhone) document.getElementById('s-clinicPhone').value = settings.clinicPhone;
+      if (settings.clinicEmail) document.getElementById('s-clinicEmail').value = settings.clinicEmail;
+      if (settings.defaultDuration) document.getElementById('s-defaultDuration').value = settings.defaultDuration;
+      if (settings.twilioPhone) document.getElementById('s-twilioPhone').value = settings.twilioPhone;
+      document.getElementById('s-smsEnabled').checked = settings.smsEnabled === 'true' || settings.smsEnabled === true;
+
+      // Parse working hours if JSON
+      if (settings.workingHours) {
+        try {
+          const hours = typeof settings.workingHours === 'string' ? JSON.parse(settings.workingHours) : settings.workingHours;
+          if (hours.morning) {
+            document.getElementById('s-morningStart').value = hours.morning.start;
+            document.getElementById('s-morningEnd').value = hours.morning.end;
+          }
+          if (hours.afternoon) {
+            document.getElementById('s-afternoonStart').value = hours.afternoon.start;
+            document.getElementById('s-afternoonEnd').value = hours.afternoon.end;
+          }
+        } catch (e) {}
+      }
+    }
+  },
+
+  /**
+   * Handle settings save
+   */
+  async handleSettingsSave(e) {
+    e.preventDefault();
+    
+    const settings = {
+      clinicName: document.getElementById('s-clinicName').value,
+      clinicAddress: document.getElementById('s-clinicAddress').value,
+      clinicPhone: document.getElementById('s-clinicPhone').value,
+      clinicEmail: document.getElementById('s-clinicEmail').value,
+      defaultDuration: document.getElementById('s-defaultDuration').value,
+      smsEnabled: document.getElementById('s-smsEnabled').checked.toString(),
+      twilioPhone: document.getElementById('s-twilioPhone').value,
+      workingHours: JSON.stringify({
+        morning: {
+          start: document.getElementById('s-morningStart').value,
+          end: document.getElementById('s-morningEnd').value
+        },
+        afternoon: {
+          start: document.getElementById('s-afternoonStart').value,
+          end: document.getElementById('s-afternoonEnd').value
+        }
+      })
+    };
+
+    const response = await API.updateSettings(settings);
+
+    if (response.success) {
+      Utils.showToast('Настройките са запазени', 'success');
+    } else {
+      Utils.showToast('Грешка при запазване', 'error');
+    }
   }
 };
 

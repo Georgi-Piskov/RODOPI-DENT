@@ -45,6 +45,17 @@ const Utils = {
   },
 
   /**
+   * Format date to ISO string (YYYY-MM-DD) from Date object
+   */
+  formatDateISO(date) {
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  },
+
+  /**
    * Check if a date is a working day
    */
   isWorkingDay(date) {
