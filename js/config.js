@@ -24,7 +24,7 @@ const CONFIG = {
   },
   
   // Google OAuth2 Configuration
-  GOOGLE_CLIENT_ID: '758029403966-kcrrbhapfe32jfdfsm7pkun4jfhm9b8c.apps.googleusercontent.com',
+  GOOGLE_CLIENT_ID: '758029403966-j68sst10c2pjtd2qllk6j34esqsn319n.apps.googleusercontent.com',
   
   // Working hours
   WORKING_HOURS: {
