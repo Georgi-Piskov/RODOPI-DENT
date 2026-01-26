@@ -109,12 +109,12 @@ const API = {
   },
 
   /**
-   * Confirm an appointment
+   * Confirm an appointment with duration
    */
-  async confirmAppointment(appointmentId) {
+  async confirmAppointment(appointmentId, duration = 30) {
     return this.request(CONFIG.ENDPOINTS.CONFIRM, {
       method: 'POST',
-      body: JSON.stringify({ appointmentId, status: 'confirmed' })
+      body: JSON.stringify({ appointmentId, status: 'confirmed', duration })
     });
   },
 

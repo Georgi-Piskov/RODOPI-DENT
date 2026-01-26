@@ -48,10 +48,10 @@
     },
     {
       "parameters": {
-        "jsCode": "// Get request body\nconst body = $('Webhook - Confirm').first().json.body;\nconst appointmentId = body.appointmentId;\nconst newStatus = body.status;\n\nif (!appointmentId || !newStatus) {\n  return [{\n    json: {\n      success: false,\n      error: 'appointmentId and status are required',\n      rowIndex: null\n    }\n  }];\n}\n\n// Valid statuses\nconst validStatuses = ['pending', 'confirmed', 'completed', 'cancelled'];\nif (!validStatuses.includes(newStatus)) {\n  return [{\n    json: {\n      success: false,\n      error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`,\n      rowIndex: null\n    }\n  }];\n}\n\n// Find the appointment\nconst appointments = $('Read Appointments').all();\nlet rowIndex = null;\nlet appointment = null;\n\nfor (let i = 0; i < appointments.length; i++) {\n  if (appointments[i].json.id === appointmentId) {\n    rowIndex = i + 2; // +2 because: +1 for header row, +1 for 0-based index\n    appointment = appointments[i].json;\n    break;\n  }\n}\n\nif (!rowIndex) {\n  return [{\n    json: {\n      success: false,\n      error: 'Appointment not found',\n      rowIndex: null\n    }\n  }];\n}\n\n// Return row index for update\nreturn [{\n  json: {\n    success: true,\n    rowIndex: rowIndex,\n    appointmentId: appointmentId,\n    oldStatus: appointment.status,\n    newStatus: newStatus,\n    patientName: appointment.patientName,\n    patientPhone: appointment.patientPhone,\n    date: appointment.date,\n    startTime: appointment.startTime,\n    updatedAt: new Date().toISOString()\n  }\n}];"
+        "jsCode": "// Get request body\nconst body = $('Webhook - Confirm').first().json.body;\nconst appointmentId = body.appointmentId;\nconst newStatus = body.status;\nconst newDuration = body.duration; // Optional - only for confirmation\n\nif (!appointmentId || !newStatus) {\n  return [{\n    json: {\n      success: false,\n      error: 'appointmentId and status are required',\n      found: false\n    }\n  }];\n}\n\n// Valid statuses\nconst validStatuses = ['pending', 'confirmed', 'completed', 'cancelled', 'expired'];\nif (!validStatuses.includes(newStatus)) {\n  return [{\n    json: {\n      success: false,\n      error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`,\n      found: false\n    }\n  }];\n}\n\n// Find the appointment\nconst appointments = $('Read Appointments').all();\nlet appointment = null;\n\nfor (const apt of appointments) {\n  if (apt.json.id === appointmentId) {\n    appointment = apt.json;\n    break;\n  }\n}\n\nif (!appointment) {\n  return [{\n    json: {\n      success: false,\n      error: 'Appointment not found',\n      found: false\n    }\n  }];\n}\n\n// Check for conflicts if confirming with a longer duration\nlet hasConflict = false;\nlet conflictWith = null;\n\nif (newStatus === 'confirmed' && newDuration) {\n  function timeToMinutes(time) {\n    const [hours, minutes] = time.split(':').map(Number);\n    return hours * 60 + minutes;\n  }\n  \n  const aptStart = timeToMinutes(appointment.startTime);\n  const aptEnd = aptStart + parseInt(newDuration);\n  \n  for (const other of appointments) {\n    if (other.json.id === appointment.id) continue;\n    if (other.json.date !== appointment.date) continue;\n    if (other.json.status === 'cancelled' || other.json.status === 'expired') continue;\n    \n    const otherStart = timeToMinutes(other.json.startTime);\n    const otherDuration = other.json.status === 'pending' ? 30 : (parseInt(other.json.duration) || 30);\n    const otherEnd = otherStart + otherDuration;\n    \n    if (aptStart < otherEnd && aptEnd > otherStart) {\n      hasConflict = true;\n      conflictWith = { time: other.json.startTime, name: other.json.patientName };\n      break;\n    }\n  }\n}\n\nif (hasConflict) {\n  return [{\n    json: {\n      success: false,\n      error: `Конфликт с ${conflictWith.name} в ${conflictWith.time}. Изберете по-кратка продължителност.`,\n      found: true,\n      conflict: true\n    }\n  }];\n}\n\n// Prepare update data\nconst updateData = {\n  id: appointmentId,\n  status: newStatus,\n  updatedAt: new Date().toISOString(),\n  patientName: appointment.patientName,\n  patientPhone: appointment.patientPhone,\n  date: appointment.date,\n  startTime: appointment.startTime,\n  oldStatus: appointment.status,\n  found: true,\n  success: true\n};\n\n// Add duration if confirming\nif (newStatus === 'confirmed' && newDuration) {\n  updateData.duration = parseInt(newDuration);\n}\n\nreturn [{ json: updateData }];"
       },
       "id": "code-find",
-      "name": "Find Appointment",
+      "name": "Find and Validate",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [440, 0]
@@ -68,7 +68,7 @@
         }
       },
       "id": "if-found",
-      "name": "Found?",
+      "name": "Valid?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [660, 0]
@@ -89,18 +89,18 @@
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "status": "={{ $json.newStatus }}",
+            "id": "={{ $json.id }}",
+            "status": "={{ $json.status }}",
+            "duration": "={{ $json.duration }}",
             "updatedAt": "={{ $json.updatedAt }}"
           }
         },
         "options": {
           "cellFormat": "USER_ENTERED"
-        },
-        "dataMode": "autoMapInputData",
-        "matchingColumns": ["id"]
+        }
       },
       "id": "sheets-update",
-      "name": "Update Status",
+      "name": "Update Appointment",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [880, -100],
@@ -114,7 +114,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Статусът е обновен\",\n  \"appointmentId\": \"{{ $('Find Appointment').item.json.appointmentId }}\",\n  \"oldStatus\": \"{{ $('Find Appointment').item.json.oldStatus }}\",\n  \"newStatus\": \"{{ $('Find Appointment').item.json.newStatus }}\"\n}",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Статусът е обновен\",\n  \"appointmentId\": \"{{ $('Find and Validate').item.json.id }}\",\n  \"oldStatus\": \"{{ $('Find and Validate').item.json.oldStatus }}\",\n  \"newStatus\": \"{{ $('Find and Validate').item.json.status }}\",\n  \"duration\": {{ $('Find and Validate').item.json.duration || 30 }}\n}",
         "options": {
           "responseHeaders": {
             "entries": [
@@ -153,6 +153,25 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [880, 100]
+    },
+    {
+      "parameters": {
+        "from": "",
+        "to": "={{ $json.patientPhone }}",
+        "message": "=Здравейте, {{ $json.patientName }}!\n\n{{ $json.status === 'confirmed' ? '✅ Вашият час е ПОТВЪРДЕН!' : $json.status === 'cancelled' ? '❌ Вашият час е отказан.' : $json.status === 'completed' ? '✅ Благодарим за посещението!' : '' }}\n\n📅 {{ $json.date }}\n🕐 {{ $json.startTime }}\n{{ $json.duration ? '⏱️ ' + $json.duration + ' минути' : '' }}\n\nРодопи Дент"
+      },
+      "id": "sms-notify",
+      "name": "Send SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [1100, 0],
+      "credentials": {
+        "twilioApi": {
+          "id": "",
+          "name": "Twilio"
+        }
+      },
+      "continueOnFail": true
     }
   ],
   "connections": {
@@ -171,29 +190,29 @@
       "main": [
         [
           {
-            "node": "Find Appointment",
+            "node": "Find and Validate",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Find Appointment": {
+    "Find and Validate": {
       "main": [
         [
           {
-            "node": "Found?",
+            "node": "Valid?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Found?": {
+    "Valid?": {
       "main": [
         [
           {
-            "node": "Update Status",
+            "node": "Update Appointment",
             "type": "main",
             "index": 0
           }
@@ -207,11 +226,16 @@
         ]
       ]
     },
-    "Update Status": {
+    "Update Appointment": {
       "main": [
         [
           {
             "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send SMS",
             "type": "main",
             "index": 0
           }

@@ -1,0 +1,214 @@
+{
+  "name": "Rodopi Dent - Expire Pending Appointments",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "schedule",
+      "name": "Every 30 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Appointments"
+        },
+        "options": {
+          "returnAllMatches": true
+        }
+      },
+      "id": "sheets-read",
+      "name": "Get All Appointments",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [220, 0],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Find pending appointments that have expired (older than 2 hours)\nconst pendingExpirationHours = 2;\nconst now = new Date();\n\nconst appointments = $('Get All Appointments').all();\nconst expiredPending = [];\n\nfor (const apt of appointments) {\n  if (apt.json.status !== 'pending') continue;\n  \n  const createdAt = new Date(apt.json.createdAt);\n  const expiresAt = new Date(createdAt.getTime() + pendingExpirationHours * 60 * 60 * 1000);\n  \n  if (now > expiresAt) {\n    expiredPending.push({\n      id: apt.json.id,\n      patientName: apt.json.patientName,\n      patientPhone: apt.json.patientPhone,\n      date: apt.json.date,\n      startTime: apt.json.startTime,\n      createdAt: apt.json.createdAt,\n      rowNumber: apt.json.row_number\n    });\n  }\n}\n\nif (expiredPending.length === 0) {\n  return [{ json: { message: 'No expired pending appointments', count: 0 } }];\n}\n\nreturn expiredPending.map(apt => ({ json: apt }));"
+      },
+      "id": "find-expired",
+      "name": "Find Expired Pending",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.count }}",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "if-has-expired",
+      "name": "Has Expired?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Appointments"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "status": "expired",
+            "updatedAt": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {
+          "cellFormat": "USER_ENTERED"
+        }
+      },
+      "id": "update-status",
+      "name": "Mark as Expired",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [880, -100],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "",
+        "to": "={{ $json.patientPhone }}",
+        "message": "=Здравейте, {{ $json.patientName }}!\n\nЗа съжаление, заявеният час за {{ $json.date }} в {{ $json.startTime }} не беше потвърден навреме.\n\nМоля, запазете нов час на нашия сайт или се обадете.\n\nРодопи Дент\n📞 тел. за връзка"
+      },
+      "id": "sms-expired",
+      "name": "Notify Patient Expired",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [1100, -100],
+      "credentials": {
+        "twilioApi": {
+          "id": "",
+          "name": "Twilio"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {},
+      "id": "noop",
+      "name": "No Expired",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [880, 100]
+    }
+  ],
+  "connections": {
+    "Every 30 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Get All Appointments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Appointments": {
+      "main": [
+        [
+          {
+            "node": "Find Expired Pending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Expired Pending": {
+      "main": [
+        [
+          {
+            "node": "Has Expired?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Expired?": {
+      "main": [
+        [
+          {
+            "node": "No Expired",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark as Expired",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark as Expired": {
+      "main": [
+        [
+          {
+            "node": "Notify Patient Expired",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "Rodopi Dent"
+    }
+  ]
+}

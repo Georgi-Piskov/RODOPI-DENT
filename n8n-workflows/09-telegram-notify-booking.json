@@ -1,0 +1,356 @@
+{
+  "name": "Rodopi Dent - Telegram Notify New Booking",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "booking-webhook",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-booking",
+      "name": "Webhook - Create Booking",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "booking-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate incoming booking data\nconst body = $input.first().json.body;\n\nconst required = ['patientName', 'patientPhone', 'date', 'startTime'];\nconst missing = required.filter(field => !body[field]);\n\nif (missing.length > 0) {\n  return [{\n    json: {\n      success: false,\n      error: `Липсващи полета: ${missing.join(', ')}`,\n      valid: false\n    }\n  }];\n}\n\n// Validate phone number (Bulgarian format)\nconst phone = body.patientPhone.replace(/\\s/g, '');\nconst phoneRegex = /^(\\+359|0)[0-9]{9}$/;\nif (!phoneRegex.test(phone)) {\n  return [{\n    json: {\n      success: false,\n      error: 'Невалиден телефонен номер',\n      valid: false\n    }\n  }];\n}\n\n// Prepare data for conflict check\nreturn [{\n  json: {\n    patientName: body.patientName.trim(),\n    patientPhone: phone,\n    date: body.date,\n    startTime: body.startTime,\n    duration: parseInt(body.duration) || 30,\n    reason: body.reason || '',\n    valid: true\n  }\n}];"
+      },
+      "id": "validate",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.valid }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-valid",
+      "name": "Is Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Appointments"
+        },
+        "options": {
+          "returnAllMatches": true
+        }
+      },
+      "id": "sheets-read",
+      "name": "Get Existing Appointments",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [660, -100],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the new booking request\nconst booking = $('Validate Input').first().json;\nconst newDate = booking.date;\nconst newStartTime = booking.startTime;\nconst pendingDefaultDuration = 30; // Pending винаги резервира 30 мин\n\n// Helper function\nfunction timeToMinutes(time) {\n  const [hours, minutes] = time.split(':').map(Number);\n  return hours * 60 + minutes;\n}\n\nconst newStart = timeToMinutes(newStartTime);\nconst newEnd = newStart + pendingDefaultDuration;\n\n// Get existing appointments\nconst appointments = $('Get Existing Appointments').all();\n\n// Check for conflicts with non-cancelled appointments\nlet hasConflict = false;\nlet conflictWith = null;\n\nfor (const apt of appointments) {\n  const status = apt.json.status;\n  if (status === 'cancelled' || status === 'expired') continue;\n  if (apt.json.date !== newDate) continue;\n  \n  const existingStart = timeToMinutes(apt.json.startTime);\n  // Pending uses 30 min, confirmed uses actual duration\n  const existingDuration = status === 'pending' ? 30 : (parseInt(apt.json.duration) || 30);\n  const existingEnd = existingStart + existingDuration;\n  \n  if (newStart < existingEnd && newEnd > existingStart) {\n    hasConflict = true;\n    conflictWith = apt.json.startTime;\n    break;\n  }\n}\n\nif (hasConflict) {\n  return [{\n    json: {\n      success: false,\n      error: `Този час е вече зает (конфликт с ${conflictWith})`,\n      conflict: true\n    }\n  }];\n}\n\n// No conflict - generate ID and prepare for save\nconst id = 'apt_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 8);\nconst now = new Date().toISOString();\n\nreturn [{\n  json: {\n    id: id,\n    patientName: booking.patientName,\n    patientPhone: booking.patientPhone,\n    date: booking.date,\n    startTime: booking.startTime,\n    duration: pendingDefaultDuration, // Винаги 30 за pending\n    requestedDuration: booking.duration, // Пожелана от пациента\n    reason: booking.reason,\n    status: 'pending',\n    createdAt: now,\n    updatedAt: now,\n    conflict: false\n  }\n}];"
+      },
+      "id": "check-conflicts",
+      "name": "Check Conflicts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, -100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.conflict }}",
+              "value2": false
+            }
+          ]
+        }
+      },
+      "id": "if-no-conflict",
+      "name": "No Conflict?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, -100]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Appointments"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "patientName": "={{ $json.patientName }}",
+            "patientPhone": "={{ $json.patientPhone }}",
+            "date": "={{ $json.date }}",
+            "startTime": "={{ $json.startTime }}",
+            "duration": "={{ $json.duration }}",
+            "reason": "={{ $json.reason }}",
+            "status": "={{ $json.status }}",
+            "createdAt": "={{ $json.createdAt }}",
+            "updatedAt": "={{ $json.updatedAt }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-append",
+      "name": "Save to Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1320, -200],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "DOCTOR_CHAT_ID",
+        "text": "=🦷 *Нова резервация!*\n\n👤 *Име:* {{ $('Check Conflicts').item.json.patientName }}\n📞 *Тел:* {{ $('Check Conflicts').item.json.patientPhone }}\n📅 *Дата:* {{ $('Check Conflicts').item.json.date }}\n🕐 *Час:* {{ $('Check Conflicts').item.json.startTime }}\n📝 *Причина:* {{ $('Check Conflicts').item.json.reason || 'Не е посочена' }}\n\n⏱️ Пациентът иска: {{ $('Check Conflicts').item.json.requestedDuration || 30 }} мин.\n\n*Изберете продължителност:*",
+        "additionalFields": {
+          "parse_mode": "Markdown",
+          "reply_markup": {
+            "inline_keyboard": [
+              [
+                { "text": "30 мин", "callback_data": "confirm_30_{{ $('Check Conflicts').item.json.id }}" },
+                { "text": "45 мин", "callback_data": "confirm_45_{{ $('Check Conflicts').item.json.id }}" },
+                { "text": "60 мин", "callback_data": "confirm_60_{{ $('Check Conflicts').item.json.id }}" },
+                { "text": "90 мин", "callback_data": "confirm_90_{{ $('Check Conflicts').item.json.id }}" }
+              ],
+              [
+                { "text": "❌ Откажи", "callback_data": "cancel_{{ $('Check Conflicts').item.json.id }}" }
+              ]
+            ]
+          }
+        }
+      },
+      "id": "telegram-notify",
+      "name": "Send Telegram Notification",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1540, -200],
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Часът е заявен! Очаквайте потвърждение.\",\n  \"appointmentId\": \"{{ $('Check Conflicts').item.json.id }}\",\n  \"date\": \"{{ $('Check Conflicts').item.json.date }}\",\n  \"time\": \"{{ $('Check Conflicts').item.json.startTime }}\",\n  \"status\": \"pending\"\n}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "response-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1760, -200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": false,\n  \"error\": \"{{ $json.error }}\"\n}",
+        "options": {
+          "responseCode": "409",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "response-conflict",
+      "name": "Respond Conflict",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1320, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": false,\n  \"error\": \"{{ $json.error }}\"\n}",
+        "options": {
+          "responseCode": "400",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "response-invalid",
+      "name": "Respond Invalid",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [660, 100]
+    }
+  ],
+  "connections": {
+    "Webhook - Create Booking": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Is Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Valid?": {
+      "main": [
+        [
+          {
+            "node": "Get Existing Appointments",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Existing Appointments": {
+      "main": [
+        [
+          {
+            "node": "Check Conflicts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conflicts": {
+      "main": [
+        [
+          {
+            "node": "No Conflict?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Conflict?": {
+      "main": [
+        [
+          {
+            "node": "Save to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Conflict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Sheets": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Telegram Notification": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "Rodopi Dent"
+    }
+  ]
+}

@@ -832,31 +832,147 @@ const App = {
       
       if (response.success && appointments.length > 0) {
         let html = '';
-        appointments.sort((a, b) => a.startTime.localeCompare(b.startTime));
         
-        appointments.forEach(apt => {
-          html += `
-            <div class="workday-appointment" data-id="${apt.id}" onclick="App.openPaymentModal('${apt.id}', '${apt.patientName}', '${apt.patientPhone}')">
-              <div class="appointment-time">${Utils.formatTime(apt.startTime)}</div>
-              <div class="appointment-info">
-                <strong>${apt.patientName}</strong>
-                <span class="phone">${apt.patientPhone}</span>
-                ${apt.reason ? `<small>${apt.reason}</small>` : ''}
-              </div>
-              <div class="appointment-actions">
-                <span class="status-badge status-badge--${apt.status}">${Utils.getStatusLabel(apt.status)}</span>
-              </div>
-            </div>
-          `;
-        });
+        // Separate pending from others
+        const pending = appointments.filter(a => a.status === 'pending');
+        const others = appointments.filter(a => a.status !== 'pending');
+        
+        // Show pending first with special styling
+        if (pending.length > 0) {
+          html += '<div class="pending-section"><h4>⏳ Чакащи потвърждение</h4>';
+          pending.sort((a, b) => a.startTime.localeCompare(b.startTime));
+          
+          pending.forEach(apt => {
+            html += this.renderPendingAppointment(apt);
+          });
+          html += '</div>';
+        }
+        
+        // Then confirmed/completed
+        if (others.length > 0) {
+          if (pending.length > 0) {
+            html += '<div class="confirmed-section"><h4>✅ Потвърдени</h4>';
+          }
+          others.sort((a, b) => a.startTime.localeCompare(b.startTime));
+          
+          others.forEach(apt => {
+            html += this.renderConfirmedAppointment(apt);
+          });
+          
+          if (pending.length > 0) {
+            html += '</div>';
+          }
+        }
         
         container.innerHTML = html;
+        this.setupAppointmentActions();
       } else {
         container.innerHTML = '<p class="text-muted">Няма записани пациенти</p>';
       }
     } catch (error) {
       console.log('Appointments load error:', error);
       container.innerHTML = '<p class="text-muted">Няма записани пациенти</p>';
+    }
+  },
+
+  /**
+   * Render a pending appointment with confirmation buttons
+   */
+  renderPendingAppointment(apt) {
+    return `
+      <div class="workday-appointment workday-appointment--pending" data-id="${apt.id}">
+        <div class="appointment-time">${Utils.formatTime(apt.startTime)}</div>
+        <div class="appointment-info">
+          <strong>${apt.patientName}</strong>
+          <span class="phone">${apt.patientPhone}</span>
+          ${apt.reason ? `<small>📝 ${apt.reason}</small>` : ''}
+        </div>
+        <div class="appointment-pending-actions">
+          <div class="duration-buttons">
+            <span class="duration-label">Потвърди:</span>
+            <button class="btn btn--sm btn--outline" onclick="App.confirmWithDuration('${apt.id}', 30)">30м</button>
+            <button class="btn btn--sm btn--outline" onclick="App.confirmWithDuration('${apt.id}', 45)">45м</button>
+            <button class="btn btn--sm btn--outline" onclick="App.confirmWithDuration('${apt.id}', 60)">60м</button>
+            <button class="btn btn--sm btn--outline" onclick="App.confirmWithDuration('${apt.id}', 90)">90м</button>
+          </div>
+          <button class="btn btn--sm btn--danger" onclick="App.cancelAppointment('${apt.id}')">❌</button>
+        </div>
+      </div>
+    `;
+  },
+
+  /**
+   * Render a confirmed/completed appointment
+   */
+  renderConfirmedAppointment(apt) {
+    const statusClass = apt.status === 'cancelled' ? 'workday-appointment--cancelled' : '';
+    return `
+      <div class="workday-appointment ${statusClass}" data-id="${apt.id}" onclick="App.openPaymentModal('${apt.id}', '${apt.patientName}', '${apt.patientPhone}')">
+        <div class="appointment-time">
+          ${Utils.formatTime(apt.startTime)}
+          <small>${apt.duration || 30}м</small>
+        </div>
+        <div class="appointment-info">
+          <strong>${apt.patientName}</strong>
+          <span class="phone">${apt.patientPhone}</span>
+          ${apt.reason ? `<small>${apt.reason}</small>` : ''}
+        </div>
+        <div class="appointment-actions">
+          <span class="status-badge status-badge--${apt.status}">${Utils.getStatusLabel(apt.status)}</span>
+          ${apt.status === 'confirmed' ? `<button class="btn btn--sm btn--success" onclick="event.stopPropagation(); App.completeAppointment('${apt.id}')">✓ Завърши</button>` : ''}
+        </div>
+      </div>
+    `;
+  },
+
+  /**
+   * Setup appointment action event listeners
+   */
+  setupAppointmentActions() {
+    // Already handled via onclick in the HTML
+  },
+
+  /**
+   * Confirm appointment with specific duration
+   */
+  async confirmWithDuration(appointmentId, duration) {
+    const response = await API.confirmAppointment(appointmentId, duration);
+    
+    if (response.success) {
+      Utils.showToast(`Потвърдено за ${duration} минути`, 'success');
+      this.loadWorkdayAppointments(this.selectedDate);
+    } else {
+      Utils.showToast(response.error || 'Грешка при потвърждение', 'error');
+    }
+  },
+
+  /**
+   * Cancel an appointment
+   */
+  async cancelAppointment(appointmentId) {
+    if (!confirm('Сигурни ли сте, че искате да откажете този час?')) return;
+    
+    const response = await API.updateAppointmentStatus(appointmentId, 'cancelled');
+    
+    if (response.success) {
+      Utils.showToast('Часът е отказан', 'success');
+      this.loadWorkdayAppointments(this.selectedDate);
+    } else {
+      Utils.showToast('Грешка при отказване', 'error');
+    }
+  },
+
+  /**
+   * Complete an appointment
+   */
+  async completeAppointment(appointmentId) {
+    const response = await API.updateAppointmentStatus(appointmentId, 'completed');
+    
+    if (response.success) {
+      Utils.showToast('Часът е завършен', 'success');
+      this.loadWorkdayAppointments(this.selectedDate);
+    } else {
+      Utils.showToast('Грешка', 'error');
     }
   },
 

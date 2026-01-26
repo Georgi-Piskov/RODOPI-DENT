@@ -1,0 +1,403 @@
+{
+  "name": "Rodopi Dent - Telegram Callback Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": ["callback_query"],
+        "additionalFields": {}
+      },
+      "id": "telegram-trigger",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [0, 0],
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram API"
+        }
+      },
+      "webhookId": "telegram-callback"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse callback data\nconst callback = $input.first().json;\nconst callbackData = callback.callback_query.data;\nconst messageId = callback.callback_query.message.message_id;\nconst chatId = callback.callback_query.message.chat.id;\n\n// Expected format: confirm_30_apt_xxx or cancel_apt_xxx\nlet action, duration, appointmentId;\n\nif (callbackData.startsWith('confirm_')) {\n  // confirm_30_apt_xxx\n  const parts = callbackData.split('_');\n  action = 'confirm';\n  duration = parseInt(parts[1]);\n  appointmentId = parts.slice(2).join('_'); // apt_xxx\n} else if (callbackData.startsWith('cancel_')) {\n  // cancel_apt_xxx\n  action = 'cancel';\n  duration = 0;\n  appointmentId = callbackData.replace('cancel_', '');\n} else {\n  return [{ json: { error: 'Unknown action', valid: false } }];\n}\n\nreturn [{\n  json: {\n    action: action,\n    duration: duration,\n    appointmentId: appointmentId,\n    messageId: messageId,\n    chatId: chatId,\n    valid: true\n  }\n}];"
+      },
+      "id": "parse-callback",
+      "name": "Parse Callback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Appointments"
+        },
+        "options": {
+          "returnAllMatches": true
+        }
+      },
+      "id": "sheets-read",
+      "name": "Get Appointment",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [440, 0],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Find the appointment and check for conflicts if confirming with longer duration\nconst parsed = $('Parse Callback').first().json;\nconst appointments = $('Get Appointment').all();\n\n// Find target appointment\nconst apt = appointments.find(a => a.json.id === parsed.appointmentId);\n\nif (!apt) {\n  return [{ json: { error: 'Записът не е намерен', valid: false, action: 'error' } }];\n}\n\nif (apt.json.status !== 'pending') {\n  return [{ json: { error: 'Записът вече е обработен', valid: false, action: 'already_processed' } }];\n}\n\n// If cancelling, no need to check conflicts\nif (parsed.action === 'cancel') {\n  return [{\n    json: {\n      ...apt.json,\n      action: 'cancel',\n      newStatus: 'cancelled',\n      messageId: parsed.messageId,\n      chatId: parsed.chatId,\n      valid: true\n    }\n  }];\n}\n\n// Confirming - check if new duration causes conflicts\nconst newDuration = parsed.duration;\n\nfunction timeToMinutes(time) {\n  const [hours, minutes] = time.split(':').map(Number);\n  return hours * 60 + minutes;\n}\n\nconst aptStart = timeToMinutes(apt.json.startTime);\nconst aptEnd = aptStart + newDuration;\n\n// Check conflicts with other appointments\nlet hasConflict = false;\nlet conflictWith = null;\n\nfor (const other of appointments) {\n  if (other.json.id === apt.json.id) continue;\n  if (other.json.date !== apt.json.date) continue;\n  if (other.json.status === 'cancelled' || other.json.status === 'expired') continue;\n  \n  const otherStart = timeToMinutes(other.json.startTime);\n  const otherDuration = other.json.status === 'pending' ? 30 : (parseInt(other.json.duration) || 30);\n  const otherEnd = otherStart + otherDuration;\n  \n  // Check overlap\n  if (aptStart < otherEnd && aptEnd > otherStart) {\n    hasConflict = true;\n    conflictWith = {\n      time: other.json.startTime,\n      name: other.json.patientName,\n      status: other.json.status\n    };\n    break;\n  }\n}\n\nif (hasConflict) {\n  return [{\n    json: {\n      ...apt.json,\n      action: 'conflict',\n      conflictWith: conflictWith,\n      requestedDuration: newDuration,\n      messageId: parsed.messageId,\n      chatId: parsed.chatId,\n      valid: false\n    }\n  }];\n}\n\n// No conflict - proceed with confirmation\nreturn [{\n  json: {\n    ...apt.json,\n    action: 'confirm',\n    newStatus: 'confirmed',\n    newDuration: newDuration,\n    messageId: parsed.messageId,\n    chatId: parsed.chatId,\n    valid: true\n  }\n}];"
+      },
+      "id": "process-action",
+      "name": "Process Action",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.action }}",
+              "value2": "confirm"
+            }
+          ]
+        }
+      },
+      "id": "switch-action",
+      "name": "Switch Action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [880, 0],
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "value": "confirm",
+              "value2": "={{ $json.action }}",
+              "operation": "equals"
+            },
+            {
+              "value": "cancel",
+              "value2": "={{ $json.action }}",
+              "operation": "equals"
+            },
+            {
+              "value": "conflict",
+              "value2": "={{ $json.action }}",
+              "operation": "equals"
+            }
+          ]
+        },
+        "fallbackOutput": "extra"
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Appointments"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "status": "confirmed",
+            "duration": "={{ $json.newDuration }}",
+            "updatedAt": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "update-confirm",
+      "name": "Update Confirmed",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1100, -200],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Appointments"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "status": "cancelled",
+            "updatedAt": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "update-cancel",
+      "name": "Update Cancelled",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1100, 0],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "",
+        "to": "={{ $json.patientPhone }}",
+        "message": "=Здравейте, {{ $json.patientName }}!\n\n✅ Вашият час е ПОТВЪРДЕН:\n📅 {{ $json.date }}\n🕐 {{ $json.startTime }}\n⏱️ {{ $json.newDuration }} минути\n\nОчакваме Ви!\nРодопи Дент"
+      },
+      "id": "sms-confirm",
+      "name": "SMS Confirmed",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [1320, -200],
+      "credentials": {
+        "twilioApi": {
+          "id": "",
+          "name": "Twilio"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "from": "",
+        "to": "={{ $json.patientPhone }}",
+        "message": "=Здравейте, {{ $json.patientName }}!\n\n❌ За съжаление, заявеният час за {{ $json.date }} в {{ $json.startTime }} не може да бъде потвърден.\n\nМоля, изберете друг час или се обадете.\n\nРодопи Дент"
+      },
+      "id": "sms-cancel",
+      "name": "SMS Cancelled",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [1320, 0],
+      "credentials": {
+        "twilioApi": {
+          "id": "",
+          "name": "Twilio"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "=✅ *Потвърдено!*\n\n{{ $json.patientName }} - {{ $json.date }} в {{ $json.startTime }}\nПродължителност: {{ $json.newDuration }} мин.\n\nSMS изпратен на пациента.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "telegram-confirm-reply",
+      "name": "Reply Confirmed",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1540, -200],
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "=❌ *Отказано!*\n\n{{ $json.patientName }} - {{ $json.date }} в {{ $json.startTime }}\n\nSMS изпратен на пациента.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "telegram-cancel-reply",
+      "name": "Reply Cancelled",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1540, 0],
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "=⚠️ *Конфликт!*\n\nНе може да потвърдите {{ $json.newDuration }} мин., защото има конфликт с:\n{{ $json.conflictWith.name }} в {{ $json.conflictWith.time }}\n\nИзберете по-кратка продължителност.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "telegram-conflict-reply",
+      "name": "Reply Conflict",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1100, 200],
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parse Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Callback": {
+      "main": [
+        [
+          {
+            "node": "Get Appointment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Appointment": {
+      "main": [
+        [
+          {
+            "node": "Process Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Action": {
+      "main": [
+        [
+          {
+            "node": "Switch Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Action": {
+      "main": [
+        [
+          {
+            "node": "Update Confirmed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Cancelled",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Conflict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Confirmed": {
+      "main": [
+        [
+          {
+            "node": "SMS Confirmed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Cancelled": {
+      "main": [
+        [
+          {
+            "node": "SMS Cancelled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SMS Confirmed": {
+      "main": [
+        [
+          {
+            "node": "Reply Confirmed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SMS Cancelled": {
+      "main": [
+        [
+          {
+            "node": "Reply Cancelled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "Rodopi Dent"
+    }
+  ]
+}

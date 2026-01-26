@@ -4,14 +4,17 @@
 
 | Файл | Endpoint | Метод | Описание |
 |------|----------|-------|----------|
-| `01-slots-webhook.json` | `/webhook/slots-webhook` | GET | Връща свободни часове за дата |
-| `02-booking-webhook.json` | `/webhook/booking-webhook` | POST | Създава нова резервация + SMS |
+| `01-slots-webhook.json` | `/webhook/slots-webhook` | GET | Връща свободни часове (филтрира pending + confirmed) |
+| `02-booking-webhook.json` | `/webhook/booking-webhook` | POST | Създава резервация (DEPRECATED - виж 09) |
 | `03-appointments-webhook.json` | `/webhook/appointments-webhook` | GET | Връща списък записи |
-| `04-confirm-webhook.json` | `/webhook/confirm-webhook` | POST | Обновява статус на запис |
+| `04-confirm-webhook.json` | `/webhook/confirm-webhook` | POST | Потвърждава с продължителност + SMS |
 | `05-settings-webhook.json` | `/webhook/settings-webhook` | GET/POST | Настройки на системата |
 | `06a-finance-get.json` | `/webhook/finance-webhook` | GET | Чете финансови записи |
 | `06b-finance-add.json` | `/webhook/finance-add` | POST | Добавя финансов запис |
 | `07-daily-backup.json` | - | Schedule | Ежедневен backup в 23:00 |
+| `08-expire-pending.json` | - | Schedule 30м | Изтича pending след 2 часа |
+| `09-telegram-notify-booking.json` | `/webhook/booking-webhook` | POST | Резервация + Telegram нотификация |
+| `10-telegram-callback.json` | - | Telegram Trigger | Обработва бутони от Telegram |
 
 ---
 
