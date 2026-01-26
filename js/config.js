@@ -24,7 +24,7 @@ const CONFIG = {
   },
   
   // Google OAuth2 Configuration
-  GOOGLE_CLIENT_ID: '', // TODO: Add your Google OAuth Client ID
+  GOOGLE_CLIENT_ID: '758029403966-kcrrbhapfe32jfdfsm7pkun4jfhm9b8c.apps.googleusercontent.com',
   
   // Working hours
   WORKING_HOURS: {

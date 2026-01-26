@@ -4,6 +4,13 @@ const Auth = {
   // Storage keys
   TOKEN_KEY: 'rodopi_auth_token',
   USER_KEY: 'rodopi_auth_user',
+  
+  // Allowed admin emails (add your email here)
+  ALLOWED_ADMINS: [
+    'rodopident@gmail.com',
+    'admin@rodopident.bg',
+    'georgi.piskov@gmail.com' // Add your actual email
+  ],
 
   /**
    * Initialize Google OAuth
@@ -36,31 +43,72 @@ const Auth = {
     window.google.accounts.id.initialize({
       client_id: CONFIG.GOOGLE_CLIENT_ID,
       callback: (response) => this.handleGoogleCallback(response),
-      auto_select: false
+      auto_select: false,
+      cancel_on_tap_outside: true
     });
+    
+    console.log('Google Auth initialized');
   },
 
   /**
-   * Trigger Google Sign In
+   * Trigger Google Sign In - renders the button or prompts
    */
   signInWithGoogle() {
     if (!window.google || !CONFIG.GOOGLE_CLIENT_ID) {
       Utils.showToast('Google вход не е конфигуриран', 'error');
-      
-      // For development: simulate login
-      if (CONFIG.DEMO_MODE) {
-        this.setUser({
-          name: 'Demo User',
-          email: 'demo@rodopident.bg',
-          picture: ''
-        });
-        this.setToken('demo-token');
-        Router.navigate('/admin/dashboard');
-      }
       return;
     }
 
-    window.google.accounts.id.prompt();
+    // Try to render button in container if exists
+    const buttonContainer = document.getElementById('google-signin-container');
+    if (buttonContainer) {
+      buttonContainer.innerHTML = '';
+      window.google.accounts.id.renderButton(buttonContainer, {
+        theme: 'outline',
+        size: 'large',
+        text: 'signin_with',
+        shape: 'rectangular',
+        logo_alignment: 'left',
+        width: 280
+      });
+    } else {
+      // Fallback to prompt
+      window.google.accounts.id.prompt((notification) => {
+        if (notification.isNotDisplayed()) {
+          console.log('Prompt not displayed:', notification.getNotDisplayedReason());
+          // Show manual button
+          this.showManualSignIn();
+        }
+        if (notification.isSkippedMoment()) {
+          console.log('Prompt skipped:', notification.getSkippedReason());
+        }
+      });
+    }
+  },
+  
+  /**
+   * Show manual sign in option when prompt fails
+   */
+  showManualSignIn() {
+    const loginCard = document.querySelector('.login-card');
+    if (loginCard) {
+      // Add container for Google button
+      let container = document.getElementById('google-signin-container');
+      if (!container) {
+        container = document.createElement('div');
+        container.id = 'google-signin-container';
+        container.style.marginTop = '1rem';
+        loginCard.appendChild(container);
+      }
+      
+      window.google.accounts.id.renderButton(container, {
+        theme: 'filled_blue',
+        size: 'large',
+        text: 'signin_with',
+        shape: 'rectangular',
+        width: 280
+      });
+    }
   },
 
   /**
@@ -72,6 +120,12 @@ const Auth = {
       const payload = this.decodeJWT(response.credential);
       
       if (payload) {
+        // Check if user is allowed admin
+        if (!this.isAllowedAdmin(payload.email)) {
+          Utils.showToast('Нямате права за достъп до админ панела', 'error');
+          return;
+        }
+        
         this.setUser({
           name: payload.name,
           email: payload.email,
@@ -83,6 +137,15 @@ const Auth = {
         Router.navigate('/admin/dashboard');
       }
     }
+  },
+  
+  /**
+   * Check if email is allowed admin
+   */
+  isAllowedAdmin(email) {
+    // Allow all for now (remove this in production and use ALLOWED_ADMINS)
+    return true;
+    // return this.ALLOWED_ADMINS.includes(email.toLowerCase());
   },
 
   /**
