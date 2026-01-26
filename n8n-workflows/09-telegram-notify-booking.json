@@ -167,23 +167,30 @@
       "parameters": {
         "chatId": "DOCTOR_CHAT_ID",
         "text": "=🦷 *Нова резервация!*\n\n👤 *Име:* {{ $json.patientName }}\n📞 *Тел:* {{ $json.patientPhone }}\n📅 *Дата:* {{ $json.date }}\n🕐 *Час:* {{ $json.startTime }}\n📝 *Причина:* {{ $json.reason || 'Не е посочена' }}\n\n*Изберете продължителност:*",
-        "additionalFields": {
-          "parse_mode": "Markdown",
-          "reply_markup": {
-            "inline_keyboard": [
-              [
-                { "text": "30 мин", "callback_data": "confirm_30_{{ $json.id }}" },
-                { "text": "45 мин", "callback_data": "confirm_45_{{ $json.id }}" }
-              ],
-              [
-                { "text": "60 мин", "callback_data": "confirm_60_{{ $json.id }}" },
-                { "text": "90 мин", "callback_data": "confirm_90_{{ $json.id }}" }
-              ],
-              [
-                { "text": "❌ Откажи", "callback_data": "cancel_{{ $json.id }}" }
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": [
+                { "text": "30м", "callbackData": "=confirm_30_{{ $json.id }}" },
+                { "text": "45м", "callbackData": "=confirm_45_{{ $json.id }}" }
               ]
-            ]
-          }
+            },
+            {
+              "row": [
+                { "text": "60м", "callbackData": "=confirm_60_{{ $json.id }}" },
+                { "text": "90м", "callbackData": "=confirm_90_{{ $json.id }}" }
+              ]
+            },
+            {
+              "row": [
+                { "text": "❌ Откажи", "callbackData": "=cancel_{{ $json.id }}" }
+              ]
+            }
+          ]
+        },
+        "additionalFields": {
+          "parse_mode": "Markdown"
         }
       },
       "id": "telegram-notify",
