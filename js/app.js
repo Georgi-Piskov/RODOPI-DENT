@@ -692,19 +692,32 @@ const App = {
    */
   async handleIncomeSubmit(form) {
     const formData = new FormData(form);
+    const incomeType = formData.get('type');
     const data = {
       date: this.selectedDate || Utils.today(),
-      type: formData.get('type'),
+      type: incomeType, // 'official' or 'custom'
       amount: parseFloat(formData.get('amount')),
       description: formData.get('description') || 'Приход',
       paymentMethod: formData.get('paymentMethod'),
       category: 'income'
     };
 
-    // Save locally for now (will sync to n8n later)
-    this.addLocalFinanceRecord(data);
+    // Save to n8n/Google Sheets
+    try {
+      const response = await API.addFinanceRecord(data);
+      if (response.success) {
+        Utils.showToast('Приходът е записан', 'success');
+      } else {
+        // Fallback to local storage
+        this.addLocalFinanceRecord(data);
+        Utils.showToast('Записано локално', 'warning');
+      }
+    } catch (error) {
+      // Fallback to local storage
+      this.addLocalFinanceRecord(data);
+      Utils.showToast('Записано локално', 'warning');
+    }
     
-    Utils.showToast('Приходът е записан', 'success');
     this.closeModal('income-modal');
     form.reset();
     this.loadWorkdayFinance(this.selectedDate);
@@ -717,16 +730,26 @@ const App = {
     const formData = new FormData(form);
     const data = {
       date: this.selectedDate || Utils.today(),
-      type: 'expense',
+      type: 'custom', // expenses go to custom
       amount: -Math.abs(parseFloat(formData.get('amount'))), // Negative for expenses
       description: formData.get('description'),
       category: formData.get('category')
     };
 
-    // Save locally
-    this.addLocalFinanceRecord(data);
+    // Save to n8n/Google Sheets
+    try {
+      const response = await API.addFinanceRecord(data);
+      if (response.success) {
+        Utils.showToast('Разходът е записан', 'success');
+      } else {
+        this.addLocalFinanceRecord(data);
+        Utils.showToast('Записано локално', 'warning');
+      }
+    } catch (error) {
+      this.addLocalFinanceRecord(data);
+      Utils.showToast('Записано локално', 'warning');
+    }
     
-    Utils.showToast('Разходът е записан', 'success');
     this.closeModal('expense-modal');
     form.reset();
     this.loadWorkdayFinance(this.selectedDate);
@@ -739,7 +762,7 @@ const App = {
     const formData = new FormData(form);
     const data = {
       date: this.selectedDate || Utils.today(),
-      type: 'official',
+      type: 'official', // Patient payments are official
       amount: parseFloat(formData.get('amount')),
       description: `Плащане от ${formData.get('patientName')}`,
       paymentMethod: formData.get('paymentMethod'),
@@ -748,10 +771,20 @@ const App = {
       category: 'patient_payment'
     };
 
-    // Save locally
-    this.addLocalFinanceRecord(data);
+    // Save to n8n/Google Sheets
+    try {
+      const response = await API.addFinanceRecord(data);
+      if (response.success) {
+        Utils.showToast('Плащането е записано', 'success');
+      } else {
+        this.addLocalFinanceRecord(data);
+        Utils.showToast('Записано локално', 'warning');
+      }
+    } catch (error) {
+      this.addLocalFinanceRecord(data);
+      Utils.showToast('Записано локално', 'warning');
+    }
     
-    Utils.showToast('Плащането е записано', 'success');
     this.closeModal('payment-modal');
     form.reset();
     this.loadWorkdayFinance(this.selectedDate);
