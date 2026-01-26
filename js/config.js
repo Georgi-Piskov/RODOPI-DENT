@@ -20,6 +20,7 @@ const CONFIG = {
     PROCEDURES: '/procedures-webhook',
     SETTINGS: '/settings-webhook',
     FINANCE: '/finance-webhook',
+    FINANCE_ADD: '/finance-add',
     NHIF_PRICES: '/nhif-prices-webhook'
   },
   

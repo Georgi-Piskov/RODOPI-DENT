@@ -174,7 +174,7 @@ const API = {
    * Add finance record
    */
   async addFinanceRecord(record) {
-    return this.request(CONFIG.ENDPOINTS.FINANCE, {
+    return this.request(CONFIG.ENDPOINTS.FINANCE_ADD, {
       method: 'POST',
       body: JSON.stringify(record)
     });
