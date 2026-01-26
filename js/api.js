@@ -1,8 +1,11 @@
 // API client for Rodopi Dent PWA
 
 const API = {
+  // Request timeout in milliseconds
+  TIMEOUT: 5000,
+
   /**
-   * Base fetch wrapper with error handling
+   * Base fetch wrapper with error handling and timeout
    */
   async request(endpoint, options = {}) {
     const url = CONFIG.API_BASE_URL + endpoint;
@@ -27,7 +30,13 @@ const API = {
         throw new Error('OFFLINE');
       }
       
+      // Add timeout using AbortController
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.TIMEOUT);
+      mergedOptions.signal = controller.signal;
+      
       const response = await fetch(url, mergedOptions);
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -38,6 +47,11 @@ const API = {
       
     } catch (error) {
       console.error('API Error:', error);
+      
+      // Handle timeout
+      if (error.name === 'AbortError') {
+        return { success: false, error: 'TIMEOUT', message: 'Заявката отне твърде дълго' };
+      }
       
       // Handle offline
       if (error.message === 'OFFLINE' || !navigator.onLine) {
