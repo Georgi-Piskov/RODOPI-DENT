@@ -1256,7 +1256,10 @@ const Calendar = {
       const event = this.pendingEvents.find(e => e.id === eventId);
       if (!event) throw new Error('Събитието не е намерено');
       
-      const patientName = event.title.replace('⏳ ', '');
+      // Remove all ⏳ and ✅ prefixes to get clean name
+      const patientName = (event.title || '')
+        .replace(/^[⏳✅\s]+/, '')
+        .trim();
       
       // Calculate new end time
       const [hours, minutes] = event.startTime.split(':').map(Number);
@@ -1266,17 +1269,26 @@ const Calendar = {
       const endMins = endMinutes % 60;
       const newEndTime = `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;
       
-      // Build new description
+      // Build new description - update status
       let newDescription = (event.description || '')
-        .replace(/⏳ Статус: ЧАКАЩ \(pending\)/, '✅ Статус: ПОТВЪРДЕН')
-        .replace(/⏳ Статус: pending/, '✅ Статус: ПОТВЪРДЕН');
+        .replace(/⏳\s*Статус:\s*ЧАКАЩ\s*\(pending\)/gi, '✅ Статус: ПОТВЪРДЕН')
+        .replace(/⏳\s*Статус:\s*pending/gi, '✅ Статус: ПОТВЪРДЕН')
+        .replace(/Статус:\s*ЧАКАЩ/gi, '✅ Статус: ПОТВЪРДЕН');
       
-      if (!newDescription.includes('✅ Статус:')) {
-        newDescription += '\n✅ Статус: ПОТВЪРДЕН';
+      // Add status if not present
+      if (!newDescription.includes('Статус: ПОТВЪРДЕН')) {
+        newDescription = newDescription.replace(/Статус:[^\n]*/i, '✅ Статус: ПОТВЪРДЕН');
+        if (!newDescription.includes('Статус:')) {
+          newDescription += '\n✅ Статус: ПОТВЪРДЕН';
+        }
       }
-      newDescription += `\n⏱️ Продължителност: ${duration} мин.`;
       
-      // Update calendar event
+      // Add duration info
+      if (!newDescription.includes('Продължителност:')) {
+        newDescription += `\n⏱️ Продължителност: ${duration} мин.`;
+      }
+      
+      // Update calendar event - include description!
       const response = await API.updateCalendarEvent({
         eventId: eventId,
         patientName: `✅ ${patientName}`,
@@ -1284,7 +1296,8 @@ const Calendar = {
         startTime: event.startTime,
         endTime: newEndTime,
         duration: duration,
-        colorId: 'green'
+        colorId: 'green',
+        notes: newDescription
       });
       
       if (response.success) {
