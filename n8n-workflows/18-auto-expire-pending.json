@@ -142,8 +142,8 @@
     },
     {
       "parameters": {
-        "content": "=🕐 **Изтекли заявки изчистени**\n\nИзтрити: {{ $('Delete Expired Event').all().length || 0 }} заявки\n\nПричина: {{ $json.reason }}",
-        "chatId": "={{ $env.TELEGRAM_ADMIN_CHAT_ID }}",
+        "chatId": "2146283697",
+        "text": "=⏰ *Изтекли заявки*\n\nДнес изтекоха {{ $('Delete Expired Event').all().length || 0 }} заявки за часове.\n\nПациентите са уведомени по SMS.",
         "additionalFields": {
           "parse_mode": "Markdown"
         }
