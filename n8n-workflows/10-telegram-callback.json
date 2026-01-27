@@ -208,6 +208,31 @@
     },
     {
       "parameters": {
+        "method": "POST",
+        "url": "https://n8n.simeontsvetanovn8nworkflows.site/webhook/send-sms",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"phone\": \"{{ $('Process Action').item.json.patientPhone }}\",\n  \"template\": \"booking_confirmed\",\n  \"date\": \"{{ $('Process Action').item.json.date }}\",\n  \"time\": \"{{ $('Process Action').item.json.startTime }}\",\n  \"duration\": \"{{ $('Process Action').item.json.duration }}\",\n  \"patientName\": \"{{ $('Process Action').item.json.patientName }}\"\n}",
+        "options": {}
+      },
+      "id": "sms-confirmed",
+      "name": "SMS Confirmed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, -200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
         "chatId": "={{ $('Process Action').item.json.chatId }}",
         "text": "=❌ *Отказано!*\n\n👤 {{ $('Process Action').item.json.patientName }}\n📅 {{ $('Process Action').item.json.date }} в {{ $('Process Action').item.json.startTime }}\n\nЗаписът е изтрит от календара.",
         "additionalFields": {
@@ -225,6 +250,31 @@
           "name": "Telegram API"
         }
       }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.simeontsvetanovn8nworkflows.site/webhook/send-sms",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"phone\": \"{{ $('Process Action').item.json.patientPhone }}\",\n  \"template\": \"booking_rejected\",\n  \"date\": \"{{ $('Process Action').item.json.date }}\",\n  \"time\": \"{{ $('Process Action').item.json.startTime }}\",\n  \"patientName\": \"{{ $('Process Action').item.json.patientName }}\"\n}",
+        "options": {}
+      },
+      "id": "sms-cancelled",
+      "name": "SMS Cancelled",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 300],
+      "continueOnFail": true
     },
     {
       "parameters": {
@@ -346,6 +396,11 @@
             "node": "Reply Confirmed",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "SMS Confirmed",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -355,6 +410,11 @@
         [
           {
             "node": "Reply Cancelled",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "SMS Cancelled",
             "type": "main",
             "index": 0
           }
