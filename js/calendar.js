@@ -57,14 +57,15 @@ const Calendar = {
     `;
     
     this.setupEventListeners();
-    // Load pending events first (all future pending)
+    // Load current view events FIRST (needed for conflict detection)
+    await this.loadEvents();
+    // Load pending events (all future pending)
     await this.loadPendingEvents();
     // Load callback events (marked with 🔔)
     await this.loadCallbackEvents();
+    // Now update sections (this.events is populated)
     this.updatePendingRequestsSection();
     this.updateCallbackSection();
-    // Then load current view events
-    await this.loadEvents();
     this.renderView();
   },
 
@@ -512,6 +513,9 @@ const Calendar = {
       });
       
       if (response.success && response.data?.events) {
+        // Store ALL events for conflict detection
+        this.allFutureEvents = response.data.events;
+        
         // Filter only pending events
         this.pendingEvents = response.data.events.filter(e => {
           const title = e.title || '';
@@ -523,12 +527,15 @@ const Calendar = {
                  description.toLowerCase().includes('pending');
         });
         console.log('Loaded pending events:', this.pendingEvents.length, this.pendingEvents);
+        console.log('Loaded all future events for conflict detection:', this.allFutureEvents.length);
       } else {
         this.pendingEvents = [];
+        this.allFutureEvents = [];
       }
     } catch (error) {
       console.error('Error loading pending events:', error);
       this.pendingEvents = [];
+      this.allFutureEvents = [];
     }
   },
 
@@ -1455,11 +1462,14 @@ const Calendar = {
   getMaxAvailableMinutes(date, startTime, excludeEventId = null) {
     const startMinutes = this.timeToMinutes(startTime);
     
-    // Get all events for this date (both confirmed and pending)
-    const allEvents = [
-      ...this.events.filter(e => e.date === date),
-      ...this.pendingEvents.filter(e => e.date === date)
-    ].filter(e => e.id !== excludeEventId);
+    // Get all events for this date from allFutureEvents (most complete)
+    // Fallback to events + pendingEvents if allFutureEvents not available
+    const eventsSource = this.allFutureEvents && this.allFutureEvents.length > 0 
+      ? this.allFutureEvents 
+      : [...(this.events || []), ...(this.pendingEvents || [])];
+    
+    const allEvents = eventsSource
+      .filter(e => e.date === date && e.id !== excludeEventId);
     
     // Find the next event after this start time
     let nextEventStart = 18 * 60; // Default: end of working day (18:00)
@@ -1484,11 +1494,12 @@ const Calendar = {
     const startMinutes = this.timeToMinutes(startTime);
     const endMinutes = this.timeToMinutes(endTime);
     
-    // Get all events for this date (both confirmed and pending)
-    const allEvents = [
-      ...this.events.filter(e => e.date === date),
-      ...this.pendingEvents.filter(e => e.date === date)
-    ];
+    // Get all events for this date from allFutureEvents (most complete)
+    const eventsSource = this.allFutureEvents && this.allFutureEvents.length > 0 
+      ? this.allFutureEvents 
+      : [...(this.events || []), ...(this.pendingEvents || [])];
+    
+    const allEvents = eventsSource.filter(e => e.date === date);
     
     const conflicts = allEvents.filter(event => {
       // Exclude the event we're checking
