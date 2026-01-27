@@ -63,26 +63,47 @@ const API = {
   },
 
   // ============================================
-  // Public Endpoints (Calendar-based)
+  // Public Endpoints (Calendar-based with fallback)
   // ============================================
 
   /**
-   * Get available time slots for a date (from Google Calendar)
+   * Get available time slots for a date
+   * Tries Calendar endpoint first, falls back to Sheets if not available
    */
   async getSlots(date) {
-    // Use new calendar-based endpoint
-    return this.request(`${CONFIG.ENDPOINTS.PUBLIC_SLOTS}?date=${date}`);
+    // Try new calendar-based endpoint first
+    let result = await this.request(`${CONFIG.ENDPOINTS.PUBLIC_SLOTS}?date=${date}`);
+    
+    // If calendar endpoint fails (404 or error), fallback to old sheets endpoint
+    if (!result.success && (result.error?.includes('404') || result.error?.includes('TIMEOUT'))) {
+      console.log('Calendar endpoint unavailable, using fallback');
+      result = await this.request(`${CONFIG.ENDPOINTS.SLOTS}?date=${date}`);
+    }
+    
+    return result;
   },
 
   /**
-   * Create a new booking (creates event in Google Calendar)
+   * Create a new booking
+   * Tries Calendar endpoint first, falls back to Sheets if not available
    */
   async createBooking(bookingData) {
-    // Use new calendar-based endpoint
-    return this.request(CONFIG.ENDPOINTS.PUBLIC_BOOKING, {
+    // Try new calendar-based endpoint first
+    let result = await this.request(CONFIG.ENDPOINTS.PUBLIC_BOOKING, {
       method: 'POST',
       body: JSON.stringify(bookingData)
     });
+    
+    // If calendar endpoint fails, fallback to old booking endpoint
+    if (!result.success && (result.error?.includes('404') || result.error?.includes('TIMEOUT'))) {
+      console.log('Calendar booking endpoint unavailable, using fallback');
+      result = await this.request(CONFIG.ENDPOINTS.BOOKING, {
+        method: 'POST',
+        body: JSON.stringify(bookingData)
+      });
+    }
+    
+    return result;
   },
 
   /**
