@@ -2582,39 +2582,47 @@ button {
 
 .pending-request-card__actions {
   display: flex;
-  gap: var(--spacing-1);
+  gap: 0.5rem;
   flex-shrink: 0;
 }
 
 .pending-request-card__actions .btn {
-  min-width: 40px;
-  height: 32px;
-  padding: 0 var(--spacing-2);
+  min-width: 45px;
+  height: 34px;
+  padding: 0 0.75rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 600;
+  border: none;
+  cursor: pointer;
 }
 
 .pending-request-card__actions .pending-confirm-30,
 .pending-request-card__actions .pending-confirm-60 {
-  background: var(--success) !important;
-  color: white !important;
-  border-radius: var(--radius-sm);
-  opacity: 1 !important;
-  visibility: visible !important;
+  background-color: #22c55e !important;
+  color: #ffffff !important;
+  border-radius: 6px;
 }
 
 .pending-request-card__actions .pending-confirm-30:hover,
 .pending-request-card__actions .pending-confirm-60:hover {
-  background: #16a34a;
+  background-color: #16a34a !important;
   transform: scale(1.05);
 }
 
 .pending-request-card__actions .pending-reject {
-  width: 32px;
-  min-width: 32px;
+  background-color: #ef4444 !important;
+  color: #ffffff !important;
+  border-radius: 6px;
+  min-width: 34px;
+  width: 34px;
+}
+
+.pending-request-card__actions .pending-reject:hover {
+  background-color: #dc2626 !important;
+  transform: scale(1.05);
 }
 
 /* Duration buttons */
