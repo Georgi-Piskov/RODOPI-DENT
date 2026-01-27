@@ -386,29 +386,38 @@ const Calendar = {
     }
     
     let html = `
-      <div class="time-grid time-grid--week">
-        <!-- Empty corner -->
-        <div class="time-labels">
-          <div class="time-label" style="height: 50px;"></div>
-          ${hours.map(h => `<div class="time-label">${String(h).padStart(2, '0')}:00</div>`).join('')}
+      <div class="week-view">
+        <!-- Header row with day names -->
+        <div class="week-view__header">
+          <div class="week-view__corner"></div>
+          ${weekDays.map(wd => `
+            <div class="week-view__day-header ${wd.isToday ? 'week-view__day-header--today' : ''} ${wd.isWeekend ? 'week-view__day-header--weekend' : ''}">
+              <span class="week-view__day-name">${wd.day}</span>
+              <span class="week-view__day-num">${wd.dayNum}</span>
+            </div>
+          `).join('')}
         </div>
         
-        <!-- Week days headers -->
-        ${weekDays.map(wd => `
-          <div class="week-header__day ${wd.isToday ? 'week-header__day--today' : ''} ${wd.isWeekend ? 'week-header__day--weekend' : ''}">
-            <span class="week-header__name">${wd.day}</span>
-            <span class="week-header__date">${wd.dayNum}</span>
+        <!-- Scrollable body with time grid -->
+        <div class="week-view__body">
+          <!-- Time labels column -->
+          <div class="week-view__time-labels">
+            ${hours.map(h => `<div class="week-view__time-label">${String(h).padStart(2, '0')}:00</div>`).join('')}
           </div>
-        `).join('')}
-        
-        <!-- Day columns with hour slots -->
-        ${weekDays.map(wd => `
-          <div class="day-column ${wd.isToday ? 'day-column--today' : ''} ${wd.isWeekend ? 'day-column--weekend' : ''}" data-date="${wd.date}">
-            ${hours.map(h => `<div class="hour-slot" data-hour="${h}" data-date="${wd.date}"></div>`).join('')}
-            ${this.renderEventsForDay(wd.date)}
-            ${wd.isToday ? '<div class="current-time-line" id="time-line"></div>' : ''}
+          
+          <!-- Day columns -->
+          <div class="week-view__days">
+            ${weekDays.map(wd => `
+              <div class="week-view__day-column ${wd.isToday ? 'week-view__day-column--today' : ''} ${wd.isWeekend ? 'week-view__day-column--weekend' : ''}" data-date="${wd.date}">
+                ${hours.map(h => `<div class="week-view__hour-slot" data-hour="${h}" data-date="${wd.date}"></div>`).join('')}
+                <div class="week-view__events">
+                  ${this.renderEventsForDay(wd.date)}
+                </div>
+                ${wd.isToday ? '<div class="week-view__time-line" id="time-line"></div>' : ''}
+              </div>
+            `).join('')}
           </div>
-        `).join('')}
+        </div>
       </div>
     `;
     
@@ -644,8 +653,8 @@ const Calendar = {
    * Setup grid event listeners
    */
   setupGridListeners() {
-    // Click on empty slot to add event
-    document.querySelectorAll('.hour-slot').forEach(slot => {
+    // Click on empty slot to add event (both old and new selectors)
+    document.querySelectorAll('.hour-slot, .week-view__hour-slot').forEach(slot => {
       slot.addEventListener('click', (e) => {
         const date = slot.dataset.date;
         const hour = slot.dataset.hour;

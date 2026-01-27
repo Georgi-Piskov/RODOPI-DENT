@@ -1837,16 +1837,202 @@ button {
   font-weight: 600;
 }
 
-/* Time Grid (Day/Week View) */
-.time-grid {
-  display: grid;
-  grid-template-columns: 50px 1fr;
-  min-height: 720px;
-  overflow-x: auto;
+/* ============================================
+   WEEK VIEW - New Grid Layout
+   ============================================ */
+
+.week-view {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 200px);
+  min-height: 600px;
 }
 
-.time-grid--week {
-  grid-template-columns: 50px repeat(7, minmax(100px, 1fr));
+/* Week Header - Fixed at top */
+.week-view__header {
+  display: grid;
+  grid-template-columns: 60px repeat(7, 1fr);
+  border-bottom: 2px solid var(--color-gray-200);
+  background: var(--color-white);
+  flex-shrink: 0;
+}
+
+.week-view__corner {
+  border-right: 1px solid var(--color-gray-200);
+  background: var(--color-white);
+}
+
+.week-view__day-header {
+  text-align: center;
+  padding: var(--spacing-2) var(--spacing-1);
+  border-right: 1px solid var(--color-gray-100);
+  background: var(--color-white);
+}
+
+.week-view__day-header:last-child {
+  border-right: none;
+}
+
+.week-view__day-header--weekend {
+  background: var(--color-gray-50);
+}
+
+.week-view__day-header--today {
+  background: var(--color-primary);
+  color: white;
+}
+
+.week-view__day-name {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-gray-500);
+}
+
+.week-view__day-num {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-gray-800);
+  line-height: 1.2;
+}
+
+.week-view__day-header--today .week-view__day-name,
+.week-view__day-header--today .week-view__day-num {
+  color: white;
+}
+
+.week-view__day-header--weekend .week-view__day-name,
+.week-view__day-header--weekend .week-view__day-num {
+  color: var(--color-gray-400);
+}
+
+/* Week Body - Scrollable */
+.week-view__body {
+  display: flex;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Time Labels - Sticky left column */
+.week-view__time-labels {
+  width: 60px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--color-gray-200);
+  background: var(--color-white);
+  position: sticky;
+  left: 0;
+  z-index: 2;
+}
+
+.week-view__time-label {
+  height: 60px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding-right: var(--spacing-2);
+  padding-top: 2px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-gray-400);
+}
+
+/* Day Columns Container */
+.week-view__days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  flex: 1;
+  min-width: 700px;
+}
+
+/* Individual Day Column */
+.week-view__day-column {
+  position: relative;
+  border-right: 1px solid var(--color-gray-100);
+  background: var(--color-white);
+}
+
+.week-view__day-column:last-child {
+  border-right: none;
+}
+
+.week-view__day-column--today {
+  background: rgba(37, 99, 235, 0.03);
+}
+
+.week-view__day-column--weekend {
+  background: var(--color-gray-50);
+}
+
+/* Hour Slots */
+.week-view__hour-slot {
+  height: 60px;
+  border-bottom: 1px solid var(--color-gray-100);
+  position: relative;
+}
+
+.week-view__hour-slot::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 1px dashed var(--color-gray-100);
+}
+
+.week-view__hour-slot:hover {
+  background: rgba(37, 99, 235, 0.08);
+  cursor: pointer;
+}
+
+/* Events Container - Absolute positioned over hour slots */
+.week-view__events {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.week-view__events .calendar-event {
+  pointer-events: auto;
+}
+
+/* Current Time Line */
+.week-view__time-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-danger);
+  z-index: 10;
+}
+
+.week-view__time-line::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: -4px;
+  width: 10px;
+  height: 10px;
+  background: var(--color-danger);
+  border-radius: 50%;
+}
+
+/* ============================================
+   TIME GRID (Day View - keeping old styles)
+   ============================================ */
+
+/* Time Grid (Day View) */
+.time-grid {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  min-height: 720px;
+  overflow-x: auto;
 }
 
 /* Time Labels */
@@ -2248,8 +2434,16 @@ button {
 
 /* Responsive Calendar */
 @media (max-width: 900px) {
-  .time-grid--week {
+  .week-view__header {
     grid-template-columns: 50px repeat(7, 1fr);
+  }
+  
+  .week-view__time-labels {
+    width: 50px;
+  }
+  
+  .week-view__day-num {
+    font-size: 18px;
   }
   
   .calendar-event__phone {
@@ -2268,14 +2462,8 @@ button {
     justify-content: space-between;
   }
   
-  .time-grid--week {
-    display: none;
-  }
-  
-  .month-grid__day {
-    min-height: 60px;
-  }
-  
+  /* Hide week view on mobile, show day view instead */
+  .week-view {
   .month-grid__events {
     display: none;
   }
