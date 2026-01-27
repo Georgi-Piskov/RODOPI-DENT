@@ -411,6 +411,18 @@ const Calendar = {
     document.getElementById('event-delete-btn')?.addEventListener('click', async () => {
       await this.handleEventDelete();
     });
+    
+    // Color picker
+    document.querySelectorAll('.color-picker__option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        // Remove active from all
+        document.querySelectorAll('.color-picker__option').forEach(b => b.classList.remove('active'));
+        // Add active to clicked
+        btn.classList.add('active');
+        // Set hidden input value
+        document.querySelector('input[name="colorId"]').value = btn.dataset.color;
+      });
+    });
   },
 
   /**
@@ -846,8 +858,11 @@ const Calendar = {
       const displayName = (event.patientName || event.title || '').substring(0, 25);
       const displayTime = event.startTime || '';
       
+      // Color class
+      const colorClass = event.color ? `calendar-event--color-${event.color}` : '';
+      
       return `
-        <div class="calendar-event calendar-event--${event.status || 'confirmed'}" 
+        <div class="calendar-event calendar-event--${event.status || 'confirmed'} ${colorClass}" 
              data-event-id="${event.id}"
              style="top: ${top}px; height: ${height}px; left: ${left}%; width: calc(${width}% - 4px);"
              title="${event.patientName || event.title} - ${event.startTime}${event.patientPhone ? ' (' + event.patientPhone + ')' : ''}">
@@ -1059,6 +1074,20 @@ const Calendar = {
               </div>
             </div>
             <div class="form-group event-form__row--full">
+              <label>Цвят</label>
+              <div class="color-picker" id="color-picker">
+                <button type="button" class="color-picker__option color-picker__option--green" data-color="green" title="Зелен (стандартен)"></button>
+                <button type="button" class="color-picker__option color-picker__option--blue" data-color="blue" title="Син"></button>
+                <button type="button" class="color-picker__option color-picker__option--red" data-color="red" title="Червен"></button>
+                <button type="button" class="color-picker__option color-picker__option--yellow" data-color="yellow" title="Жълт"></button>
+                <button type="button" class="color-picker__option color-picker__option--purple" data-color="purple" title="Лилав"></button>
+                <button type="button" class="color-picker__option color-picker__option--orange" data-color="orange" title="Оранжев"></button>
+                <button type="button" class="color-picker__option color-picker__option--pink" data-color="pink" title="Розов"></button>
+                <button type="button" class="color-picker__option color-picker__option--gray" data-color="gray" title="Сив"></button>
+              </div>
+              <input type="hidden" name="colorId" value="">
+            </div>
+            <div class="form-group event-form__row--full">
               <label>Процедура</label>
               <input type="text" name="procedure" placeholder="Преглед, избелване, лечение...">
             </div>
@@ -1091,6 +1120,11 @@ const Calendar = {
     
     form.reset();
     
+    // Reset color picker
+    document.querySelectorAll('.color-picker__option').forEach(b => b.classList.remove('active'));
+    document.querySelector('.color-picker__option--green')?.classList.add('active');
+    form.colorId.value = 'green';
+    
     if (event) {
       // Edit mode
       title.textContent = 'Редактирай час';
@@ -1105,6 +1139,16 @@ const Calendar = {
       form.procedure.value = event.procedure || '';
       form.notes.value = event.notes || event.description || '';
       form.eventId.value = event.id || event.googleEventId || '';
+      
+      // Set color if exists
+      if (event.color) {
+        document.querySelectorAll('.color-picker__option').forEach(b => b.classList.remove('active'));
+        const colorBtn = document.querySelector(`.color-picker__option--${event.color}`);
+        if (colorBtn) {
+          colorBtn.classList.add('active');
+          form.colorId.value = event.color;
+        }
+      }
     } else {
       // Create mode
       title.textContent = 'Нов час';
@@ -1144,7 +1188,8 @@ const Calendar = {
       duration: parseInt(formData.get('duration')),
       status: formData.get('status'),
       procedure: formData.get('procedure'),
-      notes: formData.get('notes')
+      notes: formData.get('notes'),
+      colorId: formData.get('colorId') || 'green'
     };
     
     const submitBtn = document.getElementById('event-submit-btn');
