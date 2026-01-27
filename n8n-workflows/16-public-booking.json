@@ -210,7 +210,7 @@
     },
     {
       "parameters": {
-        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "chatId": "2146283697",
         "text": "=🦷 *Нова заявка за час!*\n\n👤 Пациент: {{ $('Prepare Event Data').first().json.patientName }}\n📞 Телефон: {{ $('Prepare Event Data').first().json.patientPhone }}\n📅 Дата: {{ $('Prepare Event Data').first().json.startDateTime.split('T')[0] }}\n🕐 Час: {{ $('Prepare Event Data').first().json.startDateTime.split('T')[1].slice(0, 5) }}\n📋 Причина: {{ $('Validate Input').first().json.reason || 'Не е посочена' }}\n\n⏳ *Изберете продължителност:*",
         "additionalFields": {
           "parse_mode": "Markdown",
@@ -268,6 +268,31 @@
           "name": "Telegram Bot"
         }
       }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.simeontsvetanovn8nworkflows.site/webhook/send-sms",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"phone\": \"{{ $('Prepare Event Data').first().json.patientPhone }}\",\n  \"template\": \"booking_received\",\n  \"date\": \"{{ $('Prepare Event Data').first().json.startDateTime.split('T')[0] }}\",\n  \"time\": \"{{ $('Prepare Event Data').first().json.startDateTime.split('T')[1].slice(0, 5) }}\",\n  \"patientName\": \"{{ $('Prepare Event Data').first().json.patientName }}\"\n}",
+        "options": {}
+      },
+      "id": "send-sms-received",
+      "name": "Send SMS to Patient",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1760, 500],
+      "continueOnFail": true
     }
   ],
   "connections": {
@@ -372,6 +397,11 @@
           },
           {
             "node": "Telegram Notify",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send SMS to Patient",
             "type": "main",
             "index": 0
           }

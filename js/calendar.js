@@ -46,6 +46,7 @@ const Calendar = {
       <div class="calendar-view">
         ${this.renderHeader()}
         ${this.renderPendingRequestsSection()}
+        ${this.renderCallbackSection()}
         <div class="calendar-view__body" id="calendar-body">
           <div class="calendar-loading">
             <div class="calendar-loading__spinner"></div>
@@ -58,7 +59,10 @@ const Calendar = {
     this.setupEventListeners();
     // Load pending events first (all future pending)
     await this.loadPendingEvents();
+    // Load callback events (marked with 🔔)
+    await this.loadCallbackEvents();
     this.updatePendingRequestsSection();
+    this.updateCallbackSection();
     // Then load current view events
     await this.loadEvents();
     this.renderView();
@@ -525,6 +529,40 @@ const Calendar = {
     } catch (error) {
       console.error('Error loading pending events:', error);
       this.pendingEvents = [];
+    }
+  },
+
+  /**
+   * Load callback events (for phone callbacks)
+   */
+  async loadCallbackEvents() {
+    try {
+      // Get events for the next 90 days to find callback requests
+      const today = new Date();
+      const futureDate = new Date();
+      futureDate.setDate(today.getDate() + 90);
+      
+      const response = await API.getCalendarEvents({
+        startDate: today.toISOString(),
+        endDate: futureDate.toISOString(),
+        view: 'month'
+      });
+      
+      if (response.success && response.data?.events) {
+        // Filter only callback events (marked with 🔔)
+        this.callbackEvents = response.data.events.filter(e => {
+          const title = e.title || '';
+          const description = e.description || '';
+          return title.startsWith('🔔') || 
+                 description.toLowerCase().includes('статус: за обаждане');
+        });
+        console.log('Loaded callback events:', this.callbackEvents.length, this.callbackEvents);
+      } else {
+        this.callbackEvents = [];
+      }
+    } catch (error) {
+      console.error('Error loading callback events:', error);
+      this.callbackEvents = [];
     }
   },
 
@@ -1087,6 +1125,104 @@ const Calendar = {
   },
 
   /**
+   * Render callback requests section (for phone callbacks)
+   */
+  renderCallbackSection() {
+    return `
+      <div class="callback-requests" id="callback-requests" style="display: none;">
+        <div class="callback-requests__header">
+          <h3 class="callback-requests__title">🔔 За обаждане</h3>
+          <span class="callback-requests__count" id="callback-count">0</span>
+        </div>
+        <div class="callback-requests__list" id="callback-list">
+          <!-- Callback requests will be rendered here -->
+        </div>
+      </div>
+    `;
+  },
+
+  /**
+   * Update callback requests section with current data
+   */
+  updateCallbackSection() {
+    const callbackList = document.getElementById('callback-list');
+    const callbackCount = document.getElementById('callback-count');
+    const callbackSection = document.getElementById('callback-requests');
+    
+    if (!callbackList || !callbackCount) return;
+    
+    // Get callback events (marked with 🔔)
+    const callbackEvents = this.callbackEvents || [];
+    
+    callbackCount.textContent = callbackEvents.length;
+    
+    if (callbackEvents.length === 0) {
+      callbackSection.style.display = 'none';
+      return;
+    }
+    
+    callbackSection.style.display = 'block';
+    
+    const html = callbackEvents.map(event => {
+      const patientName = (event.title || '').replace('🔔 ', '').replace('🔔', '').trim();
+      const dateStr = Utils.formatDate(event.date, 'dd.mm.yyyy');
+      const dayName = ['Нед', 'Пон', 'Вто', 'Сря', 'Чет', 'Пет', 'Съб'][new Date(event.date).getDay()];
+      
+      // Extract phone from description
+      const phoneMatch = (event.description || '').match(/📞 Тел: ([^\n]+)/);
+      const phone = phoneMatch ? phoneMatch[1].trim() : '';
+      
+      // Extract reason from description  
+      const reasonMatch = (event.description || '').match(/📋 Причина: ([^\n]+)/);
+      const reason = reasonMatch ? reasonMatch[1].trim() : '';
+      
+      return `
+        <div class="callback-request-card" data-event-id="${event.id}">
+          <div class="callback-request-card__info">
+            <strong>${patientName}</strong>
+            <span class="callback-request-card__datetime">
+              📅 ${dayName}, ${dateStr} в ${event.startTime}
+            </span>
+            ${phone ? `<a href="tel:${phone}" class="callback-request-card__phone">📞 ${phone}</a>` : ''}
+            ${reason ? `<span class="callback-request-card__reason">📋 ${reason}</span>` : ''}
+          </div>
+          <div class="callback-request-card__actions">
+            <button class="btn btn--success btn--small callback-done" 
+                    data-event-id="${event.id}" 
+                    title="Маркирай като обаден">
+              ✓ Обадих се
+            </button>
+            <button class="btn btn--danger btn--small callback-delete" 
+                    data-event-id="${event.id}" 
+                    title="Изтрий">
+              ✕
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    callbackList.innerHTML = html;
+    
+    // Add event listeners for callback buttons
+    callbackList.querySelectorAll('.callback-done').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const eventId = e.currentTarget.dataset.eventId;
+        await this.markCallbackDone(eventId);
+      });
+    });
+    
+    callbackList.querySelectorAll('.callback-delete').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const eventId = e.currentTarget.dataset.eventId;
+        await this.deleteCallbackEvent(eventId);
+      });
+    });
+  },
+
+  /**
    * Update pending requests section with current data
    */
   updatePendingRequestsSection() {
@@ -1125,28 +1261,70 @@ const Calendar = {
       const reasonMatch = (event.description || '').match(/📋 Причина: ([^\n]+)/);
       const reason = reasonMatch ? reasonMatch[1].trim() : '';
       
+      // Find next event to calculate max available time
+      const maxAvailableMinutes = this.getMaxAvailableMinutes(event.date, event.startTime, event.id);
+      
       // Check for conflicts with different durations
       const conflicts30 = this.checkForConflicts(event.date, event.startTime, this.addMinutesToTime(event.startTime, 30), event.id);
       const conflicts60 = this.checkForConflicts(event.date, event.startTime, this.addMinutesToTime(event.startTime, 60), event.id);
       
-      const has30Conflict = conflicts30.length > 0;
-      const has60Conflict = conflicts60.length > 0;
+      const can30 = maxAvailableMinutes >= 30;
+      const can60 = maxAvailableMinutes >= 60;
       
       // Build conflict warning message
       let conflictWarning = '';
-      if (has30Conflict || has60Conflict) {
-        const conflictNames = [...new Set([...conflicts30, ...conflicts60].map(c => 
+      let conflictNames = [];
+      if (!can30 || conflicts30.length > 0 || conflicts60.length > 0) {
+        conflictNames = [...new Set([...conflicts30, ...conflicts60].map(c => 
           (c.title || '').replace(/^[⏳✅\s]+/, '').trim()
         ))];
-        conflictWarning = `
-          <div class="pending-request-card__conflict">
-            ⚠️ Конфликт с: ${conflictNames.join(', ')}
-          </div>
-        `;
+        if (conflictNames.length > 0) {
+          conflictWarning = `
+            <div class="pending-request-card__conflict">
+              ⚠️ Следващ час след ${maxAvailableMinutes} мин: ${conflictNames.join(', ')}
+            </div>
+          `;
+        }
       }
       
+      // Build action buttons based on availability
+      let actionButtons = '';
+      
+      if (can30) {
+        actionButtons += `
+          <button class="btn btn--success btn--small pending-confirm-30" 
+                  data-event-id="${event.id}" data-duration="30" 
+                  title="Потвърди 30 мин">
+            30м
+          </button>`;
+      }
+      
+      if (can60) {
+        actionButtons += `
+          <button class="btn btn--success btn--small pending-confirm-60" 
+                  data-event-id="${event.id}" data-duration="60" 
+                  title="Потвърди 60 мин">
+            60м
+          </button>`;
+      }
+      
+      // If no confirm options available, or there's a conflict, show "for callback" button
+      if (!can30 || (maxAvailableMinutes < 60 && maxAvailableMinutes > 0)) {
+        actionButtons += `
+          <button class="btn btn--warning btn--small pending-callback" 
+                  data-event-id="${event.id}" 
+                  title="Запази за телефонно обаждане">
+            📞 За обаждане
+          </button>`;
+      }
+      
+      actionButtons += `
+        <button class="btn btn--danger btn--small pending-reject" data-event-id="${event.id}" title="Откажи">
+          ✕
+        </button>`;
+      
       return `
-        <div class="pending-request-card ${has30Conflict || has60Conflict ? 'has-conflict' : ''}" data-event-id="${event.id}">
+        <div class="pending-request-card ${!can60 ? 'has-conflict' : ''}" data-event-id="${event.id}">
           <div class="pending-request-card__info">
             <strong>${patientName}</strong>
             <span class="pending-request-card__datetime">
@@ -1157,19 +1335,7 @@ const Calendar = {
             ${conflictWarning}
           </div>
           <div class="pending-request-card__actions">
-            <button class="btn btn--success btn--small pending-confirm-30 ${has30Conflict ? 'has-conflict' : ''}" 
-                    data-event-id="${event.id}" data-duration="30" 
-                    title="${has30Conflict ? '⚠️ Ще създаде конфликт!' : 'Потвърди 30 мин'}">
-              30м${has30Conflict ? '⚠️' : ''}
-            </button>
-            <button class="btn btn--success btn--small pending-confirm-60 ${has60Conflict ? 'has-conflict' : ''}" 
-                    data-event-id="${event.id}" data-duration="60" 
-                    title="${has60Conflict ? '⚠️ Ще създаде конфликт!' : 'Потвърди 60 мин'}">
-              60м${has60Conflict ? '⚠️' : ''}
-            </button>
-            <button class="btn btn--danger btn--small pending-reject" data-event-id="${event.id}" title="Откажи">
-              ✕
-            </button>
+            ${actionButtons}
           </div>
         </div>
       `;
@@ -1192,6 +1358,15 @@ const Calendar = {
         e.stopPropagation();
         const eventId = e.currentTarget.dataset.eventId;
         this.rejectPendingRequest(eventId);
+      });
+    });
+    
+    // Add event listeners for callback buttons
+    pendingList.querySelectorAll('.pending-callback').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const eventId = e.currentTarget.dataset.eventId;
+        await this.moveToCallbackList(eventId);
       });
     });
   },
@@ -1271,6 +1446,34 @@ const Calendar = {
         resolve(null);
       });
     });
+  },
+
+  /**
+   * Get maximum available minutes until next event
+   * Returns the time in minutes until the next event starts
+   */
+  getMaxAvailableMinutes(date, startTime, excludeEventId = null) {
+    const startMinutes = this.timeToMinutes(startTime);
+    
+    // Get all events for this date (both confirmed and pending)
+    const allEvents = [
+      ...this.events.filter(e => e.date === date),
+      ...this.pendingEvents.filter(e => e.date === date)
+    ].filter(e => e.id !== excludeEventId);
+    
+    // Find the next event after this start time
+    let nextEventStart = 18 * 60; // Default: end of working day (18:00)
+    
+    for (const event of allEvents) {
+      const eventStart = this.timeToMinutes(event.startTime);
+      
+      // Only consider events that start after our start time
+      if (eventStart > startMinutes && eventStart < nextEventStart) {
+        nextEventStart = eventStart;
+      }
+    }
+    
+    return nextEventStart - startMinutes;
   },
 
   /**
@@ -1519,6 +1722,169 @@ const Calendar = {
       this.renderView();
     } else {
       throw new Error(response.error || 'Грешка при потвърждение');
+    }
+  },
+
+  /**
+   * Move pending request to callback list (for doctor to call patient)
+   */
+  async moveToCallbackList(eventId) {
+    const event = this.pendingEvents.find(e => e.id === eventId);
+    if (!event) return;
+    
+    const patientName = (event.title || '').replace(/^[⏳✅\s]+/, '').trim();
+    
+    // Extract phone number from description
+    const phoneMatch = (event.description || '').match(/📞\s*Тел:\s*([0-9+\s]+)/);
+    const patientPhone = phoneMatch ? phoneMatch[1].replace(/\s/g, '') : null;
+    
+    try {
+      // Update event to callback status (🔔 prefix, orange color)
+      let newDescription = (event.description || '')
+        .replace(/⏳\s*Статус:\s*ЧАКАЩ\s*\(pending\)/gi, '🔔 Статус: ЗА ОБАЖДАНЕ')
+        .replace(/⏳\s*Статус:\s*pending/gi, '🔔 Статус: ЗА ОБАЖДАНЕ')
+        .replace(/Статус:\s*ЧАКАЩ/gi, '🔔 Статус: ЗА ОБАЖДАНЕ');
+      
+      if (!newDescription.includes('Статус: ЗА ОБАЖДАНЕ')) {
+        newDescription += '\n🔔 Статус: ЗА ОБАЖДАНЕ';
+      }
+      
+      newDescription += `\n📅 Преместен за обаждане: ${new Date().toLocaleString('bg-BG')}`;
+      
+      const response = await API.updateCalendarEvent({
+        eventId: event.id,
+        patientName: `🔔 ${patientName}`,
+        date: event.date,
+        startTime: event.startTime,
+        endTime: event.endTime,
+        colorId: '6', // Orange for callback
+        notes: newDescription
+      });
+      
+      if (response.success) {
+        Utils.showToast(`${patientName} е добавен за телефонно обаждане`, 'info');
+        
+        // Send SMS to patient about conflict
+        if (patientPhone) {
+          const formattedDate = new Date(event.date).toLocaleDateString('bg-BG', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+          });
+          
+          API.sendSMS({
+            phone: patientPhone,
+            template: 'booking_conflict',
+            date: formattedDate,
+            time: event.startTime,
+            patientName: patientName
+          }).catch(err => console.warn('SMS error:', err));
+        }
+        
+        // Move from pending to callback list
+        this.pendingEvents = this.pendingEvents.filter(e => e.id !== eventId);
+        
+        // Add to callback events array
+        if (!this.callbackEvents) this.callbackEvents = [];
+        this.callbackEvents.push({
+          ...event,
+          title: `🔔 ${patientName}`,
+          status: 'callback'
+        });
+        
+        this.updatePendingRequestsSection();
+        this.updateCallbackSection();
+        await this.loadEvents();
+        this.renderView();
+      } else {
+        throw new Error(response.error || 'Грешка при преместване');
+      }
+    } catch (error) {
+      console.error('Error moving to callback:', error);
+      Utils.showToast('Грешка: ' + error.message, 'error');
+    }
+  },
+
+  /**
+   * Mark a callback event as done (doctor called the patient)
+   */
+  async markCallbackDone(eventId) {
+    const event = this.callbackEvents?.find(e => e.id === eventId);
+    if (!event) {
+      // Maybe it's still in calendar, find from all events
+      const calEvent = this.events.find(e => e.id === eventId);
+      if (!calEvent) return;
+    }
+    
+    const eventToUse = event || this.events.find(e => e.id === eventId);
+    const patientName = (eventToUse.title || '').replace(/^[🔔⏳✅\s]+/, '').trim();
+    
+    const confirmed = confirm(`Маркирай "${patientName}" като обаден и изтрий от списъка?`);
+    if (!confirmed) return;
+    
+    try {
+      // Delete the calendar event
+      const response = await API.deleteCalendarEvent(eventId);
+      
+      if (response.success) {
+        Utils.showToast(`${patientName} е маркиран като обаден`, 'success');
+        
+        // Remove from callback list
+        if (this.callbackEvents) {
+          this.callbackEvents = this.callbackEvents.filter(e => e.id !== eventId);
+        }
+        
+        // Remove from DOM
+        const card = document.querySelector(`.callback-request-card[data-event-id="${eventId}"]`);
+        if (card) card.remove();
+        
+        this.updateCallbackSection();
+        await this.loadEvents();
+        this.renderView();
+      } else {
+        throw new Error(response.error || 'Грешка');
+      }
+    } catch (error) {
+      console.error('Error marking callback done:', error);
+      Utils.showToast('Грешка: ' + error.message, 'error');
+    }
+  },
+
+  /**
+   * Delete a callback event without marking as done
+   */
+  async deleteCallbackEvent(eventId) {
+    const event = this.callbackEvents?.find(e => e.id === eventId);
+    const eventToUse = event || this.events.find(e => e.id === eventId);
+    if (!eventToUse) return;
+    
+    const patientName = (eventToUse.title || '').replace(/^[🔔⏳✅\s]+/, '').trim();
+    
+    const confirmed = confirm(`Сигурни ли сте, че искате да изтриете "${patientName}" от списъка за обаждане?`);
+    if (!confirmed) return;
+    
+    try {
+      const response = await API.deleteCalendarEvent(eventId);
+      
+      if (response.success) {
+        Utils.showToast(`${patientName} е изтрит`, 'success');
+        
+        if (this.callbackEvents) {
+          this.callbackEvents = this.callbackEvents.filter(e => e.id !== eventId);
+        }
+        
+        const card = document.querySelector(`.callback-request-card[data-event-id="${eventId}"]`);
+        if (card) card.remove();
+        
+        this.updateCallbackSection();
+        await this.loadEvents();
+        this.renderView();
+      } else {
+        throw new Error(response.error || 'Грешка');
+      }
+    } catch (error) {
+      console.error('Error deleting callback:', error);
+      Utils.showToast('Грешка: ' + error.message, 'error');
     }
   },
 
