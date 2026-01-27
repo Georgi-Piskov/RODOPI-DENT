@@ -1289,8 +1289,10 @@ const Calendar = {
       
       if (response.success) {
         Utils.showToast(`Часът за ${patientName} е потвърден!`, 'success');
-        // Reload pending events
-        await this.loadPendingEvents();
+        // Immediately remove from local array and DOM
+        this.pendingEvents = this.pendingEvents.filter(e => e.id !== eventId);
+        const card = document.querySelector(`.pending-request-card[data-event-id="${eventId}"]`);
+        if (card) card.remove();
         this.updatePendingRequestsSection();
         // Also reload current view events
         await this.loadEvents();
@@ -1321,8 +1323,10 @@ const Calendar = {
       
       if (response.success) {
         Utils.showToast(`Часът за ${patientName} е отказан и изтрит.`, 'success');
-        // Reload pending events
-        await this.loadPendingEvents();
+        // Immediately remove from local array and DOM
+        this.pendingEvents = this.pendingEvents.filter(e => e.id !== eventId);
+        const card = document.querySelector(`.pending-request-card[data-event-id="${eventId}"]`);
+        if (card) card.remove();
         this.updatePendingRequestsSection();
         // Also reload current view events
         await this.loadEvents();
