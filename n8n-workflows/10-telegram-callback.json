@@ -21,7 +21,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const callback = $input.first().json;\n\n// Check if this is a callback_query (button press)\nif (!callback.callback_query) {\n  return [{ json: { error: 'Not a callback query', valid: false, skip: true } }];\n}\n\nconst callbackData = callback.callback_query.data;\nconst messageId = callback.callback_query.message.message_id;\nconst chatId = callback.callback_query.message.chat.id;\n\nlet action, duration, eventId;\n\nif (callbackData.startsWith('confirm_')) {\n  const parts = callbackData.split('_');\n  action = 'confirm';\n  duration = parseInt(parts[1]);\n  // Event ID is everything after confirm_XX_\n  eventId = parts.slice(2).join('_');\n} else if (callbackData.startsWith('cancel_')) {\n  action = 'cancel';\n  duration = 0;\n  eventId = callbackData.replace('cancel_', '');\n} else {\n  return [{ json: { error: 'Unknown action', valid: false } }];\n}\n\nreturn [{\n  json: {\n    action: action,\n    duration: duration,\n    eventId: eventId,\n    messageId: messageId,\n    chatId: chatId,\n    valid: true\n  }\n}];"
+        "jsCode": "const callback = $input.first().json;\n\n// Check if this is a callback_query (button press)\nif (!callback.callback_query) {\n  return [{ json: { error: 'Not a callback query', valid: false, skip: true } }];\n}\n\nconst callbackData = callback.callback_query.data;\nconst messageId = callback.callback_query.message.message_id;\nconst chatId = callback.callback_query.message.chat.id;\n\nlet action, duration, eventId;\n\nif (callbackData.startsWith('confirm_')) {\n  const parts = callbackData.split('_');\n  action = 'confirm';\n  duration = parseInt(parts[1]);\n  // Event ID is everything after confirm_XX_\n  eventId = parts.slice(2).join('_');\n} else if (callbackData.startsWith('cancel_')) {\n  action = 'cancel';\n  duration = 0;\n  eventId = callbackData.replace('cancel_', '');\n} else if (callbackData.startsWith('callback_')) {\n  action = 'callback';\n  duration = 0;\n  eventId = callbackData.replace('callback_', '');\n} else {\n  return [{ json: { error: 'Unknown action', valid: false } }];\n}\n\nreturn [{\n  json: {\n    action: action,\n    duration: duration,\n    eventId: eventId,\n    messageId: messageId,\n    chatId: chatId,\n    valid: true\n  }\n}];"
       },
       "id": "parse-callback",
       "name": "Parse Callback",
@@ -70,7 +70,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const parsed = $('Parse Callback').first().json;\nconst event = $input.first().json;\n\nif (!event || !event.id) {\n  return [{ json: { error: 'Събитието не е намерено', action: 'error', chatId: parsed.chatId } }];\n}\n\n// Check if already confirmed (doesn't have ⏳ in title)\nconst title = event.summary || '';\nif (!title.includes('⏳')) {\n  return [{ json: { error: 'Записът вече е обработен', action: 'already_processed', chatId: parsed.chatId } }];\n}\n\n// Extract patient name (remove ⏳ prefix)\nconst patientName = title.replace('⏳ ', '').trim();\n\n// Get start time from event\nconst startDateTime = event.start?.dateTime || event.start?.date;\nconst date = startDateTime.slice(0, 10);\nconst startTime = startDateTime.slice(11, 16);\n\n// Extract phone from description\nconst description = event.description || '';\nconst phoneMatch = description.match(/📞 Тел: ([^\\n]+)/);\nconst phone = phoneMatch ? phoneMatch[1].trim() : '';\n\n// Extract reason from description\nconst reasonMatch = description.match(/📋 Причина: ([^\\n]+)/);\nconst reason = reasonMatch ? reasonMatch[1].trim() : '';\n\nif (parsed.action === 'cancel') {\n  return [{\n    json: {\n      eventId: event.id,\n      patientName: patientName,\n      patientPhone: phone,\n      date: date,\n      startTime: startTime,\n      reason: reason,\n      action: 'cancel',\n      messageId: parsed.messageId,\n      chatId: parsed.chatId,\n      valid: true\n    }\n  }];\n}\n\n// For confirm action, calculate new end time based on duration\nconst newDuration = parsed.duration;\nconst [hours, minutes] = startTime.split(':').map(Number);\nconst startMinutes = hours * 60 + minutes;\nconst endMinutes = startMinutes + newDuration;\nconst endHours = Math.floor(endMinutes / 60);\nconst endMins = endMinutes % 60;\nconst newEndTime = `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;\n\n// Build new description (update status)\nlet newDescription = description\n  .replace(/⏳ Статус: ЧАКАЩ \\(pending\\)/, '✅ Статус: ПОТВЪРДЕН')\n  .replace(/⏳ Статус: pending/, '✅ Статус: ПОТВЪРДЕН');\n\nif (!newDescription.includes('✅ Статус:')) {\n  newDescription += '\\n✅ Статус: ПОТВЪРДЕН';\n}\nnewDescription += `\\n⏱️ Продължителност: ${newDuration} мин.`;\n\nreturn [{\n  json: {\n    eventId: event.id,\n    patientName: patientName,\n    patientPhone: phone,\n    date: date,\n    startTime: startTime,\n    newEndTime: newEndTime,\n    newEndDateTime: `${date}T${newEndTime}:00`,\n    duration: newDuration,\n    reason: reason,\n    newSummary: `✅ ${patientName}`,\n    newDescription: newDescription,\n    action: 'confirm',\n    messageId: parsed.messageId,\n    chatId: parsed.chatId,\n    valid: true\n  }\n}];"
+        "jsCode": "const parsed = $('Parse Callback').first().json;\nconst event = $input.first().json;\n\nif (!event || !event.id) {\n  return [{ json: { error: 'Събитието не е намерено', action: 'error', chatId: parsed.chatId } }];\n}\n\n// Check if already confirmed (doesn't have ⏳ in title)\nconst title = event.summary || '';\nif (!title.includes('⏳')) {\n  return [{ json: { error: 'Записът вече е обработен', action: 'already_processed', chatId: parsed.chatId } }];\n}\n\n// Extract patient name (remove ⏳ prefix)\nconst patientName = title.replace('⏳ ', '').trim();\n\n// Get start time from event\nconst startDateTime = event.start?.dateTime || event.start?.date;\nconst date = startDateTime.slice(0, 10);\nconst startTime = startDateTime.slice(11, 16);\n\n// Extract phone from description\nconst description = event.description || '';\nconst phoneMatch = description.match(/📞 Тел: ([^\\n]+)/);\nconst phone = phoneMatch ? phoneMatch[1].trim() : '';\n\n// Extract reason from description\nconst reasonMatch = description.match(/📋 Причина: ([^\\n]+)/);\nconst reason = reasonMatch ? reasonMatch[1].trim() : '';\n\nif (parsed.action === 'cancel') {\n  return [{\n    json: {\n      eventId: event.id,\n      patientName: patientName,\n      patientPhone: phone,\n      date: date,\n      startTime: startTime,\n      reason: reason,\n      action: 'cancel',\n      messageId: parsed.messageId,\n      chatId: parsed.chatId,\n      valid: true\n    }\n  }];\n}\n\nif (parsed.action === 'callback') {\n  // For callback action, mark as 'for callback' - doctor will call patient\n  let newDescription = description\n    .replace(/⏳ Статус: ЧАКАЩ \\(pending\\)/, '🔔 Статус: ЗА ОБАЖДАНЕ')\n    .replace(/⏳ Статус: pending/, '🔔 Статус: ЗА ОБАЖДАНЕ');\n  \n  if (!newDescription.includes('🔔 Статус:')) {\n    newDescription += '\\n🔔 Статус: ЗА ОБАЖДАНЕ';\n  }\n  \n  return [{\n    json: {\n      eventId: event.id,\n      patientName: patientName,\n      patientPhone: phone,\n      date: date,\n      startTime: startTime,\n      reason: reason,\n      newSummary: `🔔 ${patientName}`,\n      newDescription: newDescription,\n      action: 'callback',\n      messageId: parsed.messageId,\n      chatId: parsed.chatId,\n      valid: true\n    }\n  }];\n}\n\n// For confirm action, calculate new end time based on duration\nconst newDuration = parsed.duration;\nconst [hours, minutes] = startTime.split(':').map(Number);\nconst startMinutes = hours * 60 + minutes;\nconst endMinutes = startMinutes + newDuration;\nconst endHours = Math.floor(endMinutes / 60);\nconst endMins = endMinutes % 60;\nconst newEndTime = `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;\n\n// Build new description (update status)\nlet newDescription = description\n  .replace(/⏳ Статус: ЧАКАЩ \\(pending\\)/, '✅ Статус: ПОТВЪРДЕН')\n  .replace(/⏳ Статус: pending/, '✅ Статус: ПОТВЪРДЕН');\n\nif (!newDescription.includes('✅ Статус:')) {\n  newDescription += '\\n✅ Статус: ПОТВЪРДЕН';\n}\nnewDescription += `\\n⏱️ Продължителност: ${newDuration} мин.`;\n\nreturn [{\n  json: {\n    eventId: event.id,\n    patientName: patientName,\n    patientPhone: phone,\n    date: date,\n    startTime: startTime,\n    newEndTime: newEndTime,\n    newEndDateTime: `${date}T${newEndTime}:00`,\n    duration: newDuration,\n    reason: reason,\n    newSummary: `✅ ${patientName}`,\n    newDescription: newDescription,\n    action: 'confirm',\n    messageId: parsed.messageId,\n    chatId: parsed.chatId,\n    valid: true\n  }\n}];"
       },
       "id": "process-action",
       "name": "Process Action",
@@ -295,6 +295,82 @@
           "name": "Telegram API"
         }
       }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "callback-check",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "callback",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "is-callback",
+      "name": "Is Callback?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, 400]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "rodopi.dent@gmail.com"
+        },
+        "eventId": "={{ $json.eventId }}",
+        "updateFields": {
+          "summary": "={{ $json.newSummary }}",
+          "description": "={{ $json.newDescription }}",
+          "colorId": "6"
+        }
+      },
+      "id": "update-callback",
+      "name": "Update Event Callback",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.2,
+      "position": [1320, 400],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "",
+          "name": "Google Calendar"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Process Action').item.json.chatId }}",
+        "text": "=📞 *За обаждане!*\n\n👤 {{ $('Process Action').item.json.patientName }}\n📱 {{ $('Process Action').item.json.patientPhone }}\n📅 {{ $('Process Action').item.json.date }}\n🕐 {{ $('Process Action').item.json.startTime }}\n\nМоля, обадете се на пациента да уговорите час.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "telegram-callback-reply",
+      "name": "Reply Callback",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1540, 400],
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram API"
+        }
+      }
     }
   ],
   "connections": {
@@ -353,6 +429,11 @@
           },
           {
             "node": "Is Cancel?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Is Callback?",
             "type": "main",
             "index": 0
           }
@@ -415,6 +496,29 @@
           },
           {
             "node": "SMS Cancelled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Callback?": {
+      "main": [
+        [
+          {
+            "node": "Update Event Callback",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Update Event Callback": {
+      "main": [
+        [
+          {
+            "node": "Reply Callback",
             "type": "main",
             "index": 0
           }
