@@ -1151,11 +1151,19 @@ const Calendar = {
     
     // Add event listeners for confirm/reject buttons
     pendingList.querySelectorAll('.pending-confirm').forEach(btn => {
-      btn.addEventListener('click', (e) => this.openConfirmDurationModal(e.target.dataset.eventId));
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const eventId = e.currentTarget.dataset.eventId;
+        this.openConfirmDurationModal(eventId);
+      });
     });
     
     pendingList.querySelectorAll('.pending-reject').forEach(btn => {
-      btn.addEventListener('click', (e) => this.rejectPendingRequest(e.target.dataset.eventId));
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const eventId = e.currentTarget.dataset.eventId;
+        this.rejectPendingRequest(eventId);
+      });
     });
   },
 
