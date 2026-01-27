@@ -29,6 +29,11 @@ const Calendar = {
   },
 
   /**
+   * Pending events cache (separate from current view events)
+   */
+  pendingEvents: [],
+
+  /**
    * Render the full calendar view
    */
   async render(container, view = 'week') {
@@ -51,9 +56,12 @@ const Calendar = {
     `;
     
     this.setupEventListeners();
+    // Load pending events first (all future pending)
+    await this.loadPendingEvents();
+    this.updatePendingRequestsSection();
+    // Then load current view events
     await this.loadEvents();
     this.renderView();
-    this.updatePendingRequestsSection();
   },
 
   /**
@@ -480,6 +488,43 @@ const Calendar = {
     const titleEl = document.getElementById('calendar-title');
     if (titleEl) {
       titleEl.textContent = this.getHeaderTitle();
+    }
+  },
+
+  /**
+   * Load pending events (all future events with ⏳ prefix)
+   */
+  async loadPendingEvents() {
+    try {
+      // Get events for the next 90 days to find pending requests
+      const today = new Date();
+      const futureDate = new Date();
+      futureDate.setDate(today.getDate() + 90);
+      
+      const response = await API.getCalendarEvents({
+        startDate: today.toISOString(),
+        endDate: futureDate.toISOString(),
+        view: 'month'
+      });
+      
+      if (response.success && response.data?.events) {
+        // Filter only pending events
+        this.pendingEvents = response.data.events.filter(e => {
+          const title = e.title || '';
+          const description = e.description || '';
+          return title.startsWith('⏳') || 
+                 title.toLowerCase().includes('pending') ||
+                 description.toLowerCase().includes('статус: чакащ') ||
+                 description.toLowerCase().includes('status: pending') ||
+                 description.toLowerCase().includes('pending');
+        });
+        console.log('Loaded pending events:', this.pendingEvents.length, this.pendingEvents);
+      } else {
+        this.pendingEvents = [];
+      }
+    } catch (error) {
+      console.error('Error loading pending events:', error);
+      this.pendingEvents = [];
     }
   },
 
@@ -1051,21 +1096,17 @@ const Calendar = {
     
     if (!pendingList || !pendingCount) return;
     
-    // Filter events that have ⏳ prefix (pending) or contain "pending" in description
-    const pendingEvents = this.events.filter(e => {
-      const title = e.title || '';
-      const description = e.description || '';
-      return title.startsWith('⏳') || 
-             title.toLowerCase().includes('pending') ||
-             description.toLowerCase().includes('статус: чакащ') ||
-             description.toLowerCase().includes('status: pending');
-    });
+    // Use the separately loaded pending events (covers all future dates)
+    const pendingEvents = this.pendingEvents || [];
+    
+    console.log('Pending events to display:', pendingEvents.length, pendingEvents);
     
     pendingCount.textContent = pendingEvents.length;
     
     // Hide section if no pending requests
     if (pendingEvents.length === 0) {
       pendingSection.style.display = 'none';
+      console.log('No pending requests - hiding section');
       return;
     }
     
@@ -1122,7 +1163,7 @@ const Calendar = {
    * Open modal to select duration for confirming a pending request
    */
   async openConfirmDurationModal(eventId) {
-    const event = this.events.find(e => e.id === eventId);
+    const event = this.pendingEvents.find(e => e.id === eventId);
     if (!event) return;
     
     const patientName = event.title.replace('⏳ ', '');
@@ -1161,7 +1202,7 @@ const Calendar = {
    */
   async confirmPendingRequest(eventId, duration) {
     try {
-      const event = this.events.find(e => e.id === eventId);
+      const event = this.pendingEvents.find(e => e.id === eventId);
       if (!event) throw new Error('Събитието не е намерено');
       
       const patientName = event.title.replace('⏳ ', '');
@@ -1197,9 +1238,12 @@ const Calendar = {
       
       if (response.success) {
         Utils.showToast(`Часът за ${patientName} е потвърден!`, 'success');
+        // Reload pending events
+        await this.loadPendingEvents();
+        this.updatePendingRequestsSection();
+        // Also reload current view events
         await this.loadEvents();
         this.renderView();
-        this.updatePendingRequestsSection();
       } else {
         throw new Error(response.error || 'Грешка при потвърждение');
       }
@@ -1213,7 +1257,7 @@ const Calendar = {
    * Reject a pending request
    */
   async rejectPendingRequest(eventId) {
-    const event = this.events.find(e => e.id === eventId);
+    const event = this.pendingEvents.find(e => e.id === eventId);
     if (!event) return;
     
     const patientName = event.title.replace('⏳ ', '');
@@ -1226,9 +1270,12 @@ const Calendar = {
       
       if (response.success) {
         Utils.showToast(`Часът за ${patientName} е отказан и изтрит.`, 'success');
+        // Reload pending events
+        await this.loadPendingEvents();
+        this.updatePendingRequestsSection();
+        // Also reload current view events
         await this.loadEvents();
         this.renderView();
-        this.updatePendingRequestsSection();
       } else {
         throw new Error(response.error || 'Грешка при отказване');
       }
