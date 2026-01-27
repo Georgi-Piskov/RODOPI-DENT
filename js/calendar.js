@@ -274,7 +274,7 @@ const Calendar = {
       await this.createBlockEvent(date, startTime, endTime, title);
     }
     
-    App.showNotification('Часовете са блокирани', 'success');
+    Utils.showToast('Часовете са блокирани', 'success');
     await this.loadEvents();
     this.renderView();
   },
@@ -317,7 +317,7 @@ const Calendar = {
       }
     }
     
-    App.showNotification(`Блокирани ${this.selectedSlots.length} часа`, 'success');
+    Utils.showToast(`Блокирани ${this.selectedSlots.length} часа`, 'success');
     this.clearSelection();
     await this.loadEvents();
     this.renderView();
