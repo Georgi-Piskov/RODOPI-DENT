@@ -1051,10 +1051,15 @@ const Calendar = {
     
     if (!pendingList || !pendingCount) return;
     
-    // Filter events that have ⏳ prefix (pending)
-    const pendingEvents = this.events.filter(e => 
-      e.title && e.title.startsWith('⏳')
-    );
+    // Filter events that have ⏳ prefix (pending) or contain "pending" in description
+    const pendingEvents = this.events.filter(e => {
+      const title = e.title || '';
+      const description = e.description || '';
+      return title.startsWith('⏳') || 
+             title.toLowerCase().includes('pending') ||
+             description.toLowerCase().includes('статус: чакащ') ||
+             description.toLowerCase().includes('status: pending');
+    });
     
     pendingCount.textContent = pendingEvents.length;
     
@@ -1067,17 +1072,17 @@ const Calendar = {
     pendingSection.style.display = 'block';
     
     const html = pendingEvents.map(event => {
-      const patientName = event.title.replace('⏳ ', '');
+      const patientName = (event.title || '').replace('⏳ ', '').replace('⏳', '');
       const dateStr = Utils.formatDate(event.date, 'dd.mm.yyyy');
       const dayName = ['Нед', 'Пон', 'Вто', 'Сря', 'Чет', 'Пет', 'Съб'][new Date(event.date).getDay()];
       
       // Extract phone from description
-      const phoneMatch = (event.description || '').match(/📞 Тел: ([^\\n]+)/);
-      const phone = phoneMatch ? phoneMatch[1] : '';
+      const phoneMatch = (event.description || '').match(/📞 Тел: ([^\n]+)/);
+      const phone = phoneMatch ? phoneMatch[1].trim() : '';
       
-      // Extract reason from description
-      const reasonMatch = (event.description || '').match(/📋 Причина: ([^\\n]+)/);
-      const reason = reasonMatch ? reasonMatch[1] : '';
+      // Extract reason from description  
+      const reasonMatch = (event.description || '').match(/📋 Причина: ([^\n]+)/);
+      const reason = reasonMatch ? reasonMatch[1].trim() : '';
       
       return `
         <div class="pending-request-card" data-event-id="${event.id}">
