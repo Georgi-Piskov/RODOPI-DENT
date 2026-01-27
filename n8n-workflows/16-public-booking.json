@@ -227,95 +227,53 @@
     },
     {
       "parameters": {
-        "chatId": "2146283697",
-        "text": "=🦷 *Нова заявка за час!*\n\n👤 Пациент: {{ $('Prepare Event Data').first().json.patientName }}\n📞 Телефон: {{ $('Prepare Event Data').first().json.patientPhone }}\n📅 Дата: {{ $('Prepare Event Data').first().json.startDateTime.split('T')[0] }}\n🕐 Час: {{ $('Prepare Event Data').first().json.startDateTime.split('T')[1].slice(0, 5) }}\n📋 Причина: {{ $('Validate Input').first().json.reason || 'Не е посочена' }}\n⏱️ Свободно време: {{ $('Check Conflict').first().json.maxAvailableMinutes }} мин.\n\n⏳ *Изберете продължителност:*",
-        "additionalFields": {
-          "parse_mode": "Markdown",
-          "replyMarkup": "inlineKeyboard",
-          "inlineKeyboard": {
-            "rows": [
-              {
-                "row": [
-                  {
-                    "text": "30 мин",
-                    "callbackData": "PLACEHOLDER_30"
-                  },
-                  {
-                    "text": "60 мин",
-                    "callbackData": "PLACEHOLDER_60"
-                  }
-                ]
-              },
-              {
-                "row": [
-                  {
-                    "text": "❌ Откажи",
-                    "callbackData": "PLACEHOLDER_CANCEL"
-                  }
-                ]
-              }
-            ]
-          }
-        }
+        "method": "POST",
+        "url": "=https://api.telegram.org/botBOT_TOKEN_HERE/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"2146283697\",\n  \"text\": \"🦷 *Нова заявка за час!*\\n\\n👤 Пациент: {{ $('Prepare Event Data').first().json.patientName }}\\n📞 Телефон: {{ $('Prepare Event Data').first().json.patientPhone }}\\n📅 Дата: {{ $('Prepare Event Data').first().json.startDateTime.split('T')[0] }}\\n🕐 Час: {{ $('Prepare Event Data').first().json.startDateTime.split('T')[1].slice(0, 5) }}\\n📋 Причина: {{ $('Validate Input').first().json.reason || 'Не е посочена' }}\\n⏱️ Свободно време: {{ $('Check Conflict').first().json.maxAvailableMinutes }} мин.\\n\\n⏳ *Изберете продължителност:*\",\n  \"parse_mode\": \"Markdown\",\n  \"reply_markup\": {\n    \"inline_keyboard\": [\n      [\n        {\"text\": \"✅ 30 мин\", \"callback_data\": \"confirm_30_{{ $('Create Calendar Event').first().json.id }}\"},\n        {\"text\": \"✅ 60 мин\", \"callback_data\": \"confirm_60_{{ $('Create Calendar Event').first().json.id }}\"}\n      ],\n      [\n        {\"text\": \"❌ Откажи\", \"callback_data\": \"cancel_{{ $('Create Calendar Event').first().json.id }}\"}\n      ]\n    ]\n  }\n}",
+        "options": {}
       },
       "id": "telegram-full",
       "name": "Telegram Full Options",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [1980, 350],
-      "credentials": {
-        "telegramApi": {
-          "id": "",
-          "name": "Telegram Bot"
-        }
-      },
-      "notes": "CALLBACK DATA:\n30 мин: confirm_30_{{ $('Prepare Event Data').first().json.id }}\n60 мин: confirm_60_{{ $('Prepare Event Data').first().json.id }}\nОткажи: cancel_{{ $('Prepare Event Data').first().json.id }}"
+      "notesInFlow": true,
+      "notes": "ВАЖНО: Замени BOT_TOKEN_HERE с реалния bot token от @BotFather"
     },
     {
       "parameters": {
-        "chatId": "2146283697",
-        "text": "=🦷 *Нова заявка за час!*\n\n👤 Пациент: {{ $('Prepare Event Data').first().json.patientName }}\n📞 Телефон: {{ $('Prepare Event Data').first().json.patientPhone }}\n📅 Дата: {{ $('Prepare Event Data').first().json.startDateTime.split('T')[0] }}\n🕐 Час: {{ $('Prepare Event Data').first().json.startDateTime.split('T')[1].slice(0, 5) }}\n📋 Причина: {{ $('Validate Input').first().json.reason || 'Не е посочена' }}\n⚠️ *Свободно време: само {{ $('Check Conflict').first().json.maxAvailableMinutes }} мин!*\n\n⏳ *Изберете действие:*",
-        "additionalFields": {
-          "parse_mode": "Markdown",
-          "replyMarkup": "inlineKeyboard",
-          "inlineKeyboard": {
-            "rows": [
-              {
-                "row": [
-                  {
-                    "text": "30 мин",
-                    "callbackData": "PLACEHOLDER_30"
-                  },
-                  {
-                    "text": "📞 За обаждане",
-                    "callbackData": "PLACEHOLDER_CALLBACK"
-                  }
-                ]
-              },
-              {
-                "row": [
-                  {
-                    "text": "❌ Откажи",
-                    "callbackData": "PLACEHOLDER_CANCEL"
-                  }
-                ]
-              }
-            ]
-          }
-        }
+        "method": "POST",
+        "url": "=https://api.telegram.org/botBOT_TOKEN_HERE/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"2146283697\",\n  \"text\": \"🦷 *Нова заявка за час!*\\n\\n👤 Пациент: {{ $('Prepare Event Data').first().json.patientName }}\\n📞 Телефон: {{ $('Prepare Event Data').first().json.patientPhone }}\\n📅 Дата: {{ $('Prepare Event Data').first().json.startDateTime.split('T')[0] }}\\n🕐 Час: {{ $('Prepare Event Data').first().json.startDateTime.split('T')[1].slice(0, 5) }}\\n📋 Причина: {{ $('Validate Input').first().json.reason || 'Не е посочена' }}\\n⚠️ *Свободно време: само {{ $('Check Conflict').first().json.maxAvailableMinutes }} мин!*\\n\\n⏳ *Изберете действие:*\",\n  \"parse_mode\": \"Markdown\",\n  \"reply_markup\": {\n    \"inline_keyboard\": [\n      [\n        {\"text\": \"✅ 30 мин\", \"callback_data\": \"confirm_30_{{ $('Create Calendar Event').first().json.id }}\"}\n      ],\n      [\n        {\"text\": \"📞 За обаждане\", \"callback_data\": \"callback_{{ $('Create Calendar Event').first().json.id }}\"}\n      ],\n      [\n        {\"text\": \"❌ Откажи\", \"callback_data\": \"cancel_{{ $('Create Calendar Event').first().json.id }}\"}\n      ]\n    ]\n  }\n}",
+        "options": {}
       },
       "id": "telegram-limited",
       "name": "Telegram Limited (30 only)",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [1980, 500],
-      "credentials": {
-        "telegramApi": {
-          "id": "",
-          "name": "Telegram Bot"
-        }
-      },
-      "notes": "CALLBACK DATA:\n30 мин: confirm_30_{{ $('Prepare Event Data').first().json.id }}\nЗа обаждане: callback_{{ $('Prepare Event Data').first().json.id }}\nОткажи: cancel_{{ $('Prepare Event Data').first().json.id }}"
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1980, 500]
     },
     {
       "parameters": {
