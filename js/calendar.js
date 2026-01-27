@@ -1271,12 +1271,18 @@ const Calendar = {
       // Find next event to calculate max available time
       const maxAvailableMinutes = this.getMaxAvailableMinutes(event.date, event.startTime, event.id);
       
+      // DEBUG: Log the calculation
+      console.log(`[DEBUG] Event: ${patientName}, Date: ${event.date}, Time: ${event.startTime}, MaxAvailable: ${maxAvailableMinutes} min`);
+      console.log(`[DEBUG] allFutureEvents count: ${this.allFutureEvents?.length || 0}`);
+      
       // Check for conflicts with different durations
       const conflicts30 = this.checkForConflicts(event.date, event.startTime, this.addMinutesToTime(event.startTime, 30), event.id);
       const conflicts60 = this.checkForConflicts(event.date, event.startTime, this.addMinutesToTime(event.startTime, 60), event.id);
       
       const can30 = maxAvailableMinutes >= 30;
       const can60 = maxAvailableMinutes >= 60;
+      
+      console.log(`[DEBUG] can30: ${can30}, can60: ${can60}`);
       
       // Build conflict warning message
       let conflictWarning = '';
