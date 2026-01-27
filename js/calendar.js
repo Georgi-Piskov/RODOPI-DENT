@@ -7,11 +7,14 @@ const Calendar = {
   events: [],
   isLoading: false,
   
-  // Working hours configuration
+  // Working hours configuration (7:00 - 19:00 for dental clinic)
   workingHours: {
-    start: 9,  // 9:00
-    end: 18    // 18:00
+    start: 7,   // 7:00
+    end: 19     // 19:00
   },
+  
+  // Pixels per hour for time grid
+  hourHeight: 60,
 
   /**
    * Initialize the calendar module
@@ -338,14 +341,14 @@ const Calendar = {
    */
   renderDayView() {
     const hours = this.generateHours();
-    const today = Utils.today();
+    const today = this.getToday();
     const currentDateStr = this.formatDate(this.currentDate);
     const isToday = currentDateStr === today;
     
     let html = `
       <div class="time-grid">
         <div class="time-labels">
-          ${hours.map(h => `<div class="time-label">${h}:00</div>`).join('')}
+          ${hours.map(h => `<div class="time-label">${String(h).padStart(2, '0')}:00</div>`).join('')}
         </div>
         <div class="day-column ${isToday ? 'day-column--today' : ''}" data-date="${currentDateStr}">
           ${hours.map(h => `<div class="hour-slot" data-hour="${h}" data-date="${currentDateStr}"></div>`).join('')}
@@ -364,7 +367,7 @@ const Calendar = {
   renderWeekView() {
     const hours = this.generateHours();
     const weekStart = this.getWeekStart(this.currentDate);
-    const today = Utils.today();
+    const today = this.getToday();
     const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
     
     // Generate week days
@@ -372,11 +375,12 @@ const Calendar = {
     for (let i = 0; i < 7; i++) {
       const d = new Date(weekStart);
       d.setDate(d.getDate() + i);
+      const dateStr = this.formatDate(d);
       weekDays.push({
-        date: this.formatDate(d),
+        date: dateStr,
         day: days[i],
         dayNum: d.getDate(),
-        isToday: this.formatDate(d) === today,
+        isToday: dateStr === today,
         isWeekend: i >= 5
       });
     }
@@ -385,21 +389,21 @@ const Calendar = {
       <div class="time-grid time-grid--week">
         <!-- Empty corner -->
         <div class="time-labels">
-          <div class="time-label" style="height: 60px;"></div>
-          ${hours.map(h => `<div class="time-label">${h}:00</div>`).join('')}
+          <div class="time-label" style="height: 50px;"></div>
+          ${hours.map(h => `<div class="time-label">${String(h).padStart(2, '0')}:00</div>`).join('')}
         </div>
         
         <!-- Week days headers -->
         ${weekDays.map(wd => `
           <div class="week-header__day ${wd.isToday ? 'week-header__day--today' : ''} ${wd.isWeekend ? 'week-header__day--weekend' : ''}">
-            <span>${wd.day}</span>
+            <span class="week-header__name">${wd.day}</span>
             <span class="week-header__date">${wd.dayNum}</span>
           </div>
         `).join('')}
         
         <!-- Day columns with hour slots -->
         ${weekDays.map(wd => `
-          <div class="day-column ${wd.isToday ? 'day-column--today' : ''}" data-date="${wd.date}">
+          <div class="day-column ${wd.isToday ? 'day-column--today' : ''} ${wd.isWeekend ? 'day-column--weekend' : ''}" data-date="${wd.date}">
             ${hours.map(h => `<div class="hour-slot" data-hour="${h}" data-date="${wd.date}"></div>`).join('')}
             ${this.renderEventsForDay(wd.date)}
             ${wd.isToday ? '<div class="current-time-line" id="time-line"></div>' : ''}
@@ -418,7 +422,7 @@ const Calendar = {
     const d = this.currentDate;
     const firstDay = new Date(d.getFullYear(), d.getMonth(), 1);
     const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-    const today = Utils.today();
+    const today = this.getToday();
     const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
     
     // Get starting day (adjust for Monday start)
@@ -428,7 +432,7 @@ const Calendar = {
     let html = `
       <div class="month-grid">
         <!-- Weekday headers -->
-        ${days.map(day => `<div class="month-grid__header">${day}</div>`).join('')}
+        ${days.map((day, i) => `<div class="month-grid__header ${i >= 5 ? 'month-grid__header--weekend' : ''}">${day}</div>`).join('')}
     `;
     
     // Previous month days
@@ -458,12 +462,13 @@ const Calendar = {
           <span class="month-grid__day-number">${day}</span>
           <div class="month-grid__events">
             ${dayEvents.slice(0, maxDisplay).map(e => `
-              <div class="month-event calendar-event--${e.status || 'confirmed'}" data-event-id="${e.id}">
-                ${e.startTime} ${e.patientName || e.title}
+              <div class="month-event calendar-event--${e.status || 'confirmed'}" data-event-id="${e.id}" title="${e.patientName || e.title}">
+                <span class="month-event__time">${e.startTime}</span>
+                <span class="month-event__name">${(e.patientName || e.title || '').substring(0, 15)}</span>
               </div>
             `).join('')}
             ${dayEvents.length > maxDisplay ? `
-              <div class="month-event month-event--more">+${dayEvents.length - maxDisplay} още</div>
+              <div class="month-event month-event--more" title="Кликнете за да видите всички">+${dayEvents.length - maxDisplay} още</div>
             ` : ''}
           </div>
         </div>
@@ -500,22 +505,119 @@ const Calendar = {
   },
 
   /**
-   * Render events for a specific day
+   * Get today's date in YYYY-MM-DD format (local timezone)
+   */
+  getToday() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  },
+
+  /**
+   * Calculate overlapping event groups for proper layout
+   */
+  calculateEventLayout(events) {
+    if (!events.length) return [];
+    
+    // Sort events by start time
+    const sorted = [...events].sort((a, b) => {
+      const aStart = this.timeToMinutes(a.startTime);
+      const bStart = this.timeToMinutes(b.startTime);
+      return aStart - bStart;
+    });
+    
+    // Group overlapping events
+    const groups = [];
+    let currentGroup = [sorted[0]];
+    let groupEnd = this.timeToMinutes(sorted[0].startTime) + (sorted[0].duration || 30);
+    
+    for (let i = 1; i < sorted.length; i++) {
+      const event = sorted[i];
+      const eventStart = this.timeToMinutes(event.startTime);
+      
+      if (eventStart < groupEnd) {
+        // Overlaps with current group
+        currentGroup.push(event);
+        groupEnd = Math.max(groupEnd, eventStart + (event.duration || 30));
+      } else {
+        // New group
+        groups.push(currentGroup);
+        currentGroup = [event];
+        groupEnd = eventStart + (event.duration || 30);
+      }
+    }
+    groups.push(currentGroup);
+    
+    // Assign columns within each group
+    const layoutEvents = [];
+    for (const group of groups) {
+      const columns = [];
+      
+      for (const event of group) {
+        const eventStart = this.timeToMinutes(event.startTime);
+        const eventEnd = eventStart + (event.duration || 30);
+        
+        // Find first available column
+        let colIndex = 0;
+        while (columns[colIndex] && columns[colIndex] > eventStart) {
+          colIndex++;
+        }
+        
+        columns[colIndex] = eventEnd;
+        
+        layoutEvents.push({
+          ...event,
+          column: colIndex,
+          totalColumns: group.length
+        });
+      }
+      
+      // Update totalColumns for accurate width calculation
+      const maxCol = Math.max(...layoutEvents.filter(e => group.includes(events.find(ev => ev.id === e.id))).map(e => e.column)) + 1;
+      layoutEvents.forEach(e => {
+        if (group.some(ge => ge.id === e.id)) {
+          e.totalColumns = maxCol;
+        }
+      });
+    }
+    
+    return layoutEvents;
+  },
+
+  /**
+   * Convert time string to minutes
+   */
+  timeToMinutes(timeStr) {
+    if (!timeStr) return 0;
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    return hours * 60 + minutes;
+  },
+
+  /**
+   * Render events for a specific day with proper overlap handling
    */
   renderEventsForDay(date) {
     const dayEvents = this.events.filter(e => e.date === date);
+    const layoutEvents = this.calculateEventLayout(dayEvents);
     
-    return dayEvents.map(event => {
+    return layoutEvents.map(event => {
       const top = this.getEventTop(event.startTime);
       const height = this.getEventHeight(event.duration || 30);
+      
+      // Calculate width and left position for overlapping events
+      const width = 100 / event.totalColumns;
+      const left = event.column * width;
+      
+      // Truncate long names
+      const displayName = (event.patientName || event.title || '').substring(0, 25);
+      const displayTime = event.startTime || '';
       
       return `
         <div class="calendar-event calendar-event--${event.status || 'confirmed'}" 
              data-event-id="${event.id}"
-             style="top: ${top}px; height: ${height}px;">
-          <div class="calendar-event__title">${event.patientName || event.title}</div>
-          <div class="calendar-event__time">${event.startTime} - ${event.endTime || ''}</div>
-          ${event.patientPhone ? `<div class="calendar-event__phone">📞 ${event.patientPhone}</div>` : ''}
+             style="top: ${top}px; height: ${height}px; left: ${left}%; width: calc(${width}% - 4px);"
+             title="${event.patientName || event.title} - ${event.startTime}${event.patientPhone ? ' (' + event.patientPhone + ')' : ''}">
+          <div class="calendar-event__title">${displayName}</div>
+          <div class="calendar-event__time">${displayTime}</div>
         </div>
       `;
     }).join('');
