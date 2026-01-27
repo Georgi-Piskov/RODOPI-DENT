@@ -526,8 +526,6 @@ const Calendar = {
                  description.toLowerCase().includes('status: pending') ||
                  description.toLowerCase().includes('pending');
         });
-        console.log('Loaded pending events:', this.pendingEvents.length, this.pendingEvents);
-        console.log('Loaded all future events for conflict detection:', this.allFutureEvents.length);
       } else {
         this.pendingEvents = [];
         this.allFutureEvents = [];
@@ -563,7 +561,6 @@ const Calendar = {
           return title.startsWith('🔔') || 
                  description.toLowerCase().includes('статус: за обаждане');
         });
-        console.log('Loaded callback events:', this.callbackEvents.length, this.callbackEvents);
       } else {
         this.callbackEvents = [];
       }
@@ -1242,14 +1239,11 @@ const Calendar = {
     // Use the separately loaded pending events (covers all future dates)
     const pendingEvents = this.pendingEvents || [];
     
-    console.log('Pending events to display:', pendingEvents.length, pendingEvents);
-    
     pendingCount.textContent = pendingEvents.length;
     
     // Hide section if no pending requests
     if (pendingEvents.length === 0) {
       pendingSection.style.display = 'none';
-      console.log('No pending requests - hiding section');
       return;
     }
     
@@ -1271,18 +1265,12 @@ const Calendar = {
       // Find next event to calculate max available time
       const maxAvailableMinutes = this.getMaxAvailableMinutes(event.date, event.startTime, event.id);
       
-      // DEBUG: Log the calculation
-      console.log(`[DEBUG] Event: ${patientName}, Date: ${event.date}, Time: ${event.startTime}, MaxAvailable: ${maxAvailableMinutes} min`);
-      console.log(`[DEBUG] allFutureEvents count: ${this.allFutureEvents?.length || 0}`);
-      
       // Check for conflicts with different durations
       const conflicts30 = this.checkForConflicts(event.date, event.startTime, this.addMinutesToTime(event.startTime, 30), event.id);
       const conflicts60 = this.checkForConflicts(event.date, event.startTime, this.addMinutesToTime(event.startTime, 60), event.id);
       
       const can30 = maxAvailableMinutes >= 30;
       const can60 = maxAvailableMinutes >= 60;
-      
-      console.log(`[DEBUG] can30: ${can30}, can60: ${can60}`);
       
       // Build conflict warning message
       let conflictWarning = '';
