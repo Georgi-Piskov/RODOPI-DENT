@@ -35,7 +35,10 @@ const CONFIG = {
     
     // Public Calendar endpoints (patient booking)
     PUBLIC_SLOTS: '/public-slots',
-    PUBLIC_BOOKING: '/public-booking'
+    PUBLIC_BOOKING: '/public-booking',
+    
+    // SMS endpoint
+    SEND_SMS: '/send-sms'
   },
   
   // Google OAuth2 Configuration

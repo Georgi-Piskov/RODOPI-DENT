@@ -250,6 +250,18 @@ const API = {
       method: 'POST',
       body: JSON.stringify({ eventId })
     });
+  },
+
+  /**
+   * Send SMS to patient
+   * @param {Object} smsData - { phone, message, template?, date?, time?, duration?, patientName? }
+   * Templates: booking_received, booking_confirmed, booking_rejected, booking_conflict, booking_expired, reminder
+   */
+  async sendSMS(smsData) {
+    return this.request(CONFIG.ENDPOINTS.SEND_SMS, {
+      method: 'POST',
+      body: JSON.stringify(smsData)
+    });
   }
 };
 

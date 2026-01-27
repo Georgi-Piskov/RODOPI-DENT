@@ -1,0 +1,164 @@
+{
+  "name": "Rodopi Dent - Send SMS",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-sms",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "send-sms"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse input\nconst body = $input.first().json.body;\n\nif (!body.phone || !body.message) {\n  throw new Error('Phone and message are required');\n}\n\n// Normalize Bulgarian phone number\nlet phone = body.phone.replace(/\\s+/g, '').replace(/[^0-9+]/g, '');\n\n// Convert to international format\nif (phone.startsWith('0')) {\n  phone = '+359' + phone.substring(1);\n} else if (!phone.startsWith('+')) {\n  phone = '+359' + phone;\n}\n\n// SMS Templates\nconst templates = {\n  'booking_received': `Родопи Дент: Заявката ви за час на {date} в {time} е получена и чака одобрение. Ще получите SMS при потвърждение.`,\n  'booking_confirmed': `Родопи Дент: Часът ви е ПОТВЪРДЕН! \\n📅 {date}\\n🕐 {time}\\n⏱️ {duration} мин.\\nОчакваме ви!`,\n  'booking_rejected': `Родопи Дент: За съжаление не можем да потвърдим часа ви за {date} в {time}. Ще се свържем с вас по телефона за алтернативен час.`,\n  'booking_conflict': `Родопи Дент: Часът ви за {date} в {time} е отменен поради застъпване. Ще се свържем с вас за нов час.`,\n  'booking_expired': `Родопи Дент: Заявката ви за {date} в {time} изтече без потвърждение. Моля свържете се с нас за нов час.`,\n  'reminder': `Родопи Дент: Напомняне - имате час утре ({date}) в {time}. Очакваме ви!`\n};\n\n// Get template or use custom message\nlet message = body.message;\nif (body.template && templates[body.template]) {\n  message = templates[body.template];\n  \n  // Replace placeholders\n  if (body.date) message = message.replace(/{date}/g, body.date);\n  if (body.time) message = message.replace(/{time}/g, body.time);\n  if (body.duration) message = message.replace(/{duration}/g, body.duration);\n  if (body.patientName) message = message.replace(/{name}/g, body.patientName);\n}\n\nreturn [{\n  json: {\n    phone: phone,\n    message: message,\n    template: body.template || 'custom',\n    originalData: body\n  }\n}];"
+      },
+      "id": "prepare",
+      "name": "Prepare SMS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SMS_PROVIDER_URL || 'https://api.sms.to/sms/send' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "to",
+              "value": "={{ $json.phone }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.message }}"
+            },
+            {
+              "name": "sender_id",
+              "value": "RodopiDent"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "send-sms",
+      "name": "Send SMS via Provider",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "SMS Provider API Key"
+        }
+      },
+      "notes": "Configure SMS provider credentials here. Supports: SMS.to, Twilio, BulSMS, etc."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'SMS изпратен успешно', phone: $json.phone }) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: 'SMS не можа да бъде изпратен', details: $json }) }}",
+        "options": {
+          "responseCode": "500",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-error",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [660, 200]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prepare SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare SMS": {
+      "main": [
+        [
+          {
+            "node": "Send SMS via Provider",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send SMS via Provider": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "Rodopi Dent"
+    }
+  ]
+}

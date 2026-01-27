@@ -1,0 +1,260 @@
+{
+  "name": "Rodopi Dent - Auto Expire Pending Requests",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get current time in Sofia timezone\nconst now = new Date();\nconst sofiaTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Sofia' }));\nconst currentHour = sofiaTime.getHours();\nconst currentDate = sofiaTime.toISOString().split('T')[0];\n\n// Calculate date range for expired requests\n// - If before 18:00: check yesterday's requests made after 18:00 + today's requests\n// - If after 18:00: check today's requests + tomorrow's requests\n\nconst yesterday = new Date(sofiaTime);\nyesterday.setDate(yesterday.getDate() - 1);\nconst yesterdayStr = yesterday.toISOString().split('T')[0];\n\nconst tomorrow = new Date(sofiaTime);\ntomorrow.setDate(tomorrow.getDate() + 1);\nconst tomorrowStr = tomorrow.toISOString().split('T')[0];\n\n// Query for pending events\nconst timeMin = new Date(sofiaTime);\ntimeMin.setDate(timeMin.getDate() - 2); // Look back 2 days\nconst timeMax = new Date(sofiaTime);\ntimeMax.setDate(timeMax.getDate() + 7); // Look forward 7 days\n\nreturn [{\n  json: {\n    currentHour: currentHour,\n    currentDate: currentDate,\n    yesterdayStr: yesterdayStr,\n    tomorrowStr: tomorrowStr,\n    timeMin: timeMin.toISOString(),\n    timeMax: timeMax.toISOString(),\n    isAfter18: currentHour >= 18\n  }\n}];"
+      },
+      "id": "calculate-dates",
+      "name": "Calculate Dates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "rodopi.dent@gmail.com"
+        },
+        "returnAll": true,
+        "options": {
+          "query": "⏳",
+          "singleEvents": true,
+          "timeMin": "={{ $json.timeMin }}",
+          "timeMax": "={{ $json.timeMax }}"
+        }
+      },
+      "id": "get-pending",
+      "name": "Get Pending Events",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.2,
+      "position": [440, 0],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "",
+          "name": "Google Calendar"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter events that should expire\nconst items = $input.all();\nconst dateInfo = $('Calculate Dates').first().json;\nconst currentHour = dateInfo.currentHour;\nconst currentDate = dateInfo.currentDate;\nconst isAfter18 = dateInfo.isAfter18;\n\n// Get Sofia time\nconst now = new Date();\nconst sofiaTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Sofia' }));\n\nconst expiredEvents = [];\n\nfor (const item of items) {\n  const event = item.json;\n  \n  // Only process pending events (with ⏳)\n  if (!event.summary || !event.summary.includes('⏳')) continue;\n  \n  // Get event date\n  const eventStart = event.start?.dateTime || event.start?.date;\n  if (!eventStart) continue;\n  \n  const eventDate = eventStart.split('T')[0];\n  const eventDateTime = new Date(eventStart);\n  \n  // Parse event creation time from description if available\n  let createdDate = null;\n  const createdMatch = (event.description || '').match(/Създадено:\\s*([\\d-]+\\s+[\\d:]+)/);\n  if (createdMatch) {\n    createdDate = new Date(createdMatch[1]);\n  } else {\n    // Use event created time\n    createdDate = event.created ? new Date(event.created) : null;\n  }\n  \n  // Expiration rules:\n  // 1. Same day requests: expire at 18:00 on the same day\n  // 2. Next day requests made after 18:00: expire at 18:00 of appointment day\n  // 3. Older requests: if appointment date is today and it's after 18:00 - expire\n  // 4. Past appointments: always expire\n  \n  let shouldExpire = false;\n  let reason = '';\n  \n  // Past appointments always expire\n  if (eventDateTime < sofiaTime) {\n    shouldExpire = true;\n    reason = 'Час в миналото';\n  }\n  // Same day appointment and it's after 18:00\n  else if (eventDate === currentDate && currentHour >= 18) {\n    shouldExpire = true;\n    reason = 'Изтекъл срок (до 18:00 в деня на часа)';\n  }\n  // Appointment is tomorrow and it's after 18:00 today - check creation time\n  else if (createdDate && eventDate === dateInfo.tomorrowStr && currentHour >= 18) {\n    const createdHour = createdDate.getHours();\n    const createdDateStr = createdDate.toISOString().split('T')[0];\n    \n    // If created yesterday after 18:00, it should expire at 18:00 today\n    if (createdDateStr === dateInfo.yesterdayStr && createdHour >= 18) {\n      shouldExpire = true;\n      reason = 'Изтекъл срок (заявка от снощи)';\n    }\n    // If created today before current time, and current time >= 18:00\n    else if (createdDateStr === currentDate) {\n      shouldExpire = true;\n      reason = 'Изтекъл срок (заявка от днес)';\n    }\n  }\n  \n  if (shouldExpire) {\n    // Extract phone number\n    const phoneMatch = (event.description || '').match(/📞\\s*Тел:\\s*([0-9+\\s]+)/);\n    const patientPhone = phoneMatch ? phoneMatch[1].replace(/\\s/g, '') : null;\n    const patientName = (event.summary || '').replace(/^[⏳✅\\s]+/, '').trim();\n    \n    expiredEvents.push({\n      eventId: event.id,\n      summary: event.summary,\n      patientName: patientName,\n      patientPhone: patientPhone,\n      eventDate: eventDate,\n      eventTime: eventStart.includes('T') ? eventStart.split('T')[1].substring(0, 5) : '00:00',\n      reason: reason\n    });\n  }\n}\n\nif (expiredEvents.length === 0) {\n  return [{ json: { noExpiredEvents: true } }];\n}\n\nreturn expiredEvents.map(e => ({ json: e }));"
+      },
+      "id": "filter-expired",
+      "name": "Filter Expired Events",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.noExpiredEvents }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-has-expired",
+      "name": "Has Expired Events?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.1,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "rodopi.dent@gmail.com"
+        },
+        "eventId": "={{ $json.eventId }}"
+      },
+      "id": "delete-event",
+      "name": "Delete Expired Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.2,
+      "position": [1100, -100],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "",
+          "name": "Google Calendar"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_WEBHOOK_BASE_URL || 'https://n8n.simeontsvetanovn8nworkflows.site/webhook' }}/send-sms",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"phone\": \"{{ $json.patientPhone }}\",\n  \"template\": \"booking_expired\",\n  \"date\": \"{{ $json.eventDate }}\",\n  \"time\": \"{{ $json.eventTime }}\",\n  \"patientName\": \"{{ $json.patientName }}\"\n}",
+        "options": {}
+      },
+      "id": "send-expired-sms",
+      "name": "Send Expired SMS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "content": "=🕐 **Изтекли заявки изчистени**\n\nИзтрити: {{ $('Delete Expired Event').all().length || 0 }} заявки\n\nПричина: {{ $json.reason }}",
+        "chatId": "={{ $env.TELEGRAM_ADMIN_CHAT_ID }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "telegram-notify",
+      "name": "Notify Admin",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1320, 0],
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "no-op",
+      "name": "No Expired Events",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1100, 250]
+    }
+  ],
+  "connections": {
+    "Every Hour": {
+      "main": [
+        [
+          {
+            "node": "Calculate Dates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Dates": {
+      "main": [
+        [
+          {
+            "node": "Get Pending Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pending Events": {
+      "main": [
+        [
+          {
+            "node": "Filter Expired Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Expired Events": {
+      "main": [
+        [
+          {
+            "node": "Has Expired Events?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Expired Events?": {
+      "main": [
+        [
+          {
+            "node": "Delete Expired Event",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Expired SMS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Expired Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Expired Event": {
+      "main": [
+        [
+          {
+            "node": "Notify Admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "Rodopi Dent"
+    }
+  ]
+}

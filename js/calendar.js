@@ -1125,8 +1125,28 @@ const Calendar = {
       const reasonMatch = (event.description || '').match(/📋 Причина: ([^\n]+)/);
       const reason = reasonMatch ? reasonMatch[1].trim() : '';
       
+      // Check for conflicts with different durations
+      const conflicts30 = this.checkForConflicts(event.date, event.startTime, this.addMinutesToTime(event.startTime, 30), event.id);
+      const conflicts60 = this.checkForConflicts(event.date, event.startTime, this.addMinutesToTime(event.startTime, 60), event.id);
+      
+      const has30Conflict = conflicts30.length > 0;
+      const has60Conflict = conflicts60.length > 0;
+      
+      // Build conflict warning message
+      let conflictWarning = '';
+      if (has30Conflict || has60Conflict) {
+        const conflictNames = [...new Set([...conflicts30, ...conflicts60].map(c => 
+          (c.title || '').replace(/^[⏳✅\s]+/, '').trim()
+        ))];
+        conflictWarning = `
+          <div class="pending-request-card__conflict">
+            ⚠️ Конфликт с: ${conflictNames.join(', ')}
+          </div>
+        `;
+      }
+      
       return `
-        <div class="pending-request-card" data-event-id="${event.id}">
+        <div class="pending-request-card ${has30Conflict || has60Conflict ? 'has-conflict' : ''}" data-event-id="${event.id}">
           <div class="pending-request-card__info">
             <strong>${patientName}</strong>
             <span class="pending-request-card__datetime">
@@ -1134,13 +1154,18 @@ const Calendar = {
             </span>
             ${phone ? `<span class="pending-request-card__phone">📞 ${phone}</span>` : ''}
             ${reason ? `<span class="pending-request-card__reason">📋 ${reason}</span>` : ''}
+            ${conflictWarning}
           </div>
           <div class="pending-request-card__actions">
-            <button class="btn btn--success btn--small pending-confirm-30" data-event-id="${event.id}" data-duration="30" title="Потвърди 30 мин">
-              30м
+            <button class="btn btn--success btn--small pending-confirm-30 ${has30Conflict ? 'has-conflict' : ''}" 
+                    data-event-id="${event.id}" data-duration="30" 
+                    title="${has30Conflict ? '⚠️ Ще създаде конфликт!' : 'Потвърди 30 мин'}">
+              30м${has30Conflict ? '⚠️' : ''}
             </button>
-            <button class="btn btn--success btn--small pending-confirm-60" data-event-id="${event.id}" data-duration="60" title="Потвърди 60 мин">
-              60м
+            <button class="btn btn--success btn--small pending-confirm-60 ${has60Conflict ? 'has-conflict' : ''}" 
+                    data-event-id="${event.id}" data-duration="60" 
+                    title="${has60Conflict ? '⚠️ Ще създаде конфликт!' : 'Потвърди 60 мин'}">
+              60м${has60Conflict ? '⚠️' : ''}
             </button>
             <button class="btn btn--danger btn--small pending-reject" data-event-id="${event.id}" title="Откажи">
               ✕
@@ -1249,6 +1274,46 @@ const Calendar = {
   },
 
   /**
+   * Check for time conflicts with other events
+   * Returns array of conflicting events
+   */
+  checkForConflicts(date, startTime, endTime, excludeEventId = null) {
+    const startMinutes = this.timeToMinutes(startTime);
+    const endMinutes = this.timeToMinutes(endTime);
+    
+    // Get all events for this date (both confirmed and pending)
+    const allEvents = [
+      ...this.events.filter(e => e.date === date),
+      ...this.pendingEvents.filter(e => e.date === date)
+    ];
+    
+    const conflicts = allEvents.filter(event => {
+      // Exclude the event we're checking
+      if (event.id === excludeEventId) return false;
+      
+      const eventStart = this.timeToMinutes(event.startTime);
+      const eventEnd = this.timeToMinutes(event.endTime);
+      
+      // Check for overlap: events conflict if one starts before the other ends
+      // and ends after the other starts
+      const overlaps = startMinutes < eventEnd && endMinutes > eventStart;
+      
+      return overlaps;
+    });
+    
+    return conflicts;
+  },
+
+  /**
+   * Convert time string to minutes
+   */
+  timeToMinutes(time) {
+    if (!time) return 0;
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  },
+
+  /**
    * Confirm a pending request with selected duration
    */
   async confirmPendingRequest(eventId, duration) {
@@ -1269,53 +1334,191 @@ const Calendar = {
       const endMins = endMinutes % 60;
       const newEndTime = `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;
       
-      // Build new description - update status
-      let newDescription = (event.description || '')
-        .replace(/⏳\s*Статус:\s*ЧАКАЩ\s*\(pending\)/gi, '✅ Статус: ПОТВЪРДЕН')
-        .replace(/⏳\s*Статус:\s*pending/gi, '✅ Статус: ПОТВЪРДЕН')
-        .replace(/Статус:\s*ЧАКАЩ/gi, '✅ Статус: ПОТВЪРДЕН');
+      // Check for conflicts with the new duration
+      const conflicts = this.checkForConflicts(event.date, event.startTime, newEndTime, eventId);
       
-      // Add status if not present
-      if (!newDescription.includes('Статус: ПОТВЪРДЕН')) {
-        newDescription = newDescription.replace(/Статус:[^\n]*/i, '✅ Статус: ПОТВЪРДЕН');
-        if (!newDescription.includes('Статус:')) {
-          newDescription += '\n✅ Статус: ПОТВЪРДЕН';
-        }
+      if (conflicts.length > 0) {
+        // Show conflict dialog
+        this.showConflictDialog(event, conflicts, duration, patientName);
+        return;
       }
       
-      // Add duration info
-      if (!newDescription.includes('Продължителност:')) {
-        newDescription += `\n⏱️ Продължителност: ${duration} мин.`;
-      }
+      // No conflicts - proceed with confirmation
+      await this.doConfirmEvent(event, patientName, duration, newEndTime);
       
-      // Update calendar event - include description!
-      const response = await API.updateCalendarEvent({
-        eventId: eventId,
-        patientName: `✅ ${patientName}`,
-        date: event.date,
-        startTime: event.startTime,
-        endTime: newEndTime,
-        duration: duration,
-        colorId: 'green',
-        notes: newDescription
-      });
-      
-      if (response.success) {
-        Utils.showToast(`Часът за ${patientName} е потвърден!`, 'success');
-        // Immediately remove from local array and DOM
-        this.pendingEvents = this.pendingEvents.filter(e => e.id !== eventId);
-        const card = document.querySelector(`.pending-request-card[data-event-id="${eventId}"]`);
-        if (card) card.remove();
-        this.updatePendingRequestsSection();
-        // Also reload current view events
-        await this.loadEvents();
-        this.renderView();
-      } else {
-        throw new Error(response.error || 'Грешка при потвърждение');
-      }
     } catch (error) {
       console.error('Error confirming request:', error);
       Utils.showToast('Грешка при потвърждение: ' + error.message, 'error');
+    }
+  },
+
+  /**
+   * Show conflict dialog with options
+   */
+  showConflictDialog(event, conflicts, duration, patientName) {
+    // Build conflict info
+    const conflictList = conflicts.map(c => {
+      const name = (c.title || '').replace(/^[⏳✅\s]+/, '').trim();
+      const isPending = c.title && c.title.includes('⏳');
+      return `• ${c.startTime}-${c.endTime}: ${name} ${isPending ? '(чакащ)' : '(потвърден)'}`;
+    }).join('\n');
+    
+    const message = `⚠️ КОНФЛИКТ НА ЧАСОВЕ!\n\n` +
+      `Ако потвърдите ${patientName} за ${duration} мин. (${event.startTime}-${event.endTime} -> до ${this.addMinutesToTime(event.startTime, duration)}),\n` +
+      `ще се застъпи с:\n\n${conflictList}\n\n` +
+      `Какво искате да направите?\n\n` +
+      `OK = Откажи конфликтиращите и потвърди този час\n` +
+      `Cancel = Отмени и избери друга продължителност`;
+    
+    if (confirm(message)) {
+      // Reject conflicting events and confirm this one
+      this.resolveConflictsAndConfirm(event, conflicts, patientName, duration);
+    }
+  },
+
+  /**
+   * Add minutes to time string
+   */
+  addMinutesToTime(time, minutes) {
+    const [h, m] = time.split(':').map(Number);
+    const totalMinutes = h * 60 + m + minutes;
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+  },
+
+  /**
+   * Resolve conflicts by rejecting conflicting events and confirming the main one
+   */
+  async resolveConflictsAndConfirm(event, conflicts, patientName, duration) {
+    try {
+      // First, reject/mark conflicting events
+      for (const conflict of conflicts) {
+        const conflictName = (conflict.title || '').replace(/^[⏳✅\s]+/, '').trim();
+        const isPending = conflict.title && conflict.title.includes('⏳');
+        
+        // Extract phone from conflict event
+        const phoneMatch = (conflict.description || '').match(/📞\s*Тел:\s*([0-9+\s]+)/);
+        const conflictPhone = phoneMatch ? phoneMatch[1].replace(/\s/g, '') : null;
+        
+        if (isPending) {
+          // Delete pending conflicting event
+          await API.deleteCalendarEvent(conflict.id);
+          this.pendingEvents = this.pendingEvents.filter(e => e.id !== conflict.id);
+          
+          // Send SMS to conflicting patient about cancellation
+          if (conflictPhone) {
+            const formattedDate = new Date(conflict.date).toLocaleDateString('bg-BG', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric'
+            });
+            
+            API.sendSMS({
+              phone: conflictPhone,
+              template: 'booking_conflict',
+              date: formattedDate,
+              time: conflict.startTime,
+              patientName: conflictName
+            }).catch(err => console.warn('Conflict SMS error:', err));
+          }
+        } else {
+          // For confirmed events, just notify - don't auto-delete
+          Utils.showToast(`⚠️ Внимание: ${conflictName} е потвърден час - проверете ръчно!`, 'warning');
+        }
+      }
+      
+      // Now confirm the main event
+      const newEndTime = this.addMinutesToTime(event.startTime, duration);
+      await this.doConfirmEvent(event, patientName, duration, newEndTime);
+      
+      // Update UI
+      this.updatePendingRequestsSection();
+      
+    } catch (error) {
+      console.error('Error resolving conflicts:', error);
+      Utils.showToast('Грешка при разрешаване на конфликти: ' + error.message, 'error');
+    }
+  },
+
+  /**
+   * Actually confirm the event (after conflict check passed)
+   */
+  async doConfirmEvent(event, patientName, duration, newEndTime) {
+    // Extract phone number from description
+    const phoneMatch = (event.description || '').match(/📞\s*Тел:\s*([0-9+\s]+)/);
+    const patientPhone = phoneMatch ? phoneMatch[1].replace(/\s/g, '') : null;
+    
+    // Build new description - update status
+    let newDescription = (event.description || '')
+      .replace(/⏳\s*Статус:\s*ЧАКАЩ\s*\(pending\)/gi, '✅ Статус: ПОТВЪРДЕН')
+      .replace(/⏳\s*Статус:\s*pending/gi, '✅ Статус: ПОТВЪРДЕН')
+      .replace(/Статус:\s*ЧАКАЩ/gi, '✅ Статус: ПОТВЪРДЕН');
+    
+    // Add status if not present
+    if (!newDescription.includes('Статус: ПОТВЪРДЕН')) {
+      newDescription = newDescription.replace(/Статус:[^\n]*/i, '✅ Статус: ПОТВЪРДЕН');
+      if (!newDescription.includes('Статус:')) {
+        newDescription += '\n✅ Статус: ПОТВЪРДЕН';
+      }
+    }
+    
+    // Add duration info
+    if (!newDescription.includes('Продължителност:')) {
+      newDescription += `\n⏱️ Продължителност: ${duration} мин.`;
+    }
+    
+    // Update calendar event
+    const response = await API.updateCalendarEvent({
+      eventId: event.id,
+      patientName: `✅ ${patientName}`,
+      date: event.date,
+      startTime: event.startTime,
+      endTime: newEndTime,
+      duration: duration,
+      colorId: 'green',
+      notes: newDescription
+    });
+    
+    if (response.success) {
+      Utils.showToast(`Часът за ${patientName} е потвърден!`, 'success');
+      
+      // Send confirmation SMS to patient
+      if (patientPhone) {
+        const formattedDate = new Date(event.date).toLocaleDateString('bg-BG', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        });
+        
+        API.sendSMS({
+          phone: patientPhone,
+          template: 'booking_confirmed',
+          date: formattedDate,
+          time: event.startTime,
+          duration: duration,
+          patientName: patientName
+        }).then(smsResponse => {
+          if (smsResponse.success) {
+            console.log('Confirmation SMS sent to:', patientPhone);
+          } else {
+            console.warn('Failed to send SMS:', smsResponse);
+          }
+        }).catch(err => {
+          console.warn('SMS error:', err);
+        });
+      }
+      
+      // Immediately remove from local array and DOM
+      this.pendingEvents = this.pendingEvents.filter(e => e.id !== event.id);
+      const card = document.querySelector(`.pending-request-card[data-event-id="${event.id}"]`);
+      if (card) card.remove();
+      this.updatePendingRequestsSection();
+      // Also reload current view events
+      await this.loadEvents();
+      this.renderView();
+    } else {
+      throw new Error(response.error || 'Грешка при потвърждение');
     }
   },
 
@@ -1326,7 +1529,11 @@ const Calendar = {
     const event = this.pendingEvents.find(e => e.id === eventId);
     if (!event) return;
     
-    const patientName = event.title.replace('⏳ ', '');
+    const patientName = (event.title || '').replace(/^[⏳✅\s]+/, '').trim();
+    
+    // Extract phone number from description
+    const phoneMatch = (event.description || '').match(/📞\s*Тел:\s*([0-9+\s]+)/);
+    const patientPhone = phoneMatch ? phoneMatch[1].replace(/\s/g, '') : null;
     
     const confirmed = confirm(`Сигурни ли сте, че искате да откажете часа за ${patientName}?`);
     if (!confirmed) return;
@@ -1336,6 +1543,24 @@ const Calendar = {
       
       if (response.success) {
         Utils.showToast(`Часът за ${patientName} е отказан и изтрит.`, 'success');
+        
+        // Send rejection SMS to patient
+        if (patientPhone) {
+          const formattedDate = new Date(event.date).toLocaleDateString('bg-BG', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+          });
+          
+          API.sendSMS({
+            phone: patientPhone,
+            template: 'booking_rejected',
+            date: formattedDate,
+            time: event.startTime,
+            patientName: patientName
+          }).catch(err => console.warn('SMS error:', err));
+        }
+        
         // Immediately remove from local array and DOM
         this.pendingEvents = this.pendingEvents.filter(e => e.id !== eventId);
         const card = document.querySelector(`.pending-request-card[data-event-id="${eventId}"]`);

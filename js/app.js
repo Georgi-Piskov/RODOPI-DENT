@@ -350,15 +350,72 @@ const App = {
     const response = await API.createBooking(bookingData);
 
     if (response.success) {
-      Utils.showToast('Резервацията е успешна! Ще получите SMS потвърждение.', 'success');
+      // Show confirmation message
+      this.showBookingConfirmation(bookingData);
       form.reset();
       form.hidden = true;
-      Router.navigate('/');
     } else {
       Utils.showToast(response.message || 'Грешка при резервацията', 'error');
       submitBtn.disabled = false;
       submitBtn.textContent = 'Потвърди резервацията';
     }
+  },
+
+  /**
+   * Show booking confirmation message to patient
+   */
+  showBookingConfirmation(bookingData) {
+    const container = document.querySelector('.booking-page') || document.querySelector('.page');
+    if (!container) {
+      Utils.showToast('✅ Заявката е приета и чака одобрение от доктора!', 'success');
+      setTimeout(() => Router.navigate('/'), 3000);
+      return;
+    }
+    
+    // Format date nicely
+    const dateObj = new Date(bookingData.date);
+    const formattedDate = dateObj.toLocaleDateString('bg-BG', { 
+      weekday: 'long', 
+      day: 'numeric', 
+      month: 'long', 
+      year: 'numeric' 
+    });
+    
+    container.innerHTML = `
+      <div class="booking-confirmation">
+        <div class="booking-confirmation__icon">✅</div>
+        <h2>Заявката е приета!</h2>
+        <p class="booking-confirmation__subtitle">Чака одобрение от доктора</p>
+        
+        <div class="booking-confirmation__details">
+          <div class="booking-confirmation__row">
+            <span class="label">📅 Дата:</span>
+            <span class="value">${formattedDate}</span>
+          </div>
+          <div class="booking-confirmation__row">
+            <span class="label">🕐 Час:</span>
+            <span class="value">${bookingData.startTime}</span>
+          </div>
+          <div class="booking-confirmation__row">
+            <span class="label">👤 Име:</span>
+            <span class="value">${bookingData.patientName}</span>
+          </div>
+          <div class="booking-confirmation__row">
+            <span class="label">📱 Телефон:</span>
+            <span class="value">${bookingData.patientPhone}</span>
+          </div>
+        </div>
+        
+        <div class="booking-confirmation__note">
+          <p>📱 <strong>Ще получите SMS</strong> когато докторът потвърди вашия час.</p>
+          <p>Ако не получите отговор до края на деня, ще се свържем с вас по телефона.</p>
+        </div>
+        
+        <a href="#/" class="btn btn--primary btn--lg">
+          ← Назад към началото
+        </a>
+      </div>
+    `;
   },
 
   /**
