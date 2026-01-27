@@ -1166,35 +1166,74 @@ const Calendar = {
     const event = this.pendingEvents.find(e => e.id === eventId);
     if (!event) return;
     
-    const patientName = event.title.replace('⏳ ', '');
+    const patientName = event.title.replace('⏳ ', '').replace('⏳', '');
+    const dateStr = Utils.formatDate(event.date, 'dd.mm.yyyy');
+    const dayName = ['Неделя', 'Понеделник', 'Вторник', 'Сряда', 'Четвъртък', 'Петък', 'Събота'][new Date(event.date).getDay()];
     
-    const result = await Utils.showConfirmDialog(
-      `Потвърди час за ${patientName}`,
-      `
-        <p>Изберете продължителност на часа:</p>
-        <div class="duration-buttons">
-          <button class="btn btn--primary duration-btn" data-duration="30">30 мин</button>
-          <button class="btn btn--primary duration-btn" data-duration="45">45 мин</button>
-          <button class="btn btn--primary duration-btn" data-duration="60">60 мин</button>
-          <button class="btn btn--primary duration-btn" data-duration="90">90 мин</button>
-          <button class="btn btn--primary duration-btn" data-duration="120">120 мин</button>
+    // Create custom duration modal
+    const modalHtml = `
+      <div id="duration-modal" class="modal" style="display: flex;">
+        <div class="modal__backdrop"></div>
+        <div class="modal__content" style="max-width: 400px;">
+          <div class="modal__header">
+            <h3>⏳ Потвърди час</h3>
+          </div>
+          <div class="modal__body" style="padding: 1.5rem;">
+            <p style="margin-bottom: 1rem; font-size: 1.1rem;">
+              <strong>${patientName}</strong><br>
+              📅 ${dayName}, ${dateStr} в ${event.startTime}
+            </p>
+            <p style="margin-bottom: 1rem; color: #666;">Изберете продължителност:</p>
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+              <button class="btn btn--primary btn--large duration-select-btn" data-duration="30" style="flex: 1; padding: 1rem; font-size: 1.2rem;">
+                🕐 30 мин
+              </button>
+              <button class="btn btn--primary btn--large duration-select-btn" data-duration="60" style="flex: 1; padding: 1rem; font-size: 1.2rem;">
+                🕐 60 мин
+              </button>
+            </div>
+          </div>
+          <div class="modal__footer" style="padding: 1rem; border-top: 1px solid #eee; text-align: center;">
+            <button class="btn btn--secondary duration-cancel-btn">Отказ</button>
+          </div>
         </div>
-      `,
-      { showCancel: true, cancelText: 'Затвори' }
-    );
+      </div>
+    `;
     
-    // The confirm dialog doesn't handle custom buttons well, so we'll use a simpler approach
-    // For now, let's just use a fixed duration or show a simple prompt
-    const duration = prompt('Въведете продължителност в минути (30, 45, 60, 90, 120):', '30');
-    if (!duration) return;
+    // Add modal to page
+    const modalContainer = document.createElement('div');
+    modalContainer.innerHTML = modalHtml;
+    document.body.appendChild(modalContainer);
     
-    const durationNum = parseInt(duration);
-    if (![30, 45, 60, 90, 120].includes(durationNum)) {
-      Utils.showToast('Невалидна продължителност', 'error');
-      return;
-    }
+    const modal = document.getElementById('duration-modal');
     
-    await this.confirmPendingRequest(eventId, durationNum);
+    // Return a promise that resolves when user selects duration
+    return new Promise((resolve) => {
+      // Duration button click handlers
+      modal.querySelectorAll('.duration-select-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const duration = parseInt(btn.dataset.duration);
+          modal.remove();
+          modalContainer.remove();
+          await this.confirmPendingRequest(eventId, duration);
+          resolve(duration);
+        });
+      });
+      
+      // Cancel button
+      modal.querySelector('.duration-cancel-btn').addEventListener('click', () => {
+        modal.remove();
+        modalContainer.remove();
+        resolve(null);
+      });
+      
+      // Backdrop click
+      modal.querySelector('.modal__backdrop').addEventListener('click', () => {
+        modal.remove();
+        modalContainer.remove();
+        resolve(null);
+      });
+    });
   },
 
   /**
