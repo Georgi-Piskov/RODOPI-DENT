@@ -7,10 +7,15 @@ const Calendar = {
   events: [],
   isLoading: false,
   
-  // Working hours configuration (7:00 - 19:00 for dental clinic)
+  // Selection mode for blocking
+  selectionMode: false,
+  selectedSlots: [],
+  selectionStart: null,
+  
+  // Working hours configuration (9:00 - 18:00 for dental clinic)
   workingHours: {
-    start: 7,   // 7:00
-    end: 19     // 19:00
+    start: 9,   // 9:00
+    end: 18     // 18:00 (last slot 17:30)
   },
   
   // Pixels per hour for time grid
@@ -75,8 +80,28 @@ const Calendar = {
             </div>
           </div>
           
+          <!-- Quick block buttons -->
+          <div class="block-buttons">
+            <button class="btn btn--warning btn--small" id="block-toggle" title="Режим блокиране">
+              🚫 Блокирай
+            </button>
+            <div class="block-buttons__dropdown" id="block-dropdown">
+              <button class="block-buttons__option" data-block="morning">Сутрин (09:00-12:00)</button>
+              <button class="block-buttons__option" data-block="afternoon">Следобед (13:30-17:30)</button>
+              <button class="block-buttons__option" data-block="day">Цял ден</button>
+              <button class="block-buttons__option" data-block="week">Цяла седмица</button>
+            </div>
+          </div>
+          
           <button class="btn btn--success" id="cal-add-event">+ Нов час</button>
         </div>
+      </div>
+      
+      <!-- Selection toolbar (hidden by default) -->
+      <div class="selection-toolbar" id="selection-toolbar" style="display: none;">
+        <span class="selection-toolbar__count" id="selected-count">0 часа избрани</span>
+        <button class="btn btn--danger btn--small" id="block-selected">🚫 Блокирай избраните</button>
+        <button class="btn btn--secondary btn--small" id="cancel-selection">✕ Отмени</button>
       </div>
     `;
   },
@@ -154,8 +179,209 @@ const Calendar = {
       this.openEventModal();
     });
     
+    // Block mode toggle
+    this.setupBlockListeners();
+    
     // Modal events
     this.setupModalListeners();
+  },
+  
+  /**
+   * Setup block/selection listeners
+   */
+  setupBlockListeners() {
+    const blockToggle = document.getElementById('block-toggle');
+    const blockDropdown = document.getElementById('block-dropdown');
+    
+    // Toggle dropdown
+    blockToggle?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      blockDropdown?.classList.toggle('open');
+    });
+    
+    // Quick block options
+    document.querySelectorAll('.block-buttons__option').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const blockType = btn.dataset.block;
+        blockDropdown?.classList.remove('open');
+        await this.quickBlock(blockType);
+      });
+    });
+    
+    // Block selected
+    document.getElementById('block-selected')?.addEventListener('click', async () => {
+      await this.blockSelectedSlots();
+    });
+    
+    // Cancel selection
+    document.getElementById('cancel-selection')?.addEventListener('click', () => {
+      this.clearSelection();
+    });
+    
+    // Close dropdown on outside click
+    document.addEventListener('click', () => {
+      blockDropdown?.classList.remove('open');
+    });
+  },
+  
+  /**
+   * Quick block - block morning, afternoon, day, or week
+   */
+  async quickBlock(type) {
+    const d = this.currentDate;
+    const dateStr = this.formatDate(d);
+    
+    let startTime, endTime, title;
+    let dates = [dateStr];
+    
+    switch (type) {
+      case 'morning':
+        startTime = '09:00';
+        endTime = '12:00';
+        title = 'Блокиран (сутрин)';
+        break;
+      case 'afternoon':
+        startTime = '13:30';
+        endTime = '18:00';
+        title = 'Блокиран (следобед)';
+        break;
+      case 'day':
+        startTime = '09:00';
+        endTime = '18:00';
+        title = 'Блокиран (цял ден)';
+        break;
+      case 'week':
+        // Block all 5 working days
+        startTime = '09:00';
+        endTime = '18:00';
+        title = 'Блокиран (седмица)';
+        const weekStart = this.getWeekStart(d);
+        dates = [];
+        for (let i = 0; i < 5; i++) { // Mon-Fri
+          const day = new Date(weekStart);
+          day.setDate(day.getDate() + i);
+          dates.push(this.formatDate(day));
+        }
+        break;
+    }
+    
+    if (!confirm(`Блокиране: ${title}\n${dates.length > 1 ? dates.join(', ') : dateStr}\nПотвърди?`)) {
+      return;
+    }
+    
+    // Create block events for each date
+    for (const date of dates) {
+      await this.createBlockEvent(date, startTime, endTime, title);
+    }
+    
+    App.showNotification('Часовете са блокирани', 'success');
+    await this.loadEvents();
+    this.renderView();
+  },
+  
+  /**
+   * Block selected slots (from drag selection)
+   */
+  async blockSelectedSlots() {
+    if (this.selectedSlots.length === 0) return;
+    
+    // Group by date
+    const byDate = {};
+    this.selectedSlots.forEach(slot => {
+      if (!byDate[slot.date]) byDate[slot.date] = [];
+      byDate[slot.date].push(slot.hour);
+    });
+    
+    // For each date, find continuous ranges
+    for (const date of Object.keys(byDate)) {
+      const hours = byDate[date].sort((a, b) => a - b);
+      
+      // Group continuous hours
+      let rangeStart = hours[0];
+      let rangeEnd = hours[0];
+      
+      for (let i = 1; i <= hours.length; i++) {
+        if (i < hours.length && hours[i] === rangeEnd + 1) {
+          rangeEnd = hours[i];
+        } else {
+          // Create block for this range
+          const startTime = `${String(rangeStart).padStart(2, '0')}:00`;
+          const endTime = `${String(rangeEnd + 1).padStart(2, '0')}:00`;
+          await this.createBlockEvent(date, startTime, endTime, 'Блокиран');
+          
+          if (i < hours.length) {
+            rangeStart = hours[i];
+            rangeEnd = hours[i];
+          }
+        }
+      }
+    }
+    
+    App.showNotification(`Блокирани ${this.selectedSlots.length} часа`, 'success');
+    this.clearSelection();
+    await this.loadEvents();
+    this.renderView();
+  },
+  
+  /**
+   * Create a block event in Google Calendar
+   */
+  async createBlockEvent(date, startTime, endTime, title = 'Блокиран') {
+    try {
+      const eventData = {
+        title: title,
+        date: date,
+        startTime: startTime,
+        endTime: endTime,
+        patientName: '',
+        patientPhone: '',
+        notes: 'Автоматично блокиран от системата',
+        status: 'confirmed'
+      };
+      
+      const result = await API.request(CONFIG.ENDPOINTS.CALENDAR_CREATE, {
+        method: 'POST',
+        body: JSON.stringify(eventData)
+      });
+      
+      return result.success;
+    } catch (error) {
+      console.error('Error creating block event:', error);
+      return false;
+    }
+  },
+  
+  /**
+   * Clear slot selection
+   */
+  clearSelection() {
+    this.selectedSlots = [];
+    this.selectionMode = false;
+    this.selectionStart = null;
+    
+    // Remove selection styling
+    document.querySelectorAll('.week-view__hour-slot--selected').forEach(el => {
+      el.classList.remove('week-view__hour-slot--selected');
+    });
+    
+    // Hide toolbar
+    const toolbar = document.getElementById('selection-toolbar');
+    if (toolbar) toolbar.style.display = 'none';
+  },
+  
+  /**
+   * Update selection toolbar
+   */
+  updateSelectionToolbar() {
+    const toolbar = document.getElementById('selection-toolbar');
+    const countEl = document.getElementById('selected-count');
+    
+    if (this.selectedSlots.length > 0) {
+      toolbar.style.display = 'flex';
+      countEl.textContent = `${this.selectedSlots.length} часа избрани`;
+    } else {
+      toolbar.style.display = 'none';
+    }
   },
 
   /**
@@ -653,13 +879,43 @@ const Calendar = {
    * Setup grid event listeners
    */
   setupGridListeners() {
-    // Click on empty slot to add event (both old and new selectors)
+    // Drag selection for blocking
+    let isDragging = false;
+    
     document.querySelectorAll('.hour-slot, .week-view__hour-slot').forEach(slot => {
-      slot.addEventListener('click', (e) => {
-        const date = slot.dataset.date;
-        const hour = slot.dataset.hour;
-        this.openEventModal(null, date, hour);
+      // Mouse down - start selection
+      slot.addEventListener('mousedown', (e) => {
+        if (e.shiftKey || e.ctrlKey) {
+          e.preventDefault();
+          isDragging = true;
+          this.selectionStart = { date: slot.dataset.date, hour: parseInt(slot.dataset.hour) };
+          this.toggleSlotSelection(slot);
+        }
       });
+      
+      // Mouse enter while dragging
+      slot.addEventListener('mouseenter', (e) => {
+        if (isDragging) {
+          this.toggleSlotSelection(slot, true);
+        }
+      });
+      
+      // Normal click to add event
+      slot.addEventListener('click', (e) => {
+        if (!isDragging && this.selectedSlots.length === 0) {
+          const date = slot.dataset.date;
+          const hour = slot.dataset.hour;
+          this.openEventModal(null, date, hour);
+        }
+      });
+    });
+    
+    // Mouse up - end selection
+    document.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        this.updateSelectionToolbar();
+      }
     });
     
     // Click on event to edit
@@ -700,6 +956,27 @@ const Calendar = {
         }
       });
     });
+  },
+  
+  /**
+   * Toggle slot selection
+   */
+  toggleSlotSelection(slotEl, forceSelect = false) {
+    const date = slotEl.dataset.date;
+    const hour = parseInt(slotEl.dataset.hour);
+    const slotKey = `${date}-${hour}`;
+    
+    const existingIndex = this.selectedSlots.findIndex(s => s.key === slotKey);
+    
+    if (existingIndex > -1 && !forceSelect) {
+      // Deselect
+      this.selectedSlots.splice(existingIndex, 1);
+      slotEl.classList.remove('week-view__hour-slot--selected');
+    } else if (existingIndex === -1) {
+      // Select
+      this.selectedSlots.push({ key: slotKey, date, hour });
+      slotEl.classList.add('week-view__hour-slot--selected');
+    }
   },
 
   /**

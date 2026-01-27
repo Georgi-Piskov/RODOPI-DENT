@@ -41,10 +41,10 @@ const CONFIG = {
   // Google OAuth2 Configuration
   GOOGLE_CLIENT_ID: '758029403966-j68sst10c2pjtd2qllk6j34esqsn319n.apps.googleusercontent.com',
   
-  // Working hours (extended 7:00-19:00)
+  // Working hours (real schedule)
   WORKING_HOURS: {
-    morning: { start: '07:00', end: '12:00' },
-    afternoon: { start: '13:00', end: '19:00' }
+    morning: { start: '09:00', end: '12:00' },
+    afternoon: { start: '13:30', end: '18:00' }  // Last slot at 17:30
   },
   
   // Working days (0 = Sunday, 1 = Monday, etc.)

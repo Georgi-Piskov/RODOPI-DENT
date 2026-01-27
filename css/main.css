@@ -1837,6 +1837,72 @@ button {
   font-weight: 600;
 }
 
+/* Block Buttons Dropdown */
+.block-buttons {
+  position: relative;
+}
+
+.block-buttons__dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: var(--spacing-2);
+  background: var(--color-white);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xl);
+  z-index: 50;
+  min-width: 180px;
+  display: none;
+}
+
+.block-buttons__dropdown.open {
+  display: block;
+}
+
+.block-buttons__option {
+  display: block;
+  width: 100%;
+  padding: var(--spacing-3) var(--spacing-4);
+  background: none;
+  border: none;
+  text-align: left;
+  color: var(--color-gray-700);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.block-buttons__option:hover {
+  background: var(--color-danger);
+  color: white;
+}
+
+/* Selection Toolbar */
+.selection-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  padding: var(--spacing-3) var(--spacing-4);
+  background: var(--color-warning);
+  color: white;
+  border-radius: var(--radius-md);
+  margin: var(--spacing-2) 0;
+}
+
+.selection-toolbar__count {
+  font-weight: 600;
+}
+
+/* Selected slot styling */
+.week-view__hour-slot--selected {
+  background: rgba(239, 68, 68, 0.3) !important;
+  border: 2px dashed var(--color-danger) !important;
+}
+
+.week-view__hour-slot--selected:hover {
+  background: rgba(239, 68, 68, 0.4) !important;
+}
+
 /* ============================================
    WEEK VIEW - New Grid Layout
    ============================================ */
