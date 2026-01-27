@@ -1,0 +1,144 @@
+{
+  "name": "Rodopi Dent - Calendar Update Event",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "calendar-update",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "calendar-update"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse and validate input\nconst body = $input.first().json.body;\n\n// Required: event ID\nif (!body.eventId && !body.id && !body.googleEventId) {\n  throw new Error('ID на събитието е задължително');\n}\n\nconst eventId = body.eventId || body.id || body.googleEventId;\n\n// Build update fields\nconst updateFields = {};\n\n// If moving to new date/time\nif (body.date && body.startTime) {\n  const duration = body.duration || 30;\n  const [hours, minutes] = body.startTime.split(':').map(Number);\n  const startDate = new Date(`${body.date}T${body.startTime}:00`);\n  const endDate = new Date(startDate.getTime() + duration * 60 * 1000);\n  const endTime = body.endTime || `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;\n  \n  updateFields.startDateTime = `${body.date}T${body.startTime}:00`;\n  updateFields.endDateTime = `${body.date}T${endTime}:00`;\n}\n\n// Update title/summary\nif (body.patientName) {\n  updateFields.summary = body.patientName;\n}\n\n// Build description\nlet description = '';\nif (body.patientPhone !== undefined || body.procedure !== undefined || body.notes !== undefined) {\n  if (body.patientPhone) {\n    description += `📞 Тел: ${body.patientPhone}\\n`;\n  }\n  if (body.procedure) {\n    description += `🦷 Процедура: ${body.procedure}\\n`;\n  }\n  if (body.notes) {\n    description += `📝 Бележки: ${body.notes}\\n`;\n  }\n  updateFields.description = description.trim();\n}\n\nreturn [{\n  json: {\n    eventId: eventId,\n    updateFields: updateFields,\n    originalData: body\n  }\n}];"
+      },
+      "id": "prepare",
+      "name": "Prepare Update Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "rodopi.dent@gmail.com"
+        },
+        "eventId": "={{ $json.eventId }}",
+        "updateFields": {
+          "start": "={{ $json.updateFields.startDateTime }}",
+          "end": "={{ $json.updateFields.endDateTime }}",
+          "summary": "={{ $json.updateFields.summary }}",
+          "description": "={{ $json.updateFields.description }}"
+        }
+      },
+      "id": "update-event",
+      "name": "Update Calendar Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.2,
+      "position": [440, 0],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "",
+          "name": "Google Calendar"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get updated event details\nconst event = $input.first().json;\nconst prevData = $('Prepare Update Data').first().json.originalData;\n\n// Parse times\nconst startDateTime = event.start?.dateTime || event.start?.date;\nconst endDateTime = event.end?.dateTime || event.end?.date;\nlet startDate, startTime, endTime;\n\nif (startDateTime) {\n  const start = new Date(startDateTime);\n  const end = new Date(endDateTime);\n  startDate = start.toISOString().split('T')[0];\n  startTime = start.toTimeString().slice(0, 5);\n  endTime = end.toTimeString().slice(0, 5);\n}\n\nreturn [{\n  json: {\n    id: event.id,\n    googleEventId: event.id,\n    title: event.summary,\n    date: startDate,\n    startTime: startTime,\n    endTime: endTime,\n    description: event.description,\n    status: event.status,\n    htmlLink: event.htmlLink,\n    updated: event.updated\n  }\n}];"
+      },
+      "id": "format-response",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'Събитието е обновено успешно', event: $json }) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [880, 0]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prepare Update Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Update Data": {
+      "main": [
+        [
+          {
+            "node": "Update Calendar Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Calendar Event": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "Rodopi Dent"
+    }
+  ]
+}

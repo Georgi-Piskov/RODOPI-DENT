@@ -10,6 +10,9 @@ const CONFIG = {
   // Google Sheets ID
   SHEETS_ID: '1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g',
   
+  // Google Calendar ID
+  CALENDAR_ID: 'rodopi.dent@gmail.com',
+  
   // API Endpoints
   ENDPOINTS: {
     SLOTS: '/slots-webhook',
@@ -21,7 +24,12 @@ const CONFIG = {
     SETTINGS: '/settings-webhook',
     FINANCE: '/finance-webhook',
     FINANCE_ADD: '/finance-add',
-    NHIF_PRICES: '/nhif-prices-webhook'
+    NHIF_PRICES: '/nhif-prices-webhook',
+    // Calendar endpoints
+    CALENDAR_EVENTS: '/calendar-events',
+    CALENDAR_CREATE: '/calendar-create',
+    CALENDAR_UPDATE: '/calendar-update',
+    CALENDAR_DELETE: '/calendar-delete'
   },
   
   // Google OAuth2 Configuration

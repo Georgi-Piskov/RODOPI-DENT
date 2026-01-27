@@ -178,6 +178,55 @@ const API = {
       method: 'POST',
       body: JSON.stringify(record)
     });
+  },
+
+  // ============================================
+  // Google Calendar Endpoints
+  // ============================================
+
+  /**
+   * Get calendar events for a period
+   * @param {Object} params - { startDate, endDate, view }
+   */
+  async getCalendarEvents(params = {}) {
+    const queryParams = new URLSearchParams(params).toString();
+    const endpoint = queryParams 
+      ? `${CONFIG.ENDPOINTS.CALENDAR_EVENTS}?${queryParams}` 
+      : CONFIG.ENDPOINTS.CALENDAR_EVENTS;
+    return this.request(endpoint);
+  },
+
+  /**
+   * Create a new calendar event
+   * @param {Object} eventData - { patientName, patientPhone, date, startTime, duration, procedure, notes }
+   */
+  async createCalendarEvent(eventData) {
+    return this.request(CONFIG.ENDPOINTS.CALENDAR_CREATE, {
+      method: 'POST',
+      body: JSON.stringify(eventData)
+    });
+  },
+
+  /**
+   * Update an existing calendar event
+   * @param {Object} eventData - { eventId, patientName, patientPhone, date, startTime, duration, procedure, notes }
+   */
+  async updateCalendarEvent(eventData) {
+    return this.request(CONFIG.ENDPOINTS.CALENDAR_UPDATE, {
+      method: 'POST',
+      body: JSON.stringify(eventData)
+    });
+  },
+
+  /**
+   * Delete a calendar event
+   * @param {string} eventId - The Google Calendar event ID
+   */
+  async deleteCalendarEvent(eventId) {
+    return this.request(CONFIG.ENDPOINTS.CALENDAR_DELETE, {
+      method: 'POST',
+      body: JSON.stringify({ eventId })
+    });
   }
 };
 

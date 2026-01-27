@@ -32,7 +32,7 @@ const App = {
     Router.register('/admin/login', () => this.renderAdminLogin());
     Router.register('/admin/dashboard', Router.requireAuth(async () => await this.renderDashboard()));
     Router.register('/admin/workday', Router.requireAuth(async () => await this.renderWorkday()));
-    Router.register('/admin/calendar', Router.requireAuth(async () => await this.renderWorkday())); // Redirect to workday
+    Router.register('/admin/calendar', Router.requireAuth(async () => await this.renderCalendarPage()));
     Router.register('/admin/finance', Router.requireAuth(async () => await this.renderWorkday())); // Redirect to workday
     Router.register('/admin/settings', Router.requireAuth(async () => await this.renderSettings()));
   },
@@ -459,6 +459,46 @@ const App = {
   },
 
   // ============================================
+  // GOOGLE CALENDAR PAGE - Full Calendar View
+  // ============================================
+
+  /**
+   * Render Google Calendar page with day/week/month views
+   */
+  async renderCalendarPage() {
+    const main = document.getElementById('main-content');
+    
+    main.innerHTML = `
+      <div class="page page--admin page--calendar">
+        <div class="admin-header">
+          <h1>📆 Календар</h1>
+          <div class="header-actions">
+            <button id="logout-btn" class="btn btn--outline">Изход</button>
+          </div>
+        </div>
+        <nav class="admin-nav">
+          <a href="#/admin/dashboard" class="admin-nav__link">Табло</a>
+          <a href="#/admin/workday" class="admin-nav__link">Работен ден</a>
+          <a href="#/admin/calendar" class="admin-nav__link active">Календар</a>
+          <a href="#/admin/settings" class="admin-nav__link">Настройки</a>
+        </nav>
+        
+        <div id="calendar-container" class="calendar-page-container">
+          <p class="text-muted">Зареждане на календар...</p>
+        </div>
+      </div>
+    `;
+    
+    this.setupLogout();
+    
+    // Initialize full calendar view
+    const container = document.getElementById('calendar-container');
+    if (container && window.Calendar) {
+      await Calendar.render(container, 'week');
+    }
+  },
+
+  // ============================================
   // WORKDAY PAGE - Combined Calendar + Finance
   // ============================================
 
@@ -482,6 +522,7 @@ const App = {
         <nav class="admin-nav">
           <a href="#/admin/dashboard" class="admin-nav__link">Табло</a>
           <a href="#/admin/workday" class="admin-nav__link active">Работен ден</a>
+          <a href="#/admin/calendar" class="admin-nav__link">📆 Календар</a>
           <a href="#/admin/settings" class="admin-nav__link">Настройки</a>
         </nav>
         
