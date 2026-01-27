@@ -57,7 +57,9 @@
         "returnAll": true,
         "options": {
           "query": "={{ 'ID: ' + $('Parse Callback').first().json.eventId }}",
-          "singleEvents": true
+          "singleEvents": true,
+          "timeMin": "={{ new Date().toISOString() }}",
+          "timeMax": "={{ new Date(Date.now() + 90*24*60*60*1000).toISOString() }}"
         }
       },
       "id": "get-event",
@@ -282,8 +284,8 @@
     },
     {
       "parameters": {
-        "chatId": "={{ $json.chatId }}",
-        "text": "=⚠️ {{ $json.error }}",
+        "chatId": "={{ $json.chatId || $('Parse Callback').first().json.chatId }}",
+        "text": "=⚠️ {{ $json.error || 'Грешка при обработка' }}",
         "additionalFields": {
           "parse_mode": "Markdown"
         }
@@ -402,10 +404,16 @@
     },
     "Is Valid?": {
       "main": [
-        [],
         [
           {
             "node": "Get Calendar Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Error",
             "type": "main",
             "index": 0
           }
@@ -453,13 +461,7 @@
             "index": 0
           }
         ],
-        [
-          {
-            "node": "Reply Error",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "Is Cancel?": {
