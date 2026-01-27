@@ -1,0 +1,251 @@
+{
+  "name": "Rodopi Dent - Public Available Slots (Calendar)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "public-slots",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "public-slots"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get date from query parameter\nconst query = $input.first().json.query;\nconst queryDate = query.date;\n\nif (!queryDate) {\n  return [{\n    json: {\n      error: true,\n      message: 'Date parameter is required',\n      startDate: null,\n      endDate: null\n    }\n  }];\n}\n\n// Parse the requested date\nconst requestedDate = new Date(queryDate + 'T00:00:00');\nconst dayOfWeek = requestedDate.getDay();\n\n// Check if it's a working day (Monday-Friday = 1-5)\nconst workingDays = [1, 2, 3, 4, 5];\nif (!workingDays.includes(dayOfWeek)) {\n  return [{\n    json: {\n      error: false,\n      nonWorkingDay: true,\n      date: queryDate,\n      message: 'Неработен ден'\n    }\n  }];\n}\n\n// Set time range for the day\nconst startDate = queryDate + 'T00:00:00+02:00';\nconst endDate = queryDate + 'T23:59:59+02:00';\n\nreturn [{\n  json: {\n    error: false,\n    nonWorkingDay: false,\n    date: queryDate,\n    startDate: startDate,\n    endDate: endDate\n  }\n}];"
+      },
+      "id": "parse-date",
+      "name": "Parse Date",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.error }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-error",
+      "name": "Has Error?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: $json.message, slots: [] }) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-error",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [660, -100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.nonWorkingDay }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-working-day",
+      "name": "Non-Working Day?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, date: $json.date, slots: [], message: 'Неработен ден' }) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-non-working",
+      "name": "Respond Non-Working",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "rodopi.dent@gmail.com"
+        },
+        "returnAll": true,
+        "options": {
+          "timeMax": "={{ $json.endDate }}",
+          "timeMin": "={{ $json.startDate }}",
+          "singleEvents": true,
+          "orderBy": "startTime"
+        }
+      },
+      "id": "get-calendar",
+      "name": "Get Calendar Events",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.2,
+      "position": [880, 200],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "",
+          "name": "Google Calendar"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the requested date from previous node\nconst parsedData = $('Parse Date').first().json;\nconst queryDate = parsedData.date;\n\n// Working hours configuration (7:00-19:00 with lunch break)\nconst workingHours = {\n  morning: { start: '07:00', end: '12:00' },\n  afternoon: { start: '13:00', end: '19:00' }\n};\n\n// Slot interval = 30 minutes\nconst slotInterval = 30;\n\n// Helper functions\nfunction timeToMinutes(time) {\n  const [hours, minutes] = time.split(':').map(Number);\n  return hours * 60 + minutes;\n}\n\nfunction minutesToTime(mins) {\n  const hours = Math.floor(mins / 60);\n  const minutes = mins % 60;\n  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;\n}\n\n// Generate all possible 30-minute slots\nconst allSlots = [];\n\n// Morning slots (07:00 - 12:00)\nlet current = timeToMinutes(workingHours.morning.start);\nconst morningEnd = timeToMinutes(workingHours.morning.end);\nwhile (current < morningEnd) {\n  allSlots.push(minutesToTime(current));\n  current += slotInterval;\n}\n\n// Afternoon slots (13:00 - 19:00)\ncurrent = timeToMinutes(workingHours.afternoon.start);\nconst afternoonEnd = timeToMinutes(workingHours.afternoon.end);\nwhile (current < afternoonEnd) {\n  allSlots.push(minutesToTime(current));\n  current += slotInterval;\n}\n\n// Get calendar events\nconst calendarEvents = $input.all();\n\n// Build list of blocked time ranges from calendar\nconst blockedRanges = [];\n\ncalendarEvents.forEach(item => {\n  const event = item.json;\n  \n  // Skip cancelled events\n  if (event.status === 'cancelled') return;\n  \n  let startTime, endTime;\n  \n  if (event.start?.dateTime) {\n    // Timed event\n    const start = new Date(event.start.dateTime);\n    const end = new Date(event.end.dateTime);\n    startTime = start.toTimeString().slice(0, 5);\n    endTime = end.toTimeString().slice(0, 5);\n  } else if (event.start?.date) {\n    // All-day event - block entire day\n    startTime = '00:00';\n    endTime = '23:59';\n  } else {\n    return;\n  }\n  \n  const startMinutes = timeToMinutes(startTime);\n  const endMinutes = timeToMinutes(endTime);\n  \n  blockedRanges.push({\n    start: startMinutes,\n    end: endMinutes,\n    title: event.summary || 'Зает'\n  });\n});\n\n// Check if current time matters (for today)\nconst now = new Date();\nconst todayStr = now.toISOString().split('T')[0];\nconst isToday = queryDate === todayStr;\nlet nowMinutes = 0;\n\nif (isToday) {\n  // Add 30 min buffer for today - can't book immediately\n  nowMinutes = now.getHours() * 60 + now.getMinutes() + 30;\n}\n\n// Filter out blocked slots and past slots\nfunction isSlotAvailable(slotTime) {\n  const slotMinutes = timeToMinutes(slotTime);\n  \n  // If today, check if slot is in the past\n  if (isToday && slotMinutes < nowMinutes) {\n    return false;\n  }\n  \n  // Check if slot conflicts with any blocked range\n  for (const range of blockedRanges) {\n    // Conflict if slot starts during a blocked range\n    if (slotMinutes >= range.start && slotMinutes < range.end) {\n      return false;\n    }\n  }\n  \n  return true;\n}\n\nconst availableSlots = allSlots.filter(slot => isSlotAvailable(slot));\n\nreturn [{\n  json: {\n    success: true,\n    date: queryDate,\n    slots: availableSlots,\n    totalSlots: allSlots.length,\n    bookedCount: blockedRanges.length,\n    isToday: isToday\n  }\n}];"
+      },
+      "id": "calculate-slots",
+      "name": "Calculate Available Slots",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-slots",
+      "name": "Respond with Slots",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1320, 200]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Date": {
+      "main": [
+        [
+          {
+            "node": "Has Error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Error?": {
+      "main": [
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Non-Working Day?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Non-Working Day?": {
+      "main": [
+        [
+          {
+            "node": "Respond Non-Working",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Calendar Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Calendar Events": {
+      "main": [
+        [
+          {
+            "node": "Calculate Available Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Available Slots": {
+      "main": [
+        [
+          {
+            "node": "Respond with Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

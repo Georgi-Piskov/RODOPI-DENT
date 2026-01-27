@@ -4,8 +4,8 @@
 
 | Файл | Endpoint | Метод | Описание |
 |------|----------|-------|----------|
-| `01-slots-webhook.json` | `/webhook/slots-webhook` | GET | Връща свободни часове (филтрира pending + confirmed) |
-| `02-booking-webhook.json` | `/webhook/booking-webhook` | POST | Създава резервация (DEPRECATED - виж 09) |
+| `01-slots-webhook.json` | `/webhook/slots-webhook` | GET | ⚠️ DEPRECATED - използвай 15 |
+| `02-booking-webhook.json` | `/webhook/booking-webhook` | POST | ⚠️ DEPRECATED - използвай 16 |
 | `03-appointments-webhook.json` | `/webhook/appointments-webhook` | GET | Връща списък записи |
 | `04-confirm-webhook.json` | `/webhook/confirm-webhook` | POST | Потвърждава с продължителност + SMS |
 | `05-settings-webhook.json` | `/webhook/settings-webhook` | GET/POST | Настройки на системата |
@@ -13,8 +13,14 @@
 | `06b-finance-add.json` | `/webhook/finance-add` | POST | Добавя финансов запис |
 | `07-daily-backup.json` | - | Schedule | Ежедневен backup в 23:00 |
 | `08-expire-pending.json` | - | Schedule 30м | Изтича pending след 2 часа |
-| `09-telegram-notify-booking.json` | `/webhook/booking-webhook` | POST | Резервация + Telegram нотификация |
+| `09-telegram-notify-booking.json` | `/webhook/booking-webhook` | POST | ⚠️ DEPRECATED - използвай 16 |
 | `10-telegram-callback.json` | - | Telegram Trigger | Обработва бутони от Telegram |
+| `11-calendar-events.json` | `/webhook/calendar-events` | GET | 📅 Календар - чете събития |
+| `12-calendar-create.json` | `/webhook/calendar-create` | POST | 📅 Календар - създава събитие |
+| `13-calendar-update.json` | `/webhook/calendar-update` | PUT | 📅 Календар - обновява събитие |
+| `14-calendar-delete.json` | `/webhook/calendar-delete` | DELETE | 📅 Календар - изтрива събитие |
+| `15-public-slots.json` | `/webhook/public-slots` | GET | ✅ **АКТИВЕН** - свободни часове от Calendar |
+| `16-public-booking.json` | `/webhook/public-booking` | POST | ✅ **АКТИВЕН** - резервация в Calendar + Telegram |
 
 ---
 
@@ -34,6 +40,11 @@
 ### 3. Настрой credentials
 
 Трябва да свържеш:
+
+#### Google Calendar (ЗАДЪЛЖИТЕЛНО!)
+1. Settings → Credentials → Add Credential
+2. Избери "Google Calendar OAuth2"
+3. Свържи с `rodopi.dent@gmail.com`
 
 #### Google Sheets
 1. Settings → Credentials → Add Credential

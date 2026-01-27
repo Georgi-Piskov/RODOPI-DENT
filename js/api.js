@@ -63,21 +63,23 @@ const API = {
   },
 
   // ============================================
-  // Public Endpoints
+  // Public Endpoints (Calendar-based)
   // ============================================
 
   /**
-   * Get available time slots for a date
+   * Get available time slots for a date (from Google Calendar)
    */
   async getSlots(date) {
-    return this.request(`${CONFIG.ENDPOINTS.SLOTS}?date=${date}`);
+    // Use new calendar-based endpoint
+    return this.request(`${CONFIG.ENDPOINTS.PUBLIC_SLOTS}?date=${date}`);
   },
 
   /**
-   * Create a new booking
+   * Create a new booking (creates event in Google Calendar)
    */
   async createBooking(bookingData) {
-    return this.request(CONFIG.ENDPOINTS.BOOKING, {
+    // Use new calendar-based endpoint
+    return this.request(CONFIG.ENDPOINTS.PUBLIC_BOOKING, {
       method: 'POST',
       body: JSON.stringify(bookingData)
     });

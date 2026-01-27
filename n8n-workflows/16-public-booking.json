@@ -1,0 +1,355 @@
+{
+  "name": "Rodopi Dent - Public Booking (Calendar)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "public-booking",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "public-booking"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate incoming booking data\nconst body = $input.first().json.body;\n\nconst required = ['patientName', 'patientPhone', 'date', 'startTime'];\nconst missing = required.filter(field => !body[field]);\n\nif (missing.length > 0) {\n  return [{\n    json: {\n      valid: false,\n      error: `Липсващи полета: ${missing.join(', ')}`\n    }\n  }];\n}\n\n// Validate phone number (Bulgarian format)\nconst phone = body.patientPhone.replace(/\\s/g, '');\nconst phoneRegex = /^(\\+359|0)[0-9]{9}$/;\nif (!phoneRegex.test(phone)) {\n  return [{\n    json: {\n      valid: false,\n      error: 'Невалиден телефонен номер. Моля, използвайте формат: 0888123456 или +359888123456'\n    }\n  }];\n}\n\n// Validate date is in the future\nconst bookingDate = new Date(body.date + 'T' + body.startTime);\nconst now = new Date();\nif (bookingDate < now) {\n  return [{\n    json: {\n      valid: false,\n      error: 'Не може да запазите час в миналото'\n    }\n  }];\n}\n\n// Check if it's a working day\nconst dayOfWeek = new Date(body.date).getDay();\nif (dayOfWeek === 0 || dayOfWeek === 6) {\n  return [{\n    json: {\n      valid: false,\n      error: 'Събота и неделя са почивни дни'\n    }\n  }];\n}\n\n// Default duration is 30 minutes for new bookings (doctor will confirm actual duration)\nconst duration = 30;\n\nreturn [{\n  json: {\n    valid: true,\n    patientName: body.patientName.trim(),\n    patientPhone: phone,\n    date: body.date,\n    startTime: body.startTime,\n    duration: duration,\n    reason: (body.reason || '').trim(),\n    notes: (body.notes || '').trim()\n  }\n}];"
+      },
+      "id": "validate",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.valid }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "is-valid",
+      "name": "Is Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: $json.error }) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-invalid",
+      "name": "Respond Invalid",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [660, -100]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "rodopi.dent@gmail.com"
+        },
+        "returnAll": true,
+        "options": {
+          "timeMax": "={{ $json.date }}T23:59:59+02:00",
+          "timeMin": "={{ $json.date }}T00:00:00+02:00",
+          "singleEvents": true
+        }
+      },
+      "id": "get-calendar",
+      "name": "Get Calendar Events",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.2,
+      "position": [660, 100],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "",
+          "name": "Google Calendar"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the booking request\nconst booking = $('Validate Input').first().json;\nconst bookingDate = booking.date;\nconst bookingTime = booking.startTime;\nconst bookingDuration = booking.duration;\n\n// Helper function\nfunction timeToMinutes(time) {\n  const [hours, minutes] = time.split(':').map(Number);\n  return hours * 60 + minutes;\n}\n\nconst bookingStart = timeToMinutes(bookingTime);\nconst bookingEnd = bookingStart + bookingDuration;\n\n// Get existing calendar events\nconst calendarEvents = $input.all();\n\n// Check for conflicts\nlet hasConflict = false;\nlet conflictWith = null;\n\nfor (const item of calendarEvents) {\n  const event = item.json;\n  \n  // Skip cancelled events\n  if (event.status === 'cancelled') continue;\n  \n  let existingStart, existingEnd;\n  \n  if (event.start?.dateTime) {\n    const start = new Date(event.start.dateTime);\n    const end = new Date(event.end.dateTime);\n    existingStart = start.getHours() * 60 + start.getMinutes();\n    existingEnd = end.getHours() * 60 + end.getMinutes();\n  } else if (event.start?.date) {\n    // All-day event blocks entire day\n    hasConflict = true;\n    conflictWith = 'целодневно събитие';\n    break;\n  } else {\n    continue;\n  }\n  \n  // Check overlap: newStart < existingEnd AND newEnd > existingStart\n  if (bookingStart < existingEnd && bookingEnd > existingStart) {\n    hasConflict = true;\n    const startHour = Math.floor(existingStart / 60);\n    const startMin = existingStart % 60;\n    conflictWith = `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')}`;\n    break;\n  }\n}\n\nif (hasConflict) {\n  return [{\n    json: {\n      conflict: true,\n      error: `Този час е вече зает (конфликт с ${conflictWith})`\n    }\n  }];\n}\n\n// No conflict - prepare data for calendar event creation\nconst id = 'apt_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 8);\n\nreturn [{\n  json: {\n    conflict: false,\n    id: id,\n    patientName: booking.patientName,\n    patientPhone: booking.patientPhone,\n    date: booking.date,\n    startTime: booking.startTime,\n    duration: booking.duration,\n    reason: booking.reason,\n    notes: booking.notes\n  }\n}];"
+      },
+      "id": "check-conflict",
+      "name": "Check Conflict",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.conflict }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "has-conflict",
+      "name": "Has Conflict?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, 100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: $json.error }) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-conflict",
+      "name": "Respond Conflict",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1320, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare calendar event data\nconst booking = $json;\n\n// Calculate end time\nconst [hours, minutes] = booking.startTime.split(':').map(Number);\nconst startMinutes = hours * 60 + minutes;\nconst endMinutes = startMinutes + booking.duration;\nconst endHours = Math.floor(endMinutes / 60);\nconst endMins = endMinutes % 60;\nconst endTime = `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;\n\n// Build description with structured data\nlet description = `📞 Тел: ${booking.patientPhone}\\n`;\nif (booking.reason) {\n  description += `📋 Причина: ${booking.reason}\\n`;\n}\nif (booking.notes) {\n  description += `📝 Бележки: ${booking.notes}\\n`;\n}\ndescription += `\\n⏳ Статус: ЧАКАЩ (pending)\\n`;\ndescription += `🆔 ID: ${booking.id}\\n`;\ndescription += `📅 Създаден: ${new Date().toLocaleString('bg-BG')}`;\n\nreturn [{\n  json: {\n    summary: `⏳ ${booking.patientName}`,\n    description: description,\n    startDateTime: `${booking.date}T${booking.startTime}:00`,\n    endDateTime: `${booking.date}T${endTime}:00`,\n    colorId: '5',  // Yellow for pending\n    id: booking.id,\n    patientName: booking.patientName,\n    patientPhone: booking.patientPhone\n  }\n}];"
+      },
+      "id": "prepare-event",
+      "name": "Prepare Event Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 200]
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "rodopi.dent@gmail.com"
+        },
+        "start": "={{ $json.startDateTime }}",
+        "end": "={{ $json.endDateTime }}",
+        "additionalFields": {
+          "summary": "={{ $json.summary }}",
+          "description": "={{ $json.description }}",
+          "colorId": "={{ $json.colorId }}"
+        }
+      },
+      "id": "create-calendar-event",
+      "name": "Create Calendar Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.2,
+      "position": [1540, 200],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "",
+          "name": "Google Calendar"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare success response\nconst calendarEvent = $input.first().json;\nconst preparedData = $('Prepare Event Data').first().json;\n\nreturn [{\n  json: {\n    success: true,\n    message: 'Часът е запазен успешно! Очаквайте потвърждение.',\n    booking: {\n      id: preparedData.id,\n      googleEventId: calendarEvent.id,\n      patientName: preparedData.patientName,\n      patientPhone: preparedData.patientPhone,\n      date: preparedData.startDateTime.split('T')[0],\n      startTime: preparedData.startDateTime.split('T')[1].slice(0, 5),\n      status: 'pending'\n    }\n  }\n}];"
+      },
+      "id": "prepare-response",
+      "name": "Prepare Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1980, 200]
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🦷 *Нова заявка за час!*\n\n👤 Пациент: {{ $('Prepare Event Data').first().json.patientName }}\n📞 Телефон: {{ $('Prepare Event Data').first().json.patientPhone }}\n📅 Дата: {{ $('Prepare Event Data').first().json.startDateTime.split('T')[0] }}\n🕐 Час: {{ $('Prepare Event Data').first().json.startDateTime.split('T')[1].slice(0, 5) }}\n\n⏳ Статус: Чакащ потвърждение",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "telegram-notify",
+      "name": "Telegram Notify",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1760, 400],
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Is Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Valid?": {
+      "main": [
+        [
+          {
+            "node": "Respond Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Calendar Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Calendar Events": {
+      "main": [
+        [
+          {
+            "node": "Check Conflict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Conflict": {
+      "main": [
+        [
+          {
+            "node": "Has Conflict?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Conflict?": {
+      "main": [
+        [
+          {
+            "node": "Respond Conflict",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Event Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Event Data": {
+      "main": [
+        [
+          {
+            "node": "Create Calendar Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Calendar Event": {
+      "main": [
+        [
+          {
+            "node": "Prepare Response",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Telegram Notify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Response": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

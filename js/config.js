@@ -15,6 +15,7 @@ const CONFIG = {
   
   // API Endpoints
   ENDPOINTS: {
+    // Old Sheet-based endpoints (deprecated)
     SLOTS: '/slots-webhook',
     BOOKING: '/booking-webhook',
     CANCEL: '/cancel-webhook',
@@ -25,20 +26,25 @@ const CONFIG = {
     FINANCE: '/finance-webhook',
     FINANCE_ADD: '/finance-add',
     NHIF_PRICES: '/nhif-prices-webhook',
-    // Calendar endpoints
+    
+    // Calendar endpoints (admin)
     CALENDAR_EVENTS: '/calendar-events',
     CALENDAR_CREATE: '/calendar-create',
     CALENDAR_UPDATE: '/calendar-update',
-    CALENDAR_DELETE: '/calendar-delete'
+    CALENDAR_DELETE: '/calendar-delete',
+    
+    // Public Calendar endpoints (patient booking)
+    PUBLIC_SLOTS: '/public-slots',
+    PUBLIC_BOOKING: '/public-booking'
   },
   
   // Google OAuth2 Configuration
   GOOGLE_CLIENT_ID: '758029403966-j68sst10c2pjtd2qllk6j34esqsn319n.apps.googleusercontent.com',
   
-  // Working hours
+  // Working hours (extended 7:00-19:00)
   WORKING_HOURS: {
-    morning: { start: '09:00', end: '12:00' },
-    afternoon: { start: '13:30', end: '17:00' }
+    morning: { start: '07:00', end: '12:00' },
+    afternoon: { start: '13:00', end: '19:00' }
   },
   
   // Working days (0 = Sunday, 1 = Monday, etc.)
