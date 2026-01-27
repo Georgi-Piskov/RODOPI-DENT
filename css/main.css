@@ -1951,7 +1951,7 @@ button {
 /* Individual Day Column */
 .week-view__day-column {
   position: relative;
-  border-right: 1px solid var(--color-gray-100);
+  border-right: 1px solid var(--color-gray-300);
   background: var(--color-white);
 }
 
@@ -1970,7 +1970,7 @@ button {
 /* Hour Slots */
 .week-view__hour-slot {
   height: 60px;
-  border-bottom: 1px solid var(--color-gray-100);
+  border-bottom: 1px solid var(--color-gray-300);
   position: relative;
 }
 
@@ -1980,7 +1980,7 @@ button {
   left: 0;
   right: 0;
   top: 50%;
-  border-top: 1px dashed var(--color-gray-100);
+  border-top: 1px dashed var(--color-gray-200);
 }
 
 .week-view__hour-slot:hover {
