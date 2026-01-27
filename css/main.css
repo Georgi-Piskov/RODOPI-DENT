@@ -2576,18 +2576,37 @@ button {
 
 .pending-request-card__actions {
   display: flex;
-  gap: var(--spacing-2);
+  gap: var(--spacing-1);
   flex-shrink: 0;
 }
 
 .pending-request-card__actions .btn {
-  width: 36px;
-  height: 36px;
-  padding: 0;
+  min-width: 40px;
+  height: 32px;
+  padding: 0 var(--spacing-2);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.pending-request-card__actions .pending-confirm-30,
+.pending-request-card__actions .pending-confirm-60 {
+  background: var(--success);
+  color: white;
+  border-radius: var(--radius-sm);
+}
+
+.pending-request-card__actions .pending-confirm-30:hover,
+.pending-request-card__actions .pending-confirm-60:hover {
+  background: #16a34a;
+  transform: scale(1.05);
+}
+
+.pending-request-card__actions .pending-reject {
+  width: 32px;
+  min-width: 32px;
 }
 
 /* Duration buttons */

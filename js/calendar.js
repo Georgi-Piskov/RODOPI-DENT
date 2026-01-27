@@ -1136,8 +1136,11 @@ const Calendar = {
             ${reason ? `<span class="pending-request-card__reason">📋 ${reason}</span>` : ''}
           </div>
           <div class="pending-request-card__actions">
-            <button class="btn btn--success btn--small pending-confirm" data-event-id="${event.id}" title="Потвърди">
-              ✓
+            <button class="btn btn--success btn--small pending-confirm-30" data-event-id="${event.id}" data-duration="30" title="Потвърди 30 мин">
+              30м
+            </button>
+            <button class="btn btn--success btn--small pending-confirm-60" data-event-id="${event.id}" data-duration="60" title="Потвърди 60 мин">
+              60м
             </button>
             <button class="btn btn--danger btn--small pending-reject" data-event-id="${event.id}" title="Откажи">
               ✕
@@ -1149,12 +1152,13 @@ const Calendar = {
     
     pendingList.innerHTML = html;
     
-    // Add event listeners for confirm/reject buttons
-    pendingList.querySelectorAll('.pending-confirm').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+    // Add event listeners for confirm buttons (30 and 60 min)
+    pendingList.querySelectorAll('.pending-confirm-30, .pending-confirm-60').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const eventId = e.currentTarget.dataset.eventId;
-        this.openConfirmDurationModal(eventId);
+        const duration = parseInt(e.currentTarget.dataset.duration);
+        await this.confirmPendingRequest(eventId, duration);
       });
     });
     
