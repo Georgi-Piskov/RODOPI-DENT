@@ -1,5 +1,5 @@
 {
-  "name": "Rodopi Dent - Telegram Callback Handler",
+  "name": "Rodopi Dent - Telegram Callback Handler (Calendar)",
   "nodes": [
     {
       "parameters": {
@@ -21,7 +21,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const callback = $input.first().json;\n\n// Check if this is a callback_query (button press)\nif (!callback.callback_query) {\n  // This is a regular message, not a button callback - ignore it\n  return [{ json: { error: 'Not a callback query', valid: false, skip: true } }];\n}\n\nconst callbackData = callback.callback_query.data;\nconst messageId = callback.callback_query.message.message_id;\nconst chatId = callback.callback_query.message.chat.id;\n\nlet action, duration, appointmentId;\n\nif (callbackData.startsWith('confirm_')) {\n  const parts = callbackData.split('_');\n  action = 'confirm';\n  duration = parseInt(parts[1]);\n  appointmentId = parts.slice(2).join('_');\n} else if (callbackData.startsWith('cancel_')) {\n  action = 'cancel';\n  duration = 0;\n  appointmentId = callbackData.replace('cancel_', '');\n} else {\n  return [{ json: { error: 'Unknown action', valid: false } }];\n}\n\nreturn [{\n  json: {\n    action: action,\n    duration: duration,\n    appointmentId: appointmentId,\n    messageId: messageId,\n    chatId: chatId,\n    valid: true\n  }\n}];"
+        "jsCode": "const callback = $input.first().json;\n\n// Check if this is a callback_query (button press)\nif (!callback.callback_query) {\n  return [{ json: { error: 'Not a callback query', valid: false, skip: true } }];\n}\n\nconst callbackData = callback.callback_query.data;\nconst messageId = callback.callback_query.message.message_id;\nconst chatId = callback.callback_query.message.chat.id;\n\nlet action, duration, eventId;\n\nif (callbackData.startsWith('confirm_')) {\n  const parts = callbackData.split('_');\n  action = 'confirm';\n  duration = parseInt(parts[1]);\n  // Event ID is everything after confirm_XX_\n  eventId = parts.slice(2).join('_');\n} else if (callbackData.startsWith('cancel_')) {\n  action = 'cancel';\n  duration = 0;\n  eventId = callbackData.replace('cancel_', '');\n} else {\n  return [{ json: { error: 'Unknown action', valid: false } }];\n}\n\nreturn [{\n  json: {\n    action: action,\n    duration: duration,\n    eventId: eventId,\n    messageId: messageId,\n    chatId: chatId,\n    valid: true\n  }\n}];"
       },
       "id": "parse-callback",
       "name": "Parse Callback",
@@ -31,40 +31,52 @@
     },
     {
       "parameters": {
-        "operation": "read",
-        "documentId": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.valid }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "is-valid",
+      "name": "Is Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "calendar": {
           "__rl": true,
           "mode": "id",
-          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+          "value": "rodopi.dent@gmail.com"
         },
-        "sheetName": {
-          "__rl": true,
-          "mode": "name",
-          "value": "Appointments"
-        },
-        "options": {}
+        "eventId": "={{ $('Parse Callback').first().json.eventId }}"
       },
-      "id": "sheets-read",
-      "name": "Get Appointments",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.5,
-      "position": [440, 0],
+      "id": "get-event",
+      "name": "Get Calendar Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.2,
+      "position": [660, 100],
       "credentials": {
-        "googleSheetsOAuth2Api": {
+        "googleCalendarOAuth2Api": {
           "id": "",
-          "name": "Google Sheets"
+          "name": "Google Calendar"
         }
       }
     },
     {
       "parameters": {
-        "jsCode": "const parsed = $('Parse Callback').first().json;\nconst appointments = $('Get Appointments').all();\n\nconst apt = appointments.find(a => a.json.id === parsed.appointmentId);\n\nif (!apt) {\n  return [{ json: { error: 'Записът не е намерен', valid: false, action: 'error', chatId: parsed.chatId } }];\n}\n\nif (apt.json.status !== 'pending') {\n  return [{ json: { error: 'Записът вече е обработен', valid: false, action: 'already_processed', chatId: parsed.chatId } }];\n}\n\nif (parsed.action === 'cancel') {\n  return [{\n    json: {\n      id: apt.json.id,\n      patientName: apt.json.patientName,\n      patientPhone: apt.json.patientPhone,\n      date: apt.json.date,\n      startTime: apt.json.startTime,\n      duration: apt.json.duration,\n      reason: apt.json.reason || '',\n      status: 'cancelled',\n      createdAt: apt.json.createdAt,\n      updatedAt: new Date().toISOString(),\n      action: 'cancel',\n      messageId: parsed.messageId,\n      chatId: parsed.chatId,\n      valid: true\n    }\n  }];\n}\n\nconst newDuration = parsed.duration;\n\nfunction timeToMinutes(time) {\n  const [hours, minutes] = time.split(':').map(Number);\n  return hours * 60 + minutes;\n}\n\nconst aptStart = timeToMinutes(apt.json.startTime);\nconst aptEnd = aptStart + newDuration;\n\nlet hasConflict = false;\nlet conflictWith = null;\n\nfor (const other of appointments) {\n  if (other.json.id === apt.json.id) continue;\n  if (other.json.date !== apt.json.date) continue;\n  if (other.json.status === 'cancelled' || other.json.status === 'expired') continue;\n  \n  const otherStart = timeToMinutes(other.json.startTime);\n  const otherDuration = other.json.status === 'pending' ? 30 : (parseInt(other.json.duration) || 30);\n  const otherEnd = otherStart + otherDuration;\n  \n  if (aptStart < otherEnd && aptEnd > otherStart) {\n    hasConflict = true;\n    conflictWith = { time: other.json.startTime, name: other.json.patientName };\n    break;\n  }\n}\n\nif (hasConflict) {\n  return [{\n    json: {\n      action: 'conflict',\n      conflictWith: conflictWith,\n      requestedDuration: newDuration,\n      patientName: apt.json.patientName,\n      messageId: parsed.messageId,\n      chatId: parsed.chatId,\n      valid: false\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    id: apt.json.id,\n    patientName: apt.json.patientName,\n    patientPhone: apt.json.patientPhone,\n    date: apt.json.date,\n    startTime: apt.json.startTime,\n    duration: String(newDuration),\n    reason: apt.json.reason || '',\n    status: 'confirmed',\n    createdAt: apt.json.createdAt,\n    updatedAt: new Date().toISOString(),\n    action: 'confirm',\n    newDuration: newDuration,\n    messageId: parsed.messageId,\n    chatId: parsed.chatId,\n    valid: true\n  }\n}];"
+        "jsCode": "const parsed = $('Parse Callback').first().json;\nconst event = $input.first().json;\n\nif (!event || !event.id) {\n  return [{ json: { error: 'Събитието не е намерено', action: 'error', chatId: parsed.chatId } }];\n}\n\n// Check if already confirmed (doesn't have ⏳ in title)\nconst title = event.summary || '';\nif (!title.includes('⏳')) {\n  return [{ json: { error: 'Записът вече е обработен', action: 'already_processed', chatId: parsed.chatId } }];\n}\n\n// Extract patient name (remove ⏳ prefix)\nconst patientName = title.replace('⏳ ', '').trim();\n\n// Get start time from event\nconst startDateTime = event.start?.dateTime || event.start?.date;\nconst date = startDateTime.slice(0, 10);\nconst startTime = startDateTime.slice(11, 16);\n\n// Extract phone from description\nconst description = event.description || '';\nconst phoneMatch = description.match(/📞 Тел: ([^\\n]+)/);\nconst phone = phoneMatch ? phoneMatch[1].trim() : '';\n\n// Extract reason from description\nconst reasonMatch = description.match(/📋 Причина: ([^\\n]+)/);\nconst reason = reasonMatch ? reasonMatch[1].trim() : '';\n\nif (parsed.action === 'cancel') {\n  return [{\n    json: {\n      eventId: event.id,\n      patientName: patientName,\n      patientPhone: phone,\n      date: date,\n      startTime: startTime,\n      reason: reason,\n      action: 'cancel',\n      messageId: parsed.messageId,\n      chatId: parsed.chatId,\n      valid: true\n    }\n  }];\n}\n\n// For confirm action, calculate new end time based on duration\nconst newDuration = parsed.duration;\nconst [hours, minutes] = startTime.split(':').map(Number);\nconst startMinutes = hours * 60 + minutes;\nconst endMinutes = startMinutes + newDuration;\nconst endHours = Math.floor(endMinutes / 60);\nconst endMins = endMinutes % 60;\nconst newEndTime = `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;\n\n// Build new description (update status)\nlet newDescription = description\n  .replace(/⏳ Статус: ЧАКАЩ \\(pending\\)/, '✅ Статус: ПОТВЪРДЕН')\n  .replace(/⏳ Статус: pending/, '✅ Статус: ПОТВЪРДЕН');\n\nif (!newDescription.includes('✅ Статус:')) {\n  newDescription += '\\n✅ Статус: ПОТВЪРДЕН';\n}\nnewDescription += `\\n⏱️ Продължителност: ${newDuration} мин.`;\n\nreturn [{\n  json: {\n    eventId: event.id,\n    patientName: patientName,\n    patientPhone: phone,\n    date: date,\n    startTime: startTime,\n    newEndTime: newEndTime,\n    newEndDateTime: `${date}T${newEndTime}:00`,\n    duration: newDuration,\n    reason: reason,\n    newSummary: `✅ ${patientName}`,\n    newDescription: newDescription,\n    action: 'confirm',\n    messageId: parsed.messageId,\n    chatId: parsed.chatId,\n    valid: true\n  }\n}];"
       },
       "id": "process-action",
       "name": "Process Action",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [660, 0]
+      "position": [880, 100]
     },
     {
       "parameters": {
@@ -89,11 +101,11 @@
         },
         "options": {}
       },
-      "id": "if-confirm",
+      "id": "is-confirm",
       "name": "Is Confirm?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [880, -100]
+      "position": [1100, 0]
     },
     {
       "parameters": {
@@ -118,100 +130,66 @@
         },
         "options": {}
       },
-      "id": "if-cancel",
+      "id": "is-cancel",
       "name": "Is Cancel?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [880, 150]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Prepare data for Google Sheets update (remove extra fields)\nconst data = $input.first().json;\nreturn [{\n  json: {\n    id: data.id,\n    patientName: data.patientName,\n    patientPhone: data.patientPhone,\n    date: data.date,\n    startTime: data.startTime,\n    duration: data.duration,\n    reason: data.reason,\n    status: data.status,\n    createdAt: data.createdAt,\n    updatedAt: data.updatedAt\n  }\n}];"
-      },
-      "id": "prepare-confirm",
-      "name": "Prepare Confirm Data",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1100, -200]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Prepare data for Google Sheets update (remove extra fields)\nconst data = $input.first().json;\nreturn [{\n  json: {\n    id: data.id,\n    patientName: data.patientName,\n    patientPhone: data.patientPhone,\n    date: data.date,\n    startTime: data.startTime,\n    duration: data.duration,\n    reason: data.reason,\n    status: data.status,\n    createdAt: data.createdAt,\n    updatedAt: data.updatedAt\n  }\n}];"
-      },
-      "id": "prepare-cancel",
-      "name": "Prepare Cancel Data",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1100, 100]
+      "position": [1100, 200]
     },
     {
       "parameters": {
         "operation": "update",
-        "documentId": {
+        "calendar": {
           "__rl": true,
           "mode": "id",
-          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+          "value": "rodopi.dent@gmail.com"
         },
-        "sheetName": {
-          "__rl": true,
-          "mode": "name",
-          "value": "Appointments"
-        },
-        "columns": {
-          "mappingMode": "autoMapInputData",
-          "value": {},
-          "matchingColumns": ["id"]
-        },
-        "options": {}
+        "eventId": "={{ $json.eventId }}",
+        "updateFields": {
+          "end": "={{ $json.newEndDateTime }}",
+          "summary": "={{ $json.newSummary }}",
+          "description": "={{ $json.newDescription }}",
+          "colorId": "10"
+        }
       },
-      "id": "update-confirm",
-      "name": "Update Confirmed",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.5,
-      "position": [1320, -200],
+      "id": "update-confirmed",
+      "name": "Update Event Confirmed",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.2,
+      "position": [1320, -100],
       "credentials": {
-        "googleSheetsOAuth2Api": {
+        "googleCalendarOAuth2Api": {
           "id": "",
-          "name": "Google Sheets"
+          "name": "Google Calendar"
         }
       }
     },
     {
       "parameters": {
-        "operation": "update",
-        "documentId": {
+        "operation": "delete",
+        "calendar": {
           "__rl": true,
           "mode": "id",
-          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+          "value": "rodopi.dent@gmail.com"
         },
-        "sheetName": {
-          "__rl": true,
-          "mode": "name",
-          "value": "Appointments"
-        },
-        "columns": {
-          "mappingMode": "autoMapInputData",
-          "value": {},
-          "matchingColumns": ["id"]
-        },
-        "options": {}
+        "eventId": "={{ $json.eventId }}"
       },
-      "id": "update-cancel",
-      "name": "Update Cancelled",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.5,
-      "position": [1320, 100],
+      "id": "delete-cancelled",
+      "name": "Delete Event Cancelled",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.2,
+      "position": [1320, 200],
       "credentials": {
-        "googleSheetsOAuth2Api": {
+        "googleCalendarOAuth2Api": {
           "id": "",
-          "name": "Google Sheets"
+          "name": "Google Calendar"
         }
       }
     },
     {
       "parameters": {
         "chatId": "={{ $('Process Action').item.json.chatId }}",
-        "text": "=✅ *Потвърдено!*\n\n{{ $('Process Action').item.json.patientName }} - {{ $('Process Action').item.json.date }} в {{ $('Process Action').item.json.startTime }}\nПродължителност: {{ $('Process Action').item.json.newDuration }} мин.",
+        "text": "=✅ *Потвърдено!*\n\n👤 {{ $('Process Action').item.json.patientName }}\n📅 {{ $('Process Action').item.json.date }}\n🕐 {{ $('Process Action').item.json.startTime }} - {{ $('Process Action').item.json.newEndTime }}\n⏱️ Продължителност: {{ $('Process Action').item.json.duration }} мин.",
         "additionalFields": {
           "parse_mode": "Markdown"
         }
@@ -220,7 +198,7 @@
       "name": "Reply Confirmed",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1540, -200],
+      "position": [1540, -100],
       "credentials": {
         "telegramApi": {
           "id": "",
@@ -231,7 +209,7 @@
     {
       "parameters": {
         "chatId": "={{ $('Process Action').item.json.chatId }}",
-        "text": "=❌ *Отказано!*\n\n{{ $('Process Action').item.json.patientName }} - {{ $('Process Action').item.json.date }} в {{ $('Process Action').item.json.startTime }}",
+        "text": "=❌ *Отказано!*\n\n👤 {{ $('Process Action').item.json.patientName }}\n📅 {{ $('Process Action').item.json.date }} в {{ $('Process Action').item.json.startTime }}\n\nЗаписът е изтрит от календара.",
         "additionalFields": {
           "parse_mode": "Markdown"
         }
@@ -240,7 +218,7 @@
       "name": "Reply Cancelled",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1540, 100],
+      "position": [1540, 200],
       "credentials": {
         "telegramApi": {
           "id": "",
@@ -251,16 +229,16 @@
     {
       "parameters": {
         "chatId": "={{ $json.chatId }}",
-        "text": "=⚠️ *Конфликт!*\n\nНе може да потвърдите {{ $json.requestedDuration }} мин., защото има конфликт с:\n{{ $json.conflictWith.name }} в {{ $json.conflictWith.time }}\n\nИзберете по-кратка продължителност.",
+        "text": "=⚠️ {{ $json.error }}",
         "additionalFields": {
           "parse_mode": "Markdown"
         }
       },
-      "id": "telegram-conflict-reply",
-      "name": "Reply Conflict",
+      "id": "telegram-error-reply",
+      "name": "Reply Error",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1100, -50],
+      "position": [1100, 350],
       "credentials": {
         "telegramApi": {
           "id": "",
@@ -285,14 +263,26 @@
       "main": [
         [
           {
-            "node": "Get Appointments",
+            "node": "Is Valid?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Get Appointments": {
+    "Is Valid?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Get Calendar Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Calendar Event": {
       "main": [
         [
           {
@@ -323,14 +313,14 @@
       "main": [
         [
           {
-            "node": "Prepare Confirm Data",
+            "node": "Update Event Confirmed",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Reply Conflict",
+            "node": "Reply Error",
             "type": "main",
             "index": 0
           }
@@ -341,7 +331,7 @@
       "main": [
         [
           {
-            "node": "Prepare Cancel Data",
+            "node": "Delete Event Cancelled",
             "type": "main",
             "index": 0
           }
@@ -349,29 +339,7 @@
         []
       ]
     },
-    "Prepare Confirm Data": {
-      "main": [
-        [
-          {
-            "node": "Update Confirmed",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Prepare Cancel Data": {
-      "main": [
-        [
-          {
-            "node": "Update Cancelled",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Update Confirmed": {
+    "Update Event Confirmed": {
       "main": [
         [
           {
@@ -382,7 +350,7 @@
         ]
       ]
     },
-    "Update Cancelled": {
+    "Delete Event Cancelled": {
       "main": [
         [
           {

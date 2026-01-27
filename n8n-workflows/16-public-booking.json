@@ -211,9 +211,50 @@
     {
       "parameters": {
         "chatId": "YOUR_TELEGRAM_CHAT_ID",
-        "text": "=🦷 *Нова заявка за час!*\n\n👤 Пациент: {{ $('Prepare Event Data').first().json.patientName }}\n📞 Телефон: {{ $('Prepare Event Data').first().json.patientPhone }}\n📅 Дата: {{ $('Prepare Event Data').first().json.startDateTime.split('T')[0] }}\n🕐 Час: {{ $('Prepare Event Data').first().json.startDateTime.split('T')[1].slice(0, 5) }}\n\n⏳ Статус: Чакащ потвърждение",
+        "text": "=🦷 *Нова заявка за час!*\n\n👤 Пациент: {{ $('Prepare Event Data').first().json.patientName }}\n📞 Телефон: {{ $('Prepare Event Data').first().json.patientPhone }}\n📅 Дата: {{ $('Prepare Event Data').first().json.startDateTime.split('T')[0] }}\n🕐 Час: {{ $('Prepare Event Data').first().json.startDateTime.split('T')[1].slice(0, 5) }}\n📋 Причина: {{ $('Validate Input').first().json.reason || 'Не е посочена' }}\n\n⏳ *Изберете продължителност:*",
         "additionalFields": {
-          "parse_mode": "Markdown"
+          "parse_mode": "Markdown",
+          "replyMarkup": "inlineKeyboard",
+          "inlineKeyboard": {
+            "rows": [
+              {
+                "row": [
+                  {
+                    "text": "30 мин",
+                    "callbackData": "=confirm_30_{{ $json.id }}"
+                  },
+                  {
+                    "text": "45 мин",
+                    "callbackData": "=confirm_45_{{ $json.id }}"
+                  },
+                  {
+                    "text": "60 мин",
+                    "callbackData": "=confirm_60_{{ $json.id }}"
+                  }
+                ]
+              },
+              {
+                "row": [
+                  {
+                    "text": "90 мин",
+                    "callbackData": "=confirm_90_{{ $json.id }}"
+                  },
+                  {
+                    "text": "120 мин",
+                    "callbackData": "=confirm_120_{{ $json.id }}"
+                  }
+                ]
+              },
+              {
+                "row": [
+                  {
+                    "text": "❌ Откажи",
+                    "callbackData": "=cancel_{{ $json.id }}"
+                  }
+                ]
+              }
+            ]
+          }
         }
       },
       "id": "telegram-notify",

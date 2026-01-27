@@ -40,6 +40,7 @@ const Calendar = {
     container.innerHTML = `
       <div class="calendar-view">
         ${this.renderHeader()}
+        ${this.renderPendingRequestsSection()}
         <div class="calendar-view__body" id="calendar-body">
           <div class="calendar-loading">
             <div class="calendar-loading__spinner"></div>
@@ -52,6 +53,7 @@ const Calendar = {
     this.setupEventListeners();
     await this.loadEvents();
     this.renderView();
+    this.updatePendingRequestsSection();
   },
 
   /**
@@ -1020,6 +1022,215 @@ const Calendar = {
   formatDate(date) {
     const d = new Date(date);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  },
+
+  /**
+   * Render pending requests section
+   */
+  renderPendingRequestsSection() {
+    return `
+      <div class="pending-requests" id="pending-requests">
+        <div class="pending-requests__header">
+          <h3 class="pending-requests__title">⏳ Чакащи заявки</h3>
+          <span class="pending-requests__count" id="pending-count">0</span>
+        </div>
+        <div class="pending-requests__list" id="pending-list">
+          <!-- Pending requests will be rendered here -->
+        </div>
+      </div>
+    `;
+  },
+
+  /**
+   * Update pending requests section with current data
+   */
+  updatePendingRequestsSection() {
+    const pendingList = document.getElementById('pending-list');
+    const pendingCount = document.getElementById('pending-count');
+    const pendingSection = document.getElementById('pending-requests');
+    
+    if (!pendingList || !pendingCount) return;
+    
+    // Filter events that have ⏳ prefix (pending)
+    const pendingEvents = this.events.filter(e => 
+      e.title && e.title.startsWith('⏳')
+    );
+    
+    pendingCount.textContent = pendingEvents.length;
+    
+    // Hide section if no pending requests
+    if (pendingEvents.length === 0) {
+      pendingSection.style.display = 'none';
+      return;
+    }
+    
+    pendingSection.style.display = 'block';
+    
+    const html = pendingEvents.map(event => {
+      const patientName = event.title.replace('⏳ ', '');
+      const dateStr = Utils.formatDate(event.date, 'dd.mm.yyyy');
+      const dayName = ['Нед', 'Пон', 'Вто', 'Сря', 'Чет', 'Пет', 'Съб'][new Date(event.date).getDay()];
+      
+      // Extract phone from description
+      const phoneMatch = (event.description || '').match(/📞 Тел: ([^\\n]+)/);
+      const phone = phoneMatch ? phoneMatch[1] : '';
+      
+      // Extract reason from description
+      const reasonMatch = (event.description || '').match(/📋 Причина: ([^\\n]+)/);
+      const reason = reasonMatch ? reasonMatch[1] : '';
+      
+      return `
+        <div class="pending-request-card" data-event-id="${event.id}">
+          <div class="pending-request-card__info">
+            <strong>${patientName}</strong>
+            <span class="pending-request-card__datetime">
+              📅 ${dayName}, ${dateStr} в ${event.startTime}
+            </span>
+            ${phone ? `<span class="pending-request-card__phone">📞 ${phone}</span>` : ''}
+            ${reason ? `<span class="pending-request-card__reason">📋 ${reason}</span>` : ''}
+          </div>
+          <div class="pending-request-card__actions">
+            <button class="btn btn--success btn--small pending-confirm" data-event-id="${event.id}" title="Потвърди">
+              ✓
+            </button>
+            <button class="btn btn--danger btn--small pending-reject" data-event-id="${event.id}" title="Откажи">
+              ✕
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    pendingList.innerHTML = html;
+    
+    // Add event listeners for confirm/reject buttons
+    pendingList.querySelectorAll('.pending-confirm').forEach(btn => {
+      btn.addEventListener('click', (e) => this.openConfirmDurationModal(e.target.dataset.eventId));
+    });
+    
+    pendingList.querySelectorAll('.pending-reject').forEach(btn => {
+      btn.addEventListener('click', (e) => this.rejectPendingRequest(e.target.dataset.eventId));
+    });
+  },
+
+  /**
+   * Open modal to select duration for confirming a pending request
+   */
+  async openConfirmDurationModal(eventId) {
+    const event = this.events.find(e => e.id === eventId);
+    if (!event) return;
+    
+    const patientName = event.title.replace('⏳ ', '');
+    
+    const result = await Utils.showConfirmDialog(
+      `Потвърди час за ${patientName}`,
+      `
+        <p>Изберете продължителност на часа:</p>
+        <div class="duration-buttons">
+          <button class="btn btn--primary duration-btn" data-duration="30">30 мин</button>
+          <button class="btn btn--primary duration-btn" data-duration="45">45 мин</button>
+          <button class="btn btn--primary duration-btn" data-duration="60">60 мин</button>
+          <button class="btn btn--primary duration-btn" data-duration="90">90 мин</button>
+          <button class="btn btn--primary duration-btn" data-duration="120">120 мин</button>
+        </div>
+      `,
+      { showCancel: true, cancelText: 'Затвори' }
+    );
+    
+    // The confirm dialog doesn't handle custom buttons well, so we'll use a simpler approach
+    // For now, let's just use a fixed duration or show a simple prompt
+    const duration = prompt('Въведете продължителност в минути (30, 45, 60, 90, 120):', '30');
+    if (!duration) return;
+    
+    const durationNum = parseInt(duration);
+    if (![30, 45, 60, 90, 120].includes(durationNum)) {
+      Utils.showToast('Невалидна продължителност', 'error');
+      return;
+    }
+    
+    await this.confirmPendingRequest(eventId, durationNum);
+  },
+
+  /**
+   * Confirm a pending request with selected duration
+   */
+  async confirmPendingRequest(eventId, duration) {
+    try {
+      const event = this.events.find(e => e.id === eventId);
+      if (!event) throw new Error('Събитието не е намерено');
+      
+      const patientName = event.title.replace('⏳ ', '');
+      
+      // Calculate new end time
+      const [hours, minutes] = event.startTime.split(':').map(Number);
+      const startMinutes = hours * 60 + minutes;
+      const endMinutes = startMinutes + duration;
+      const endHours = Math.floor(endMinutes / 60);
+      const endMins = endMinutes % 60;
+      const newEndTime = `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;
+      
+      // Build new description
+      let newDescription = (event.description || '')
+        .replace(/⏳ Статус: ЧАКАЩ \(pending\)/, '✅ Статус: ПОТВЪРДЕН')
+        .replace(/⏳ Статус: pending/, '✅ Статус: ПОТВЪРДЕН');
+      
+      if (!newDescription.includes('✅ Статус:')) {
+        newDescription += '\n✅ Статус: ПОТВЪРДЕН';
+      }
+      newDescription += `\n⏱️ Продължителност: ${duration} мин.`;
+      
+      // Update calendar event
+      const response = await API.updateCalendarEvent({
+        eventId: eventId,
+        patientName: `✅ ${patientName}`,
+        date: event.date,
+        startTime: event.startTime,
+        endTime: newEndTime,
+        duration: duration,
+        colorId: 'green'
+      });
+      
+      if (response.success) {
+        Utils.showToast(`Часът за ${patientName} е потвърден!`, 'success');
+        await this.loadEvents();
+        this.renderView();
+        this.updatePendingRequestsSection();
+      } else {
+        throw new Error(response.error || 'Грешка при потвърждение');
+      }
+    } catch (error) {
+      console.error('Error confirming request:', error);
+      Utils.showToast('Грешка при потвърждение: ' + error.message, 'error');
+    }
+  },
+
+  /**
+   * Reject a pending request
+   */
+  async rejectPendingRequest(eventId) {
+    const event = this.events.find(e => e.id === eventId);
+    if (!event) return;
+    
+    const patientName = event.title.replace('⏳ ', '');
+    
+    const confirmed = confirm(`Сигурни ли сте, че искате да откажете часа за ${patientName}?`);
+    if (!confirmed) return;
+    
+    try {
+      const response = await API.deleteCalendarEvent(eventId);
+      
+      if (response.success) {
+        Utils.showToast(`Часът за ${patientName} е отказан и изтрит.`, 'success');
+        await this.loadEvents();
+        this.renderView();
+        this.updatePendingRequestsSection();
+      } else {
+        throw new Error(response.error || 'Грешка при отказване');
+      }
+    } catch (error) {
+      console.error('Error rejecting request:', error);
+      Utils.showToast('Грешка при отказване: ' + error.message, 'error');
+    }
   },
 
   /**
