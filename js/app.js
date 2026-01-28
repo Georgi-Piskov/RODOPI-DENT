@@ -821,9 +821,9 @@ const App = {
           </div>
           
           <!-- Tabs for NHIF / Custom -->
-          <div class="income-tabs">
-            <button type="button" class="income-tab active" data-tab="nhif">🏥 НЗОК услуга</button>
-            <button type="button" class="income-tab" data-tab="custom">✏️ Ръчно въвеждане</button>
+          <div class="income-tabs" style="display:flex;gap:4px;margin-bottom:12px;">
+            <button type="button" class="income-tab active" data-tab="nhif" style="flex:1;padding:10px 16px;background:#2563eb;border:2px solid #2563eb;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;color:white;">🏥 НЗОК услуга</button>
+            <button type="button" class="income-tab" data-tab="custom" style="flex:1;padding:10px 16px;background:#f1f5f9;border:2px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;color:#64748b;">✏️ Ръчно въвеждане</button>
           </div>
           
           <form id="income-form">
@@ -831,9 +831,9 @@ const App = {
             <div id="nhif-tab" class="income-tab-content active">
               <div class="form-group">
                 <label>Възрастова група</label>
-                <div class="age-toggle">
-                  <button type="button" class="age-btn active" data-age="under18">Под 18 г.</button>
-                  <button type="button" class="age-btn" data-age="over18">Над 18 г.</button>
+                <div class="age-toggle" style="display:flex;gap:4px;">
+                  <button type="button" class="age-btn active" data-age="under18" style="flex:1;padding:8px 12px;background:#dbeafe;border:2px solid #2563eb;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;color:#2563eb;">Под 18 г.</button>
+                  <button type="button" class="age-btn" data-age="over18" style="flex:1;padding:8px 12px;background:#f1f5f9;border:2px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;color:#64748b;">Над 18 г.</button>
                 </div>
               </div>
               
@@ -844,18 +844,18 @@ const App = {
                 </div>
               </div>
               
-              <div class="nhif-price-display">
-                <div class="price-row">
+              <div style="background:#f0fdf4;border:2px solid #22c55e;border-radius:6px;padding:10px 12px;margin:8px 0;">
+                <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;color:#475569;">
                   <span>НЗОК плаща:</span>
-                  <strong id="nhif-fund-price">0.00 €</strong>
+                  <strong id="nhif-fund-price" style="color:#374151;">0.00 €</strong>
                 </div>
-                <div class="price-row">
+                <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;color:#475569;border-bottom:1px dashed #cbd5e1;">
                   <span>Пациент доплаща:</span>
-                  <strong id="nhif-patient-price">0.00 €</strong>
+                  <strong id="nhif-patient-price" style="color:#374151;">0.00 €</strong>
                 </div>
-                <div class="price-row total">
+                <div style="display:flex;justify-content:space-between;padding:6px 0 0;font-size:15px;font-weight:700;color:#22c55e;">
                   <span>Общо:</span>
-                  <strong id="nhif-total-price">0.00 €</strong>
+                  <strong id="nhif-total-price" style="font-size:18px;">0.00 €</strong>
                 </div>
               </div>
             </div>
@@ -875,9 +875,9 @@ const App = {
             <!-- Common fields -->
             <div class="form-group">
               <label>Плащане</label>
-              <div class="payment-toggle">
-                <button type="button" class="payment-btn active" data-method="cash">💵 В брой</button>
-                <button type="button" class="payment-btn" data-method="bank">🏦 По банков път</button>
+              <div class="payment-toggle" style="display:flex;gap:4px;">
+                <button type="button" class="payment-btn active" data-method="cash" style="flex:1;padding:8px 12px;background:#dcfce7;border:2px solid #22c55e;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;color:#22c55e;">💵 В брой</button>
+                <button type="button" class="payment-btn" data-method="bank" style="flex:1;padding:8px 12px;background:#f1f5f9;border:2px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;color:#64748b;">🏦 По банков път</button>
               </div>
             </div>
             
@@ -1042,6 +1042,9 @@ const App = {
     const container = document.getElementById('nhif-services-container');
     if (!container) return;
     
+    // Style the container
+    container.style.cssText = 'max-height:200px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;background:white;';
+    
     // Group by category
     const byCategory = {};
     Object.values(this.nhifPrices).forEach(p => {
@@ -1052,13 +1055,13 @@ const App = {
     
     let html = '';
     Object.entries(byCategory).forEach(([category, services]) => {
-      html += `<div class="nhif-category"><h4>${category}</h4>`;
+      html += `<div style="margin:0;"><div style="background:#2563eb;color:white;padding:4px 8px;font-size:11px;font-weight:700;text-transform:uppercase;position:sticky;top:0;">${category}</div>`;
       services.forEach(s => {
         html += `
-          <label class="nhif-service-item">
-            <input type="checkbox" name="nhifServices" value="${s.code}" data-name="${s.name}">
-            <span class="nhif-service-code">${s.code}</span>
-            <span class="nhif-service-name">${s.name}</span>
+          <label style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;border-bottom:1px solid #f1f5f9;">
+            <input type="checkbox" name="nhifServices" value="${s.code}" data-name="${s.name}" style="width:16px;height:16px;accent-color:#22c55e;">
+            <span style="background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:700;min-width:32px;text-align:center;">${s.code}</span>
+            <span style="font-size:12px;color:#374151;line-height:1.2;">${s.name}</span>
           </label>
         `;
       });
@@ -1099,6 +1102,18 @@ const App = {
     document.querySelectorAll('.income-tab').forEach(tab => {
       tab.addEventListener('click', (e) => {
         const tabName = e.target.dataset.tab;
+        // Update styles
+        document.querySelectorAll('.income-tab').forEach(t => {
+          if (t.dataset.tab === tabName) {
+            t.style.background = '#2563eb';
+            t.style.borderColor = '#2563eb';
+            t.style.color = 'white';
+          } else {
+            t.style.background = '#f1f5f9';
+            t.style.borderColor = '#e2e8f0';
+            t.style.color = '#64748b';
+          }
+        });
         this.switchIncomeTab(tabName);
       });
     });
@@ -1106,8 +1121,16 @@ const App = {
     // Age group toggle
     document.querySelectorAll('.age-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        document.querySelectorAll('.age-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.age-btn').forEach(b => {
+          b.classList.remove('active');
+          b.style.background = '#f1f5f9';
+          b.style.borderColor = '#e2e8f0';
+          b.style.color = '#64748b';
+        });
         e.target.classList.add('active');
+        e.target.style.background = '#dbeafe';
+        e.target.style.borderColor = '#2563eb';
+        e.target.style.color = '#2563eb';
         document.querySelector('#income-form input[name="ageGroup"]').value = e.target.dataset.age;
         this.updateNHIFPriceDisplay();
       });
@@ -1116,8 +1139,16 @@ const App = {
     // Payment method toggle (income)
     document.querySelectorAll('.payment-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        document.querySelectorAll('.payment-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.payment-btn').forEach(b => {
+          b.classList.remove('active');
+          b.style.background = '#f1f5f9';
+          b.style.borderColor = '#e2e8f0';
+          b.style.color = '#64748b';
+        });
         e.target.classList.add('active');
+        e.target.style.background = '#dcfce7';
+        e.target.style.borderColor = '#22c55e';
+        e.target.style.color = '#22c55e';
         document.querySelector('#income-form input[name="paymentMethod"]').value = e.target.dataset.method;
       });
     });
@@ -1125,8 +1156,16 @@ const App = {
     // Payment method toggle (expense)
     document.querySelectorAll('.expense-payment-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        document.querySelectorAll('.expense-payment-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.expense-payment-btn').forEach(b => {
+          b.classList.remove('active');
+          b.style.background = '#f1f5f9';
+          b.style.borderColor = '#e2e8f0';
+          b.style.color = '#64748b';
+        });
         e.target.classList.add('active');
+        e.target.style.background = '#fee2e2';
+        e.target.style.borderColor = '#ef4444';
+        e.target.style.color = '#ef4444';
         document.querySelector('#expense-form input[name="paymentMethod"]').value = e.target.dataset.method;
       });
     });
