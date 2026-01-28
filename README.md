@@ -5,8 +5,8 @@ Dental clinic website with appointment booking system - GitHub Pages deployment
 
 PWA уеб приложение за зъболекарска практика с онлайн запазване на часове.
 
-> **Версия:** 3.2  
-> **Последна актуализация:** 27 януари 2026
+> **Версия:** 3.7  
+> **Последна актуализация:** 28 януари 2026
 
 ### Функционалности
 
@@ -16,7 +16,8 @@ PWA уеб приложение за зъболекарска практика �
 - 📱 **SMS потвърждения** - автоматични SMS съобщения към пациенти (Twilio)
 - ⏳ **Чакащи заявки** - секция с pending записи и бързи бутони за одобрение
 - ⚠️ **Детекция на конфликти** - предупреждение при застъпващи се часове
-- 💰 **Финансов модул** - следене на приходи и разходи
+- 💰 **Финансов модул** - следене на приходи и разходи с НЗОК услуги
+- 🏥 **НЗОК ценоразпис** - пълен списък с цени в EUR, поддръжка на множество услуги
 - 🔒 **Google OAuth** - сигурен вход за администраторски панел
 
 ### Технологии
@@ -75,14 +76,16 @@ Workflow 09 изисква ръчна конфигурация на inline keybo
 
 ```
 ├── css/
-│   └── main.css          # Стилове включително calendar view
+│   └── main.css          # Стилове (v=3.7)
 ├── js/
 │   ├── api.js            # API клиент
-│   ├── app.js            # Основно приложение
+│   ├── app.js            # Основно приложение с финанси (v=3.7)
 │   ├── calendar.js       # Google Calendar модул
 │   ├── config.js         # Конфигурация
 │   └── ...
 ├── n8n-workflows/        # n8n workflow JSON файлове
+│   ├── 06a-finance-get.json       # Финанси GET (EUR) ✅
+│   ├── 06b-finance-add.json       # Финанси ADD (EUR) ✅
 │   ├── 10-telegram-callback.json  # Telegram бутони ✅
 │   ├── 11-calendar-events.json
 │   ├── 12-calendar-create.json
@@ -91,8 +94,12 @@ Workflow 09 изисква ръчна конфигурация на inline keybo
 │   ├── 15-public-slots.json
 │   ├── 16-public-booking.json     # Публична резервация ✅
 │   ├── 17-send-sms.json
-│   └── 18-auto-expire-pending.json
-└── index.html            # PWA входна точка (v=3.2)
+│   ├── 18-auto-expire-pending.json
+│   └── 19-nhif-prices.json        # НЗОК цени (EUR) ✅
+├── docs/
+│   ├── google-sheets-setup.js     # Структура на Sheets
+│   └── import-nhif-prices.js      # НЗОК цени в EUR
+└── index.html            # PWA входна точка (v=3.7)
 ```
 
 ---
