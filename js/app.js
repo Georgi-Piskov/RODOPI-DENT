@@ -1404,14 +1404,19 @@ const App = {
 
     try {
       // Use Calendar API to get events for the day
+      // Note: workflow expects 'date' param for day view
       const response = await API.getCalendarEvents({ 
-        startDate: date, 
-        endDate: date,
+        date: date,
         view: 'day'
       });
       
-      // Calendar API returns { success, events: [...] }
-      const events = response.data?.events || [];
+      // API wrapper returns { success, data: { success, events, count } }
+      // Extract events from the nested structure
+      const data = response.data || {};
+      const events = data.events || [];
+      
+      console.log('Calendar response:', response);
+      console.log('Events found:', events.length);
       
       if (response.success && events.length > 0) {
         // Sort by start time
