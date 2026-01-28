@@ -185,7 +185,7 @@
 
   <!-- Admin Dashboard Template -->
   <template id="page-admin-dashboard">
-    <div class="page page--admin">
+    <div class="page page--admin page--dashboard">
       <div class="admin-header">
         <h1>📊 Табло</h1>
         <button id="logout-btn" class="btn btn--outline">Изход</button>
@@ -197,23 +197,64 @@
         <a href="#/admin/settings" class="admin-nav__link">Настройки</a>
       </nav>
       <div class="admin-content">
-        <div class="stats-grid">
-          <div class="stat-card">
-            <span class="stat-card__value" id="stat-today">-</span>
-            <span class="stat-card__label">Днешни записи</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-card__value" id="stat-week">-</span>
-            <span class="stat-card__label">Тази седмица</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-card__value" id="stat-pending">-</span>
-            <span class="stat-card__label">Чакащи потвърждение</span>
+        <!-- Date Range Selector -->
+        <div class="dashboard-period-selector">
+          <button type="button" class="period-btn active" data-period="today">Днес</button>
+          <button type="button" class="period-btn" data-period="week">Седмица</button>
+          <button type="button" class="period-btn" data-period="month">Месец</button>
+          <button type="button" class="period-btn" data-period="custom">Период</button>
+          <div id="custom-date-range" class="custom-date-range" hidden>
+            <input type="date" id="date-from" />
+            <span>—</span>
+            <input type="date" id="date-to" />
+            <button type="button" class="btn btn--sm btn--primary" id="apply-date-range">Приложи</button>
           </div>
         </div>
-        <div class="today-appointments">
-          <h2>Записи за днес</h2>
-          <div id="today-list" class="appointments-list">
+        
+        <!-- Finance Stats -->
+        <div class="stats-grid stats-grid--finance">
+          <div class="stat-card stat-card--income">
+            <span class="stat-card__icon">💰</span>
+            <span class="stat-card__value" id="stat-income">0.00 €</span>
+            <span class="stat-card__label">Приходи</span>
+          </div>
+          <div class="stat-card stat-card--expense">
+            <span class="stat-card__icon">💸</span>
+            <span class="stat-card__value" id="stat-expense">0.00 €</span>
+            <span class="stat-card__label">Разходи</span>
+          </div>
+          <div class="stat-card stat-card--balance">
+            <span class="stat-card__icon">📈</span>
+            <span class="stat-card__value" id="stat-balance">0.00 €</span>
+            <span class="stat-card__label">Баланс</span>
+          </div>
+          <div class="stat-card stat-card--patients">
+            <span class="stat-card__icon">👥</span>
+            <span class="stat-card__value" id="stat-patients">0</span>
+            <span class="stat-card__label">Пациенти</span>
+          </div>
+        </div>
+        
+        <!-- Finance Breakdown -->
+        <div class="dashboard-grid">
+          <div class="dashboard-card">
+            <h3>💰 Приходи по категории</h3>
+            <div id="income-breakdown" class="breakdown-list">
+              <p class="text-muted">Зареждане...</p>
+            </div>
+          </div>
+          <div class="dashboard-card">
+            <h3>💸 Разходи по категории</h3>
+            <div id="expense-breakdown" class="breakdown-list">
+              <p class="text-muted">Зареждане...</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Recent Records -->
+        <div class="dashboard-card dashboard-card--full">
+          <h3>📋 Последни записи</h3>
+          <div id="recent-records" class="records-list">
             <p class="text-muted">Зареждане...</p>
           </div>
         </div>
@@ -222,13 +263,13 @@
   </template>
 
   <!-- Scripts -->
-  <script src="js/config.js?v=2.8"></script>
-  <script src="js/utils.js?v=2.7"></script>
-  <script src="js/api.js?v=2.8"></script>
-  <script src="js/router.js?v=2.7"></script>
-  <script src="js/auth.js?v=2.7"></script>
+  <script src="js/config.js?v=3.0"></script>
+  <script src="js/utils.js?v=3.0"></script>
+  <script src="js/api.js?v=3.0"></script>
+  <script src="js/router.js?v=3.0"></script>
+  <script src="js/auth.js?v=3.0"></script>
   <script src="js/calendar.js?v=3.2"></script>
-  <script src="js/app.js?v=2.8"></script>
+  <script src="js/app.js?v=3.0"></script>
   
   <!-- Register Service Worker -->
   <script>

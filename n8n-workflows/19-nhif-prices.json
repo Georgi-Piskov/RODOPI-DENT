@@ -1,0 +1,122 @@
+{
+  "name": "Rodopi Dent - NHIF Prices",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "nhif-prices",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-nhif",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "nhif-prices"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "NHIF_Prices"
+        },
+        "options": {}
+      },
+      "id": "read-nhif",
+      "name": "Read NHIF Prices",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [220, 0],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(item => item.json);\n\n// Group by category\nconst byCategory = {};\nitems.forEach(item => {\n  const cat = item.category || 'Други';\n  if (!byCategory[cat]) byCategory[cat] = [];\n  byCategory[cat].push({\n    id: item.id,\n    code: item.code,\n    name: item.name,\n    priceUnder18: parseFloat(item.priceUnder18) || 0,\n    priceOver18: parseFloat(item.priceOver18) || 0,\n    patientPayUnder18: parseFloat(item.patientPayUnder18) || 0,\n    patientPayOver18: parseFloat(item.patientPayOver18) || 0\n  });\n});\n\nreturn [{\n  json: {\n    success: true,\n    count: items.length,\n    categories: Object.keys(byCategory),\n    byCategory: byCategory,\n    prices: items\n  }\n}];"
+      },
+      "id": "format-response",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [660, 0]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Read NHIF Prices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read NHIF Prices": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "Rodopi Dent"
+    }
+  ]
+}

@@ -132,7 +132,7 @@ function createProceduresSheet(ss) {
 }
 
 /**
- * Finance - Финанси
+ * Finance - Финанси (всички суми в EUR)
  */
 function createFinanceSheet(ss) {
   let sheet = ss.getSheetByName('Finance');
@@ -146,11 +146,14 @@ function createFinanceSheet(ss) {
   const headers = [
     'id',
     'date',
-    'type',
-    'amount',
+    'type',           // income, expense
+    'amount',         // в EUR (положително за приходи, отрицателно за разходи)
     'description',
-    'paymentMethod',
-    'appointmentId',
+    'paymentMethod',  // cash, bank
+    'category',       // nhif, private, materials, lab, utilities, other
+    'patientName',    // име на пациент (ако е приход)
+    'nhifCode',       // НЗОК код ако е НЗОК услуга
+    'eventId',        // Google Calendar event ID
     'createdAt'
   ];
   
@@ -162,25 +165,42 @@ function createFinanceSheet(ss) {
     .setFontWeight('bold');
   
   sheet.setFrozenRows(1);
-  sheet.setColumnWidths(1, headers.length, 120);
-  sheet.setColumnWidth(5, 250); // description column wider
+  
+  // Ширини на колони
+  sheet.setColumnWidth(1, 150); // id
+  sheet.setColumnWidth(2, 100); // date
+  sheet.setColumnWidth(3, 80);  // type
+  sheet.setColumnWidth(4, 100); // amount
+  sheet.setColumnWidth(5, 300); // description
+  sheet.setColumnWidth(6, 80);  // paymentMethod
+  sheet.setColumnWidth(7, 100); // category
+  sheet.setColumnWidth(8, 150); // patientName
+  sheet.setColumnWidth(9, 80);  // nhifCode
+  sheet.setColumnWidth(10, 200); // eventId
+  sheet.setColumnWidth(11, 150); // createdAt
   
   // Валидация за type
   const typeRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(['official', 'custom'])
+    .requireValueInList(['income', 'expense'])
     .build();
   sheet.getRange('C2:C1000').setDataValidation(typeRule);
   
   // Валидация за paymentMethod
   const paymentRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(['cash', 'card', 'bank_transfer'])
+    .requireValueInList(['cash', 'bank'])
     .build();
   sheet.getRange('F2:F1000').setDataValidation(paymentRule);
   
-  // Формат за дата и сума
+  // Валидация за category
+  const categoryRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['nhif', 'private', 'materials', 'lab', 'utilities', 'rent', 'salary', 'other'])
+    .build();
+  sheet.getRange('G2:G1000').setDataValidation(categoryRule);
+  
+  // Формат за дата и сума в EUR
   sheet.getRange('B2:B1000').setNumberFormat('yyyy-mm-dd');
-  sheet.getRange('D2:D1000').setNumberFormat('#,##0.00 "лв."');
-  sheet.getRange('H2:H1000').setNumberFormat('yyyy-mm-dd hh:mm:ss');
+  sheet.getRange('D2:D1000').setNumberFormat('#,##0.00 "€"');
+  sheet.getRange('K2:K1000').setNumberFormat('yyyy-mm-dd hh:mm:ss');
 }
 
 /**

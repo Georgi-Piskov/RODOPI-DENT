@@ -11,7 +11,7 @@
         }
       },
       "id": "webhook-finance-add",
-      "name": "Webhook - Finance ADD",
+      "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [0, 0],
@@ -19,9 +19,9 @@
     },
     {
       "parameters": {
-        "jsCode": "// Handle POST - add new finance record\nconst body = $('Webhook - Finance ADD').first().json.body;\n\nconst required = ['date', 'type', 'amount'];\nconst missing = required.filter(field => !body[field] && body[field] !== 0);\n\nif (missing.length > 0) {\n  return [{\n    json: {\n      success: false,\n      error: `Липсващи полета: ${missing.join(', ')}`,\n      valid: false\n    }\n  }];\n}\n\n// Validate type - accept official, custom, expense\nconst validTypes = ['official', 'custom', 'expense'];\nif (!validTypes.includes(body.type)) {\n  return [{\n    json: {\n      success: false,\n      error: 'type must be official, custom or expense',\n      valid: false\n    }\n  }];\n}\n\nconst id = 'fin_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 8);\n\nreturn [{\n  json: {\n    id: id,\n    date: body.date,\n    type: body.type,\n    amount: parseFloat(body.amount),\n    description: body.description || '',\n    paymentMethod: body.paymentMethod || 'cash',\n    category: body.category || '',\n    appointmentId: body.appointmentId || '',\n    createdAt: new Date().toISOString(),\n    valid: true\n  }\n}];"
+        "jsCode": "const body = $input.first().json.body;\n\n// Required fields\nconst required = ['date', 'type', 'amount'];\nconst missing = required.filter(field => body[field] === undefined && body[field] !== 0);\n\nif (missing.length > 0) {\n  return [{\n    json: {\n      success: false,\n      error: `Липсващи полета: ${missing.join(', ')}`,\n      valid: false\n    }\n  }];\n}\n\n// Validate type\nconst validTypes = ['income', 'expense'];\nif (!validTypes.includes(body.type)) {\n  return [{\n    json: {\n      success: false,\n      error: 'type трябва да е income или expense',\n      valid: false\n    }\n  }];\n}\n\n// Generate unique ID\nconst id = 'fin_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);\n\n// Amount: positive for income, negative for expense\nlet amount = parseFloat(body.amount);\nif (body.type === 'expense' && amount > 0) {\n  amount = -amount;\n}\n\nreturn [{\n  json: {\n    id: id,\n    date: body.date,\n    type: body.type,\n    amount: amount,\n    description: body.description || '',\n    paymentMethod: body.paymentMethod || 'cash',\n    category: body.category || (body.type === 'income' ? 'private' : 'other'),\n    patientName: body.patientName || '',\n    nhifCode: body.nhifCode || '',\n    eventId: body.eventId || '',\n    createdAt: new Date().toISOString(),\n    valid: true\n  }\n}];"
       },
-      "id": "code-prepare-finance",
+      "id": "prepare-record",
       "name": "Prepare Record",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -38,7 +38,7 @@
           ]
         }
       },
-      "id": "if-valid",
+      "id": "is-valid",
       "name": "Is Valid?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
@@ -67,13 +67,15 @@
             "description": "={{ $json.description }}",
             "paymentMethod": "={{ $json.paymentMethod }}",
             "category": "={{ $json.category }}",
-            "appointmentId": "={{ $json.appointmentId }}",
+            "patientName": "={{ $json.patientName }}",
+            "nhifCode": "={{ $json.nhifCode }}",
+            "eventId": "={{ $json.eventId }}",
             "createdAt": "={{ $json.createdAt }}"
           }
         },
         "options": {}
       },
-      "id": "sheets-append-finance",
+      "id": "save-finance",
       "name": "Save Finance",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
@@ -88,7 +90,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Записът е добавен\",\n  \"id\": \"{{ $('Prepare Record').first().json.id }}\"\n}",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Записът е добавен\",\n  \"id\": \"{{ $('Prepare Record').first().json.id }}\",\n  \"amount\": {{ $('Prepare Record').first().json.amount }}\n}",
         "options": {
           "responseHeaders": {
             "entries": [
@@ -100,7 +102,7 @@
           }
         }
       },
-      "id": "response-post-success",
+      "id": "respond-success",
       "name": "Respond Success",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -122,7 +124,7 @@
           }
         }
       },
-      "id": "response-post-error",
+      "id": "respond-error",
       "name": "Respond Error",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -130,7 +132,7 @@
     }
   ],
   "connections": {
-    "Webhook - Finance ADD": {
+    "Webhook": {
       "main": [
         [
           {

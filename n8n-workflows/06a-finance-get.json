@@ -10,8 +10,8 @@
           "allowedOrigins": "*"
         }
       },
-      "id": "webhook-finance-get",
-      "name": "Webhook - Finance GET",
+      "id": "webhook-finance",
+      "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [0, 0],
@@ -34,7 +34,7 @@
           "returnAllMatches": true
         }
       },
-      "id": "sheets-read-finance",
+      "id": "read-finance",
       "name": "Read Finance",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
@@ -48,9 +48,9 @@
     },
     {
       "parameters": {
-        "jsCode": "// Get query parameters\nconst query = $('Webhook - Finance GET').first().json.query || {};\nlet records = $('Read Finance').all().map(item => item.json);\n\n// Filter by date if provided\nif (query.date) {\n  records = records.filter(rec => rec.date === query.date);\n}\n\n// Filter by date range\nif (query.startDate && query.endDate) {\n  records = records.filter(rec => {\n    return rec.date >= query.startDate && rec.date <= query.endDate;\n  });\n}\n\n// Filter by type (official/custom)\nif (query.type) {\n  records = records.filter(rec => rec.type === query.type);\n}\n\n// Calculate totals\nconst totalIncome = records\n  .filter(r => parseFloat(r.amount) >= 0)\n  .reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);\n\nconst totalExpense = records\n  .filter(r => parseFloat(r.amount) < 0)\n  .reduce((sum, r) => sum + Math.abs(parseFloat(r.amount || 0)), 0);\n\n// Sort by date descending\nrecords.sort((a, b) => (b.date || '').localeCompare(a.date || ''));\n\nreturn [{\n  json: {\n    success: true,\n    count: records.length,\n    totalIncome: totalIncome,\n    totalExpense: totalExpense,\n    balance: totalIncome - totalExpense,\n    records: records\n  }\n}];"
+        "jsCode": "const query = $('Webhook').first().json.query || {};\nlet records = $('Read Finance').all().map(item => item.json);\n\n// Filter by date\nif (query.date) {\n  records = records.filter(rec => rec.date === query.date);\n}\n\n// Filter by date range\nif (query.startDate && query.endDate) {\n  records = records.filter(rec => {\n    return rec.date >= query.startDate && rec.date <= query.endDate;\n  });\n}\n\n// Filter by type (income/expense)\nif (query.type) {\n  records = records.filter(rec => rec.type === query.type);\n}\n\n// Filter by category\nif (query.category) {\n  records = records.filter(rec => rec.category === query.category);\n}\n\n// Calculate totals (amounts are already +/- in EUR)\nconst totalIncome = records\n  .filter(r => r.type === 'income')\n  .reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);\n\nconst totalExpense = records\n  .filter(r => r.type === 'expense')\n  .reduce((sum, r) => sum + Math.abs(parseFloat(r.amount || 0)), 0);\n\n// Group by category\nconst byCategory = {};\nrecords.forEach(rec => {\n  const cat = rec.category || 'other';\n  if (!byCategory[cat]) {\n    byCategory[cat] = { income: 0, expense: 0, count: 0 };\n  }\n  byCategory[cat].count++;\n  if (rec.type === 'income') {\n    byCategory[cat].income += parseFloat(rec.amount || 0);\n  } else {\n    byCategory[cat].expense += Math.abs(parseFloat(rec.amount || 0));\n  }\n});\n\n// Sort by date descending\nrecords.sort((a, b) => (b.date || '').localeCompare(a.date || ''));\n\nreturn [{\n  json: {\n    success: true,\n    count: records.length,\n    totalIncome: Math.round(totalIncome * 100) / 100,\n    totalExpense: Math.round(totalExpense * 100) / 100,\n    balance: Math.round((totalIncome - totalExpense) * 100) / 100,\n    byCategory: byCategory,\n    records: records,\n    currency: 'EUR'\n  }\n}];"
       },
-      "id": "code-filter-finance",
+      "id": "filter-calculate",
       "name": "Filter & Calculate",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -71,7 +71,7 @@
           }
         }
       },
-      "id": "response-get",
+      "id": "respond",
       "name": "Respond",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -79,7 +79,7 @@
     }
   ],
   "connections": {
-    "Webhook - Finance GET": {
+    "Webhook": {
       "main": [
         [
           {

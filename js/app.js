@@ -442,26 +442,209 @@ const App = {
     Router.render('page-admin-dashboard');
     this.setupAdminNav();
     this.setupLogout();
+    this.setupDashboardListeners();
+    
+    // Load data for today by default
+    this.dashboardPeriod = 'today';
+    await this.loadDashboardData('today');
+  },
 
-    const todayList = document.getElementById('today-list');
-    if (!todayList) return;
-
-    try {
-      // Load today's appointments
-      todayList.innerHTML = '<p style="padding: 1rem; color: var(--color-gray-500);">Зареждане...</p>';
+  /**
+   * Setup dashboard event listeners
+   */
+  setupDashboardListeners() {
+    // Period buttons
+    document.querySelectorAll('.period-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const period = e.target.dataset.period;
+        
+        // Update active state
+        document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        
+        // Show/hide custom date range
+        const customRange = document.getElementById('custom-date-range');
+        if (period === 'custom') {
+          customRange.hidden = false;
+        } else {
+          customRange.hidden = true;
+          this.dashboardPeriod = period;
+          await this.loadDashboardData(period);
+        }
+      });
+    });
+    
+    // Apply custom date range
+    document.getElementById('apply-date-range')?.addEventListener('click', async () => {
+      const fromDate = document.getElementById('date-from').value;
+      const toDate = document.getElementById('date-to').value;
       
-      const response = await API.getAppointments({ date: Utils.today() });
-      
-      if (response.success && response.data) {
-        this.renderAppointmentsList(todayList, response.data);
-      } else {
-        console.log('Dashboard API response:', response);
-        todayList.innerHTML = '<p style="padding: 1rem; color: var(--color-gray-500);">Няма записи за днес</p>';
+      if (fromDate && toDate) {
+        await this.loadDashboardData('custom', fromDate, toDate);
       }
-    } catch (error) {
-      console.error('Dashboard error:', error);
-      todayList.innerHTML = '<p style="padding: 1rem; color: var(--color-gray-500);">Няма записи за днес</p>';
+    });
+  },
+
+  /**
+   * Load dashboard data for a period
+   */
+  async loadDashboardData(period, customFrom = null, customTo = null) {
+    const today = Utils.today();
+    let startDate, endDate;
+    
+    switch (period) {
+      case 'today':
+        startDate = endDate = today;
+        break;
+      case 'week':
+        // Get Monday of current week
+        const date = new Date(today);
+        const day = date.getDay();
+        const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+        startDate = new Date(date.setDate(diff)).toISOString().split('T')[0];
+        endDate = today;
+        break;
+      case 'month':
+        startDate = today.substring(0, 7) + '-01'; // First day of month
+        endDate = today;
+        break;
+      case 'custom':
+        startDate = customFrom;
+        endDate = customTo;
+        break;
     }
+    
+    try {
+      // Fetch finance data
+      const response = await API.getFinance({ startDate, endDate });
+      const records = response.data?.records || [];
+      
+      // Calculate totals
+      let totalIncome = 0, totalExpense = 0;
+      const incomeByCategory = {};
+      const expenseByCategory = {};
+      const patients = new Set();
+      
+      records.forEach(r => {
+        const amount = parseFloat(r.amount) || 0;
+        
+        if (r.type === 'income') {
+          totalIncome += amount;
+          const cat = r.category || 'other';
+          incomeByCategory[cat] = (incomeByCategory[cat] || 0) + amount;
+          if (r.patientName) patients.add(r.patientName);
+        } else if (r.type === 'expense') {
+          totalExpense += amount;
+          const cat = r.category || 'other';
+          expenseByCategory[cat] = (expenseByCategory[cat] || 0) + amount;
+        }
+      });
+      
+      // Update stats
+      document.getElementById('stat-income').textContent = `${totalIncome.toFixed(2)} €`;
+      document.getElementById('stat-expense').textContent = `${totalExpense.toFixed(2)} €`;
+      
+      const balance = totalIncome - totalExpense;
+      const balanceEl = document.getElementById('stat-balance');
+      balanceEl.textContent = `${balance.toFixed(2)} €`;
+      balanceEl.style.color = balance >= 0 ? 'var(--color-success)' : 'var(--color-danger)';
+      
+      document.getElementById('stat-patients').textContent = patients.size;
+      
+      // Render breakdowns
+      this.renderCategoryBreakdown('income-breakdown', incomeByCategory, 'income');
+      this.renderCategoryBreakdown('expense-breakdown', expenseByCategory, 'expense');
+      
+      // Render recent records
+      this.renderRecentRecords(records.slice(0, 10));
+      
+    } catch (error) {
+      console.error('Dashboard load error:', error);
+      document.getElementById('stat-income').textContent = '0.00 €';
+      document.getElementById('stat-expense').textContent = '0.00 €';
+      document.getElementById('stat-balance').textContent = '0.00 €';
+      document.getElementById('stat-patients').textContent = '0';
+    }
+  },
+
+  /**
+   * Render category breakdown
+   */
+  renderCategoryBreakdown(containerId, data, type) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    const categoryLabels = {
+      nhif: '🏥 НЗОК',
+      private: '💎 Частни',
+      materials: '🧪 Материали',
+      lab: '🔬 Лаборатория',
+      utilities: '💡 Комунални',
+      rent: '🏢 Наем',
+      salary: '👤 Заплати',
+      other: '📦 Други'
+    };
+    
+    const entries = Object.entries(data);
+    if (entries.length === 0) {
+      container.innerHTML = '<p class="text-muted">Няма данни</p>';
+      return;
+    }
+    
+    // Sort by amount descending
+    entries.sort((a, b) => b[1] - a[1]);
+    
+    const total = entries.reduce((sum, [, val]) => sum + val, 0);
+    
+    let html = '';
+    entries.forEach(([cat, amount]) => {
+      const percent = total > 0 ? (amount / total * 100).toFixed(0) : 0;
+      html += `
+        <div class="breakdown-item">
+          <div class="breakdown-label">${categoryLabels[cat] || cat}</div>
+          <div class="breakdown-bar">
+            <div class="breakdown-fill ${type}" style="width: ${percent}%"></div>
+          </div>
+          <div class="breakdown-value">${amount.toFixed(2)} € (${percent}%)</div>
+        </div>
+      `;
+    });
+    
+    container.innerHTML = html;
+  },
+
+  /**
+   * Render recent finance records
+   */
+  renderRecentRecords(records) {
+    const container = document.getElementById('recent-records');
+    if (!container) return;
+    
+    if (records.length === 0) {
+      container.innerHTML = '<p class="text-muted">Няма записи</p>';
+      return;
+    }
+    
+    let html = '<table class="records-table"><thead><tr><th>Дата</th><th>Описание</th><th>Категория</th><th>Сума</th></tr></thead><tbody>';
+    
+    records.forEach(r => {
+      const isIncome = r.type === 'income';
+      const icon = isIncome ? '💰' : '💸';
+      const amountClass = isIncome ? 'amount--positive' : 'amount--negative';
+      const categoryIcon = this.getCategoryIcon(r.category);
+      
+      html += `
+        <tr>
+          <td>${Utils.formatDateBG(r.date)}</td>
+          <td>${icon} ${r.description || 'Без описание'} ${r.patientName ? `<small>(${r.patientName})</small>` : ''}</td>
+          <td>${categoryIcon} ${r.category || '-'}</td>
+          <td class="${amountClass}">${isIncome ? '+' : '-'}${parseFloat(r.amount).toFixed(2)} €</td>
+        </tr>
+      `;
+    });
+    
+    html += '</tbody></table>';
+    container.innerHTML = html;
   },
 
   /**
@@ -607,15 +790,15 @@ const App = {
             <div class="finance-day-summary">
               <div class="finance-mini-stat income">
                 <span class="label">Приходи:</span>
-                <span class="value" id="day-income">0.00 лв.</span>
+                <span class="value" id="day-income">0.00 €</span>
               </div>
               <div class="finance-mini-stat expense">
                 <span class="label">Разходи:</span>
-                <span class="value" id="day-expense">0.00 лв.</span>
+                <span class="value" id="day-expense">0.00 €</span>
               </div>
               <div class="finance-mini-stat total">
                 <span class="label">Баланс:</span>
-                <span class="value" id="day-balance">0.00 лв.</span>
+                <span class="value" id="day-balance">0.00 €</span>
               </div>
             </div>
             <div id="day-finance-list" class="finance-day-list">
@@ -625,52 +808,121 @@ const App = {
         </div>
       </div>
 
-      <!-- Income Modal -->
+      <!-- Income Modal with NHIF services + Custom entry -->
       <div id="income-modal" class="modal" hidden>
         <div class="modal__backdrop"></div>
-        <div class="modal__content">
+        <div class="modal__content modal__content--wide">
           <h2>💰 Добави приход</h2>
+          
+          <!-- Patient info (when opened from appointment) -->
+          <div id="income-patient-info" class="patient-info-card" hidden>
+            <strong id="income-patient-name"></strong>
+            <span id="income-patient-phone"></span>
+          </div>
+          
+          <!-- Tabs for NHIF / Custom -->
+          <div class="income-tabs">
+            <button type="button" class="income-tab active" data-tab="nhif">🏥 НЗОК услуга</button>
+            <button type="button" class="income-tab" data-tab="custom">✏️ Ръчно въвеждане</button>
+          </div>
+          
           <form id="income-form">
-            <div class="form-group">
-              <label>Сума (лв.)</label>
-              <input type="number" name="amount" step="0.01" min="0" required autofocus>
+            <!-- NHIF Tab Content -->
+            <div id="nhif-tab" class="income-tab-content active">
+              <div class="form-group">
+                <label>НЗОК Услуга</label>
+                <select name="nhifService" id="nhif-service-select">
+                  <option value="">-- Избери услуга --</option>
+                  <optgroup label="Прегледи">
+                    <option value="01|Преглед">01 - Преглед</option>
+                  </optgroup>
+                  <optgroup label="Обтурации">
+                    <option value="21|Обтурация фотополимер 1-2 пов.">21 - Обтурация фотополимер 1-2 пов.</option>
+                    <option value="22|Обтурация фотополимер 3+ пов.">22 - Обтурация фотополимер 3+ пов.</option>
+                    <option value="23|Обтурация амалгама 1-2 пов.">23 - Обтурация амалгама 1-2 пов.</option>
+                    <option value="24|Обтурация амалгама 3+ пов.">24 - Обтурация амалгама 3+ пов.</option>
+                  </optgroup>
+                  <optgroup label="Екстракции">
+                    <option value="31|Екстракция временен зъб">31 - Екстракция временен зъб</option>
+                    <option value="32|Екстракция постоянен зъб">32 - Екстракция постоянен зъб</option>
+                    <option value="33|Екстракция дълбока фрактура">33 - Екстракция дълбока фрактура</option>
+                    <option value="34|Инцизия на абсцес">34 - Инцизия на абсцес</option>
+                  </optgroup>
+                  <optgroup label="Други">
+                    <option value="91|Силанизиране">91 - Силанизиране</option>
+                    <option value="92|Флуоризация">92 - Флуоризация</option>
+                  </optgroup>
+                </select>
+              </div>
+              
+              <div class="form-group">
+                <label>Възрастова група</label>
+                <div class="age-toggle">
+                  <button type="button" class="age-btn active" data-age="under18">Под 18 г.</button>
+                  <button type="button" class="age-btn" data-age="over18">Над 18 г.</button>
+                </div>
+              </div>
+              
+              <div class="nhif-price-display">
+                <div class="price-row">
+                  <span>НЗОК плаща:</span>
+                  <strong id="nhif-fund-price">0.00 €</strong>
+                </div>
+                <div class="price-row">
+                  <span>Пациент доплаща:</span>
+                  <strong id="nhif-patient-price">0.00 €</strong>
+                </div>
+                <div class="price-row total">
+                  <span>Общо:</span>
+                  <strong id="nhif-total-price">0.00 €</strong>
+                </div>
+              </div>
             </div>
-            <div class="form-group">
-              <label>Описание</label>
-              <input type="text" name="description" placeholder="Пациент, процедура...">
+            
+            <!-- Custom Tab Content -->
+            <div id="custom-tab" class="income-tab-content" hidden>
+              <div class="form-group">
+                <label>Сума (€)</label>
+                <input type="number" name="customAmount" step="0.01" min="0" placeholder="0.00">
+              </div>
+              <div class="form-group">
+                <label>Описание</label>
+                <input type="text" name="customDescription" placeholder="Процедура, услуга...">
+              </div>
             </div>
+            
+            <!-- Common fields -->
             <div class="form-group">
               <label>Плащане</label>
-              <select name="paymentMethod">
-                <option value="cash">В брой</option>
-                <option value="card">С карта</option>
-                <option value="bank">Банков превод</option>
-              </select>
+              <div class="payment-toggle">
+                <button type="button" class="payment-btn active" data-method="cash">💵 В брой</button>
+                <button type="button" class="payment-btn" data-method="bank">🏦 По банков път</button>
+              </div>
             </div>
-            <div class="form-group">
-              <label>Тип</label>
-              <select name="type">
-                <option value="official">Официален (с касов бон)</option>
-                <option value="custom">Неофициален</option>
-              </select>
-            </div>
+            
+            <input type="hidden" name="incomeType" value="nhif">
+            <input type="hidden" name="paymentMethod" value="cash">
+            <input type="hidden" name="ageGroup" value="under18">
+            <input type="hidden" name="eventId" value="">
+            <input type="hidden" name="patientName" value="">
             <input type="hidden" name="date" value="${today}">
+            
             <div class="form-actions">
               <button type="button" class="btn btn--secondary" onclick="App.closeModal('income-modal')">Отказ</button>
-              <button type="submit" class="btn btn--success">Запази</button>
+              <button type="submit" class="btn btn--success">💾 Запази</button>
             </div>
           </form>
         </div>
       </div>
 
-      <!-- Expense Modal -->
+      <!-- Expense Modal with cash/bank toggle -->
       <div id="expense-modal" class="modal" hidden>
         <div class="modal__backdrop"></div>
         <div class="modal__content">
           <h2>💸 Добави разход</h2>
           <form id="expense-form">
             <div class="form-group">
-              <label>Сума (лв.)</label>
+              <label>Сума (€)</label>
               <input type="number" name="amount" step="0.01" min="0" required autofocus>
             </div>
             <div class="form-group">
@@ -680,23 +932,32 @@ const App = {
             <div class="form-group">
               <label>Категория</label>
               <select name="category">
-                <option value="materials">Материали</option>
-                <option value="lab">Лаборатория</option>
-                <option value="utilities">Комунални</option>
-                <option value="courier">Куриер</option>
-                <option value="other">Друго</option>
+                <option value="materials">🧪 Материали</option>
+                <option value="lab">🔬 Лаборатория</option>
+                <option value="utilities">💡 Комунални</option>
+                <option value="rent">🏢 Наем</option>
+                <option value="salary">👤 Заплати</option>
+                <option value="other">📦 Друго</option>
               </select>
             </div>
+            <div class="form-group">
+              <label>Плащане</label>
+              <div class="payment-toggle">
+                <button type="button" class="expense-payment-btn active" data-method="cash">💵 В брой</button>
+                <button type="button" class="expense-payment-btn" data-method="bank">🏦 По банков път</button>
+              </div>
+            </div>
+            <input type="hidden" name="paymentMethod" value="cash">
             <input type="hidden" name="date" value="${today}">
             <div class="form-actions">
               <button type="button" class="btn btn--secondary" onclick="App.closeModal('expense-modal')">Отказ</button>
-              <button type="submit" class="btn btn--danger">Запази</button>
+              <button type="submit" class="btn btn--danger">💾 Запази</button>
             </div>
           </form>
         </div>
       </div>
 
-      <!-- Payment Modal (for clicking on appointment) -->
+      <!-- Payment Modal (for clicking on appointment) - kept for backwards compatibility -->
       <div id="payment-modal" class="modal" hidden>
         <div class="modal__backdrop"></div>
         <div class="modal__content">
@@ -734,18 +995,43 @@ const App = {
     this.setupWorkdayListeners();
     this.initAdminCalendar();
     
-    // Store current selected date
+    // Store current selected date and load NHIF prices
     this.selectedDate = today;
+    this.loadNHIFPrices();
+  },
+
+  // NHIF prices cache
+  nhifPrices: {},
+
+  /**
+   * Load NHIF prices from API
+   */
+  async loadNHIFPrices() {
+    try {
+      const response = await API.getNHIFPrices();
+      if (response.success && response.data) {
+        this.nhifPrices = response.data.prices || response.data || {};
+      }
+    } catch (error) {
+      console.log('NHIF prices load error:', error);
+      // Use hardcoded fallback prices
+      this.nhifPrices = {
+        '01': { name: 'Преглед', priceUnder18: 7.92, priceOver18: 7.14, patientPay: 1.02 },
+        '21': { name: 'Обтурация фотополимер 1-2 пов.', priceUnder18: 17.86, priceOver18: 14.29, patientPay: 0 },
+        '22': { name: 'Обтурация фотополимер 3+ пов.', priceUnder18: 25.00, priceOver18: 21.43, patientPay: 0 },
+        '31': { name: 'Екстракция временен зъб', priceUnder18: 10.71, priceOver18: 10.71, patientPay: 0 },
+        '32': { name: 'Екстракция постоянен зъб', priceUnder18: 14.29, priceOver18: 14.29, patientPay: 0 }
+      };
+    }
   },
 
   /**
    * Setup workday page event listeners
    */
   setupWorkdayListeners() {
-    // Income button
+    // Income button - opens modal in NHIF tab
     document.getElementById('add-income-btn')?.addEventListener('click', () => {
-      document.getElementById('income-modal').hidden = false;
-      document.querySelector('#income-form input[name="amount"]').focus();
+      this.openIncomeModal();
     });
 
     // Expense button
@@ -761,6 +1047,47 @@ const App = {
       });
     });
 
+    // Income tabs
+    document.querySelectorAll('.income-tab').forEach(tab => {
+      tab.addEventListener('click', (e) => {
+        const tabName = e.target.dataset.tab;
+        this.switchIncomeTab(tabName);
+      });
+    });
+
+    // Age group toggle
+    document.querySelectorAll('.age-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.age-btn').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        document.querySelector('#income-form input[name="ageGroup"]').value = e.target.dataset.age;
+        this.updateNHIFPriceDisplay();
+      });
+    });
+
+    // Payment method toggle (income)
+    document.querySelectorAll('.payment-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.payment-btn').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        document.querySelector('#income-form input[name="paymentMethod"]').value = e.target.dataset.method;
+      });
+    });
+
+    // Payment method toggle (expense)
+    document.querySelectorAll('.expense-payment-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.expense-payment-btn').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        document.querySelector('#expense-form input[name="paymentMethod"]').value = e.target.dataset.method;
+      });
+    });
+
+    // NHIF service select
+    document.getElementById('nhif-service-select')?.addEventListener('change', () => {
+      this.updateNHIFPriceDisplay();
+    });
+
     // Income form
     document.getElementById('income-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -773,11 +1100,116 @@ const App = {
       await this.handleExpenseSubmit(e.target);
     });
 
-    // Payment form
+    // Payment form (legacy)
     document.getElementById('payment-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       await this.handlePaymentSubmit(e.target);
     });
+  },
+
+  /**
+   * Open income modal (general or for specific patient)
+   */
+  openIncomeModal(eventId = '', patientName = '', patientPhone = '') {
+    const modal = document.getElementById('income-modal');
+    const patientInfo = document.getElementById('income-patient-info');
+    const form = document.getElementById('income-form');
+    
+    // Show/hide patient info
+    if (patientName) {
+      document.getElementById('income-patient-name').textContent = patientName;
+      document.getElementById('income-patient-phone').textContent = patientPhone;
+      patientInfo.hidden = false;
+      form.querySelector('input[name="patientName"]').value = patientName;
+      form.querySelector('input[name="eventId"]').value = eventId;
+    } else {
+      patientInfo.hidden = true;
+      form.querySelector('input[name="patientName"]').value = '';
+      form.querySelector('input[name="eventId"]').value = '';
+    }
+    
+    // Reset to NHIF tab
+    this.switchIncomeTab('nhif');
+    
+    // Reset form
+    form.querySelector('select[name="nhifService"]').value = '';
+    form.querySelector('input[name="customAmount"]').value = '';
+    form.querySelector('input[name="customDescription"]').value = '';
+    
+    // Reset toggles
+    document.querySelectorAll('.age-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.age-btn[data-age="under18"]').classList.add('active');
+    form.querySelector('input[name="ageGroup"]').value = 'under18';
+    
+    document.querySelectorAll('.payment-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.payment-btn[data-method="cash"]').classList.add('active');
+    form.querySelector('input[name="paymentMethod"]').value = 'cash';
+    
+    this.updateNHIFPriceDisplay();
+    
+    modal.hidden = false;
+  },
+
+  /**
+   * Open income modal for a specific patient (from appointment click)
+   */
+  openIncomeModalForPatient(eventId, patientName, patientPhone) {
+    this.openIncomeModal(eventId, patientName, patientPhone);
+  },
+
+  /**
+   * Switch between NHIF and Custom income tabs
+   */
+  switchIncomeTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.income-tab').forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.tab === tabName);
+    });
+    
+    // Show/hide tab content
+    document.getElementById('nhif-tab').hidden = tabName !== 'nhif';
+    document.getElementById('custom-tab').hidden = tabName !== 'custom';
+    
+    // Update hidden field
+    document.querySelector('#income-form input[name="incomeType"]').value = tabName;
+    
+    // Focus appropriate field
+    if (tabName === 'custom') {
+      document.querySelector('#income-form input[name="customAmount"]').focus();
+    }
+  },
+
+  /**
+   * Update NHIF price display based on selection
+   */
+  updateNHIFPriceDisplay() {
+    const select = document.getElementById('nhif-service-select');
+    const ageGroup = document.querySelector('#income-form input[name="ageGroup"]').value;
+    
+    const fundPriceEl = document.getElementById('nhif-fund-price');
+    const patientPriceEl = document.getElementById('nhif-patient-price');
+    const totalPriceEl = document.getElementById('nhif-total-price');
+    
+    if (!select.value) {
+      fundPriceEl.textContent = '0.00 €';
+      patientPriceEl.textContent = '0.00 €';
+      totalPriceEl.textContent = '0.00 €';
+      return;
+    }
+    
+    // Parse selection (format: "code|name")
+    const [code] = select.value.split('|');
+    const priceData = this.nhifPrices[code];
+    
+    if (priceData) {
+      const fundPrice = ageGroup === 'under18' ? priceData.priceUnder18 : priceData.priceOver18;
+      const patientPay = priceData.patientPay || 0;
+      const total = fundPrice + patientPay;
+      
+      fundPriceEl.textContent = `${fundPrice.toFixed(2)} €`;
+      patientPriceEl.textContent = `${patientPay.toFixed(2)} €`;
+      totalPriceEl.textContent = `${total.toFixed(2)} €`;
+    }
   },
 
   /**
@@ -788,19 +1220,59 @@ const App = {
   },
 
   /**
-   * Handle income form submission
+   * Handle income form submission (NHIF or Custom)
    */
   async handleIncomeSubmit(form) {
     const formData = new FormData(form);
-    const incomeType = formData.get('type');
-    const data = {
+    const incomeType = formData.get('incomeType'); // 'nhif' or 'custom'
+    const ageGroup = formData.get('ageGroup');
+    const paymentMethod = formData.get('paymentMethod');
+    const eventId = formData.get('eventId');
+    const patientName = formData.get('patientName');
+    
+    let data = {
       date: this.selectedDate || Utils.today(),
-      type: incomeType, // 'official' or 'custom'
-      amount: parseFloat(formData.get('amount')),
-      description: formData.get('description') || 'Приход',
-      paymentMethod: formData.get('paymentMethod'),
-      category: 'income'
+      type: 'income',
+      paymentMethod: paymentMethod,
+      eventId: eventId || '',
+      patientName: patientName || ''
     };
+    
+    if (incomeType === 'nhif') {
+      // NHIF service selected
+      const nhifService = formData.get('nhifService');
+      if (!nhifService) {
+        Utils.showToast('Моля изберете НЗОК услуга', 'warning');
+        return;
+      }
+      
+      const [code, name] = nhifService.split('|');
+      const priceData = this.nhifPrices[code];
+      
+      if (priceData) {
+        const fundPrice = ageGroup === 'under18' ? priceData.priceUnder18 : priceData.priceOver18;
+        const patientPay = priceData.patientPay || 0;
+        
+        data.amount = fundPrice + patientPay;
+        data.description = name;
+        data.category = 'nhif';
+        data.nhifCode = code;
+      }
+    } else {
+      // Custom entry
+      const customAmount = parseFloat(formData.get('customAmount'));
+      const customDescription = formData.get('customDescription');
+      
+      if (!customAmount || customAmount <= 0) {
+        Utils.showToast('Моля въведете сума', 'warning');
+        return;
+      }
+      
+      data.amount = customAmount;
+      data.description = customDescription || 'Приход';
+      data.category = 'private';
+      data.nhifCode = '';
+    }
 
     // Save to n8n/Google Sheets
     try {
@@ -828,9 +1300,10 @@ const App = {
     const formData = new FormData(form);
     const data = {
       date: this.selectedDate || Utils.today(),
-      type: 'custom', // expenses go to custom
-      amount: -Math.abs(parseFloat(formData.get('amount'))), // Negative for expenses
+      type: 'expense',
+      amount: parseFloat(formData.get('amount')), // Positive amount, type indicates expense
       description: formData.get('description'),
+      paymentMethod: formData.get('paymentMethod'),
       category: formData.get('category')
     };
 
@@ -850,22 +1323,29 @@ const App = {
     
     this.closeModal('expense-modal');
     form.reset();
+    // Reset payment toggle
+    document.querySelectorAll('.expense-payment-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.expense-payment-btn[data-method="cash"]').classList.add('active');
+    
     this.loadWorkdayFinance(this.selectedDate);
   },
 
   /**
-   * Handle payment from appointment
+   * Handle payment from appointment (legacy - redirects to income modal)
    */
   async handlePaymentSubmit(form) {
+    // This is kept for backwards compatibility
+    // New flow uses openIncomeModalForPatient
     const formData = new FormData(form);
     const data = {
       date: this.selectedDate || Utils.today(),
-      type: 'official', // Patient payments are official
+      type: 'income',
       amount: parseFloat(formData.get('amount')),
       description: `Плащане от ${formData.get('patientName')}`,
       paymentMethod: formData.get('paymentMethod'),
-      appointmentId: formData.get('appointmentId'),
-      category: 'patient_payment'
+      eventId: formData.get('appointmentId'),
+      patientName: formData.get('patientName'),
+      category: 'private'
     };
 
     // Save to n8n/Google Sheets
@@ -909,7 +1389,7 @@ const App = {
   },
 
   /**
-   * Load workday appointments for selected date
+   * Load workday appointments for selected date - uses Google Calendar API
    */
   async loadWorkdayAppointments(date) {
     const container = document.getElementById('day-appointments-list');
@@ -923,54 +1403,104 @@ const App = {
     container.innerHTML = '<p class="text-muted">Зареждане...</p>';
 
     try {
-      const response = await API.getAppointments({ date });
+      // Use Calendar API to get events for the day
+      const response = await API.getCalendarEvents({ 
+        startDate: date, 
+        endDate: date,
+        view: 'day'
+      });
       
-      // API returns { success, count, appointments }
-      const appointments = response.data?.appointments || [];
+      // Calendar API returns { success, events: [...] }
+      const events = response.data?.events || [];
       
-      if (response.success && appointments.length > 0) {
+      if (response.success && events.length > 0) {
+        // Sort by start time
+        events.sort((a, b) => {
+          const timeA = a.startTime || a.start?.dateTime || '';
+          const timeB = b.startTime || b.start?.dateTime || '';
+          return timeA.localeCompare(timeB);
+        });
+        
         let html = '';
         
-        // Separate pending from others
-        const pending = appointments.filter(a => a.status === 'pending');
-        const others = appointments.filter(a => a.status !== 'pending');
-        
-        // Show pending first with special styling
-        if (pending.length > 0) {
-          html += '<div class="pending-section"><h4>⏳ Чакащи потвърждение</h4>';
-          pending.sort((a, b) => a.startTime.localeCompare(b.startTime));
-          
-          pending.forEach(apt => {
-            html += this.renderPendingAppointment(apt);
-          });
-          html += '</div>';
-        }
-        
-        // Then confirmed/completed
-        if (others.length > 0) {
-          if (pending.length > 0) {
-            html += '<div class="confirmed-section"><h4>✅ Потвърдени</h4>';
-          }
-          others.sort((a, b) => a.startTime.localeCompare(b.startTime));
-          
-          others.forEach(apt => {
-            html += this.renderConfirmedAppointment(apt);
-          });
-          
-          if (pending.length > 0) {
-            html += '</div>';
-          }
-        }
+        events.forEach(event => {
+          html += this.renderCalendarAppointment(event, date);
+        });
         
         container.innerHTML = html;
-        this.setupAppointmentActions();
+        
+        // Store events for payment modal
+        this.dayEvents = events;
+        
       } else {
         container.innerHTML = '<p class="text-muted">Няма записани пациенти</p>';
+        this.dayEvents = [];
       }
     } catch (error) {
-      console.log('Appointments load error:', error);
+      console.log('Calendar load error:', error);
       container.innerHTML = '<p class="text-muted">Няма записани пациенти</p>';
+      this.dayEvents = [];
     }
+  },
+
+  /**
+   * Render a calendar event as appointment card
+   */
+  renderCalendarAppointment(event, date) {
+    // Extract data from calendar event
+    const eventId = event.id || event.eventId;
+    const patientName = event.patientName || event.summary || 'Неизвестен';
+    const patientPhone = event.patientPhone || event.phone || '';
+    const procedure = event.procedure || event.description || '';
+    
+    // Parse time from event
+    let startTime = '';
+    let duration = 30;
+    
+    if (event.startTime) {
+      startTime = event.startTime;
+    } else if (event.start?.dateTime) {
+      startTime = new Date(event.start.dateTime).toTimeString().slice(0, 5);
+    }
+    
+    if (event.duration) {
+      duration = event.duration;
+    } else if (event.start?.dateTime && event.end?.dateTime) {
+      const start = new Date(event.start.dateTime);
+      const end = new Date(event.end.dateTime);
+      duration = Math.round((end - start) / 60000);
+    }
+    
+    // Check if already paid (has finance record)
+    const isPaid = event.isPaid || false;
+    
+    return `
+      <div class="workday-appointment ${isPaid ? 'workday-appointment--paid' : ''}" 
+           data-event-id="${eventId}"
+           onclick="App.openIncomeModalForPatient('${eventId}', '${this.escapeHtml(patientName)}', '${patientPhone}')">
+        <div class="appointment-time">
+          ${startTime}
+          <small>${duration}м</small>
+        </div>
+        <div class="appointment-info">
+          <strong>${patientName}</strong>
+          ${patientPhone ? `<span class="phone">${patientPhone}</span>` : ''}
+          ${procedure ? `<small>📝 ${procedure}</small>` : ''}
+        </div>
+        <div class="appointment-actions">
+          ${isPaid ? '<span class="status-badge status-badge--paid">💰 Платено</span>' : '<span class="btn btn--sm btn--success">+ Приход</span>'}
+        </div>
+      </div>
+    `;
+  },
+
+  /**
+   * Escape HTML to prevent XSS
+   */
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text || '';
+    return div.innerHTML.replace(/'/g, "\\'");
   },
 
   /**
@@ -1115,20 +1645,23 @@ const App = {
       const response = await API.getFinance({ date });
       const records = response.data?.records || [];
       
-      // Calculate totals
+      // Calculate totals - using type field
       let income = 0, expense = 0;
       records.forEach(r => {
         const amount = parseFloat(r.amount) || 0;
-        if (amount >= 0) income += amount;
-        else expense += Math.abs(amount);
+        if (r.type === 'income') {
+          income += amount;
+        } else if (r.type === 'expense') {
+          expense += amount;
+        }
       });
       
-      // Update summary
-      if (incomeEl) incomeEl.textContent = `${income.toFixed(2)} лв.`;
-      if (expenseEl) expenseEl.textContent = `${expense.toFixed(2)} лв.`;
+      // Update summary in EUR
+      if (incomeEl) incomeEl.textContent = `${income.toFixed(2)} €`;
+      if (expenseEl) expenseEl.textContent = `${expense.toFixed(2)} €`;
       if (balanceEl) {
         const balance = income - expense;
-        balanceEl.textContent = `${balance.toFixed(2)} лв.`;
+        balanceEl.textContent = `${balance.toFixed(2)} €`;
         balanceEl.style.color = balance >= 0 ? 'var(--color-success)' : 'var(--color-danger)';
       }
       
@@ -1143,14 +1676,18 @@ const App = {
       
       records.forEach(r => {
         const amount = parseFloat(r.amount);
-        const isIncome = amount >= 0;
+        const isIncome = r.type === 'income';
         const icon = isIncome ? '💰' : '💸';
+        const categoryIcon = this.getCategoryIcon(r.category);
         
         html += `
           <div class="finance-record ${isIncome ? 'income' : 'expense'}">
             <span class="icon">${icon}</span>
-            <span class="desc">${r.description || 'Без описание'}</span>
-            <span class="amount">${isIncome ? '+' : ''}${amount.toFixed(2)} лв.</span>
+            <span class="desc">
+              ${categoryIcon} ${r.description || 'Без описание'}
+              ${r.patientName ? `<small>(${r.patientName})</small>` : ''}
+            </span>
+            <span class="amount">${isIncome ? '+' : '-'}${amount.toFixed(2)} €</span>
           </div>
         `;
       });
@@ -1160,10 +1697,27 @@ const App = {
     } catch (error) {
       console.error('Finance load error:', error);
       container.innerHTML = '<p class="text-muted">Грешка при зареждане</p>';
-      if (incomeEl) incomeEl.textContent = '0.00 лв.';
-      if (expenseEl) expenseEl.textContent = '0.00 лв.';
-      if (balanceEl) balanceEl.textContent = '0.00 лв.';
+      if (incomeEl) incomeEl.textContent = '0.00 €';
+      if (expenseEl) expenseEl.textContent = '0.00 €';
+      if (balanceEl) balanceEl.textContent = '0.00 €';
     }
+  },
+
+  /**
+   * Get icon for finance category
+   */
+  getCategoryIcon(category) {
+    const icons = {
+      nhif: '🏥',
+      private: '💎',
+      materials: '🧪',
+      lab: '🔬',
+      utilities: '💡',
+      rent: '🏢',
+      salary: '👤',
+      other: '📦'
+    };
+    return icons[category] || '';
   },
 
   /**
