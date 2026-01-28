@@ -72,24 +72,20 @@
     },
     {
       "parameters": {
-        "mode": "raw",
-        "jsonOutput": "={{ JSON.stringify($input.all().map(item => item.json), null, 2) }}",
-        "options": {}
+        "jsCode": "// Get all calendar events and convert to JSON string\nconst allEvents = $input.all().map(item => item.json);\nconst jsonString = JSON.stringify(allEvents, null, 2);\n\nreturn [{\n  json: {\n    calendarJson: jsonString,\n    eventCount: allEvents.length\n  }\n}];"
       },
       "id": "format-json",
       "name": "Format as JSON",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [660, 400]
     },
     {
       "parameters": {
         "operation": "text",
-        "name": "=calendar-backup-{{ $now.format('yyyy-MM-dd') }}.json",
-        "binaryPropertyName": "calendarBackup",
-        "options": {
-          "mimeType": "application/json"
-        }
+        "sourceProperty": "calendarJson",
+        "fileName": "=calendar-backup-{{ $now.format('yyyy-MM-dd') }}.json",
+        "mimeType": "application/json"
       },
       "id": "create-file",
       "name": "Create JSON File",
