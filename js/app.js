@@ -830,36 +830,17 @@ const App = {
             <!-- NHIF Tab Content -->
             <div id="nhif-tab" class="income-tab-content active">
               <div class="form-group">
-                <label>НЗОК Услуга</label>
-                <select name="nhifService" id="nhif-service-select">
-                  <option value="">-- Избери услуга --</option>
-                  <optgroup label="Прегледи">
-                    <option value="01|Преглед">01 - Преглед</option>
-                  </optgroup>
-                  <optgroup label="Обтурации">
-                    <option value="21|Обтурация фотополимер 1-2 пов.">21 - Обтурация фотополимер 1-2 пов.</option>
-                    <option value="22|Обтурация фотополимер 3+ пов.">22 - Обтурация фотополимер 3+ пов.</option>
-                    <option value="23|Обтурация амалгама 1-2 пов.">23 - Обтурация амалгама 1-2 пов.</option>
-                    <option value="24|Обтурация амалгама 3+ пов.">24 - Обтурация амалгама 3+ пов.</option>
-                  </optgroup>
-                  <optgroup label="Екстракции">
-                    <option value="31|Екстракция временен зъб">31 - Екстракция временен зъб</option>
-                    <option value="32|Екстракция постоянен зъб">32 - Екстракция постоянен зъб</option>
-                    <option value="33|Екстракция дълбока фрактура">33 - Екстракция дълбока фрактура</option>
-                    <option value="34|Инцизия на абсцес">34 - Инцизия на абсцес</option>
-                  </optgroup>
-                  <optgroup label="Други">
-                    <option value="91|Силанизиране">91 - Силанизиране</option>
-                    <option value="92|Флуоризация">92 - Флуоризация</option>
-                  </optgroup>
-                </select>
-              </div>
-              
-              <div class="form-group">
                 <label>Възрастова група</label>
                 <div class="age-toggle">
                   <button type="button" class="age-btn active" data-age="under18">Под 18 г.</button>
                   <button type="button" class="age-btn" data-age="over18">Над 18 г.</button>
+                </div>
+              </div>
+              
+              <div class="form-group">
+                <label>НЗОК Услуги <small>(изберете една или повече)</small></label>
+                <div id="nhif-services-container" class="nhif-services-list">
+                  <p class="text-muted">Зареждане на услуги...</p>
                 </div>
               </div>
               
@@ -1010,19 +991,86 @@ const App = {
     try {
       const response = await API.getNHIFPrices();
       if (response.success && response.data) {
-        this.nhifPrices = response.data.prices || response.data || {};
+        // Transform array to object keyed by code for easy lookup
+        const prices = response.data.prices || response.data || [];
+        if (Array.isArray(prices)) {
+          this.nhifPrices = {};
+          prices.forEach(p => {
+            this.nhifPrices[p.code] = {
+              id: p.id,
+              code: p.code,
+              name: p.name,
+              priceUnder18: parseFloat(p.priceUnder18) || 0,
+              priceOver18: parseFloat(p.priceOver18) || 0,
+              patientPayUnder18: parseFloat(p.patientPayUnder18) || 0,
+              patientPayOver18: parseFloat(p.patientPayOver18) || 0,
+              category: p.category
+            };
+          });
+        } else {
+          this.nhifPrices = prices;
+        }
+        console.log('NHIF prices loaded:', Object.keys(this.nhifPrices).length);
       }
     } catch (error) {
       console.log('NHIF prices load error:', error);
-      // Use hardcoded fallback prices
-      this.nhifPrices = {
-        '01': { name: 'Преглед', priceUnder18: 7.92, priceOver18: 7.14, patientPay: 1.02 },
-        '21': { name: 'Обтурация фотополимер 1-2 пов.', priceUnder18: 17.86, priceOver18: 14.29, patientPay: 0 },
-        '22': { name: 'Обтурация фотополимер 3+ пов.', priceUnder18: 25.00, priceOver18: 21.43, patientPay: 0 },
-        '31': { name: 'Екстракция временен зъб', priceUnder18: 10.71, priceOver18: 10.71, patientPay: 0 },
-        '32': { name: 'Екстракция постоянен зъб', priceUnder18: 14.29, priceOver18: 14.29, patientPay: 0 }
-      };
     }
+    
+    // Always set fallback prices from import-nhif-prices.js (in EUR)
+    if (!this.nhifPrices || Object.keys(this.nhifPrices).length === 0) {
+      this.nhifPrices = {
+        '101': { code: '101', name: 'Обстоен преглед със снемане на орален статус', priceUnder18: 16.77, priceOver18: 16.77, patientPayUnder18: 0, patientPayOver18: 0, category: 'Преглед' },
+        '301': { code: '301', name: 'Обтурация с химичен композит', priceUnder18: 45.77, priceOver18: 43.73, patientPayUnder18: 0, patientPayOver18: 2.05, category: 'Лечение' },
+        '508': { code: '508', name: 'Екстракция на временен зъб с анестезия', priceUnder18: 18.39, priceOver18: 0, patientPayUnder18: 0, patientPayOver18: 0, category: 'Хирургия' },
+        '509': { code: '509', name: 'Екстракция на постоянен зъб с анестезия', priceUnder18: 45.77, priceOver18: 43.73, patientPayUnder18: 0, patientPayOver18: 2.05, category: 'Хирургия' },
+        '332': { code: '332', name: 'Лечение на пулпит/периодонтит на временен зъб', priceUnder18: 24.63, priceOver18: 0, patientPayUnder18: 2.40, patientPayOver18: 0, category: 'Ендодонтия' },
+        '333': { code: '333', name: 'Лечение на пулпит/периодонтит на постоянен зъб', priceUnder18: 79.42, priceOver18: 0, patientPayUnder18: 3.08, patientPayOver18: 0, category: 'Ендодонтия' },
+        '832': { code: '832', name: 'Горна цяла плакова зъбна протеза', priceUnder18: 147.19, priceOver18: 0, patientPayUnder18: 0, patientPayOver18: 0, category: 'Протетика' },
+        '833': { code: '833', name: 'Долна цяла плакова зъбна протеза', priceUnder18: 147.19, priceOver18: 0, patientPayUnder18: 0, patientPayOver18: 0, category: 'Протетика' }
+      };
+      console.log('Using fallback NHIF prices');
+    }
+    
+    // Populate NHIF services checkboxes
+    this.populateNHIFServices();
+  },
+
+  /**
+   * Populate NHIF services as checkboxes (supports multiple selection)
+   */
+  populateNHIFServices() {
+    const container = document.getElementById('nhif-services-container');
+    if (!container) return;
+    
+    // Group by category
+    const byCategory = {};
+    Object.values(this.nhifPrices).forEach(p => {
+      const cat = p.category || 'Други';
+      if (!byCategory[cat]) byCategory[cat] = [];
+      byCategory[cat].push(p);
+    });
+    
+    let html = '';
+    Object.entries(byCategory).forEach(([category, services]) => {
+      html += `<div class="nhif-category"><h4>${category}</h4>`;
+      services.forEach(s => {
+        html += `
+          <label class="nhif-service-item">
+            <input type="checkbox" name="nhifServices" value="${s.code}" data-name="${s.name}">
+            <span class="nhif-service-code">${s.code}</span>
+            <span class="nhif-service-name">${s.name}</span>
+          </label>
+        `;
+      });
+      html += '</div>';
+    });
+    
+    container.innerHTML = html;
+    
+    // Add change listeners
+    container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', () => this.updateNHIFPriceDisplay());
+    });
   },
 
   /**
@@ -1083,11 +1131,6 @@ const App = {
       });
     });
 
-    // NHIF service select
-    document.getElementById('nhif-service-select')?.addEventListener('change', () => {
-      this.updateNHIFPriceDisplay();
-    });
-
     // Income form
     document.getElementById('income-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -1131,18 +1174,24 @@ const App = {
     // Reset to NHIF tab
     this.switchIncomeTab('nhif');
     
-    // Reset form
-    form.querySelector('select[name="nhifService"]').value = '';
-    form.querySelector('input[name="customAmount"]').value = '';
-    form.querySelector('input[name="customDescription"]').value = '';
+    // Reset form fields
+    const customAmountEl = form.querySelector('input[name="customAmount"]');
+    const customDescEl = form.querySelector('input[name="customDescription"]');
+    if (customAmountEl) customAmountEl.value = '';
+    if (customDescEl) customDescEl.value = '';
+    
+    // Reset NHIF checkboxes
+    document.querySelectorAll('#nhif-services-container input[type="checkbox"]').forEach(cb => {
+      cb.checked = false;
+    });
     
     // Reset toggles
     document.querySelectorAll('.age-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector('.age-btn[data-age="under18"]').classList.add('active');
+    document.querySelector('.age-btn[data-age="under18"]')?.classList.add('active');
     form.querySelector('input[name="ageGroup"]').value = 'under18';
     
     document.querySelectorAll('.payment-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector('.payment-btn[data-method="cash"]').classList.add('active');
+    document.querySelector('.payment-btn[data-method="cash"]')?.classList.add('active');
     form.querySelector('input[name="paymentMethod"]').value = 'cash';
     
     this.updateNHIFPriceDisplay();
@@ -1180,36 +1229,37 @@ const App = {
   },
 
   /**
-   * Update NHIF price display based on selection
+   * Update NHIF price display based on selected services (multiple)
    */
   updateNHIFPriceDisplay() {
-    const select = document.getElementById('nhif-service-select');
+    const checkboxes = document.querySelectorAll('#nhif-services-container input[type="checkbox"]:checked');
     const ageGroup = document.querySelector('#income-form input[name="ageGroup"]').value;
     
     const fundPriceEl = document.getElementById('nhif-fund-price');
     const patientPriceEl = document.getElementById('nhif-patient-price');
     const totalPriceEl = document.getElementById('nhif-total-price');
     
-    if (!select.value) {
-      fundPriceEl.textContent = '0.00 €';
-      patientPriceEl.textContent = '0.00 €';
-      totalPriceEl.textContent = '0.00 €';
-      return;
-    }
+    let totalFund = 0;
+    let totalPatient = 0;
     
-    // Parse selection (format: "code|name")
-    const [code] = select.value.split('|');
-    const priceData = this.nhifPrices[code];
-    
-    if (priceData) {
-      const fundPrice = ageGroup === 'under18' ? priceData.priceUnder18 : priceData.priceOver18;
-      const patientPay = priceData.patientPay || 0;
-      const total = fundPrice + patientPay;
+    checkboxes.forEach(cb => {
+      const code = cb.value;
+      const priceData = this.nhifPrices[code];
       
-      fundPriceEl.textContent = `${fundPrice.toFixed(2)} €`;
-      patientPriceEl.textContent = `${patientPay.toFixed(2)} €`;
-      totalPriceEl.textContent = `${total.toFixed(2)} €`;
-    }
+      if (priceData) {
+        if (ageGroup === 'under18') {
+          totalFund += priceData.priceUnder18 || 0;
+          totalPatient += priceData.patientPayUnder18 || 0;
+        } else {
+          totalFund += priceData.priceOver18 || 0;
+          totalPatient += priceData.patientPayOver18 || 0;
+        }
+      }
+    });
+    
+    fundPriceEl.textContent = `${totalFund.toFixed(2)} €`;
+    patientPriceEl.textContent = `${totalPatient.toFixed(2)} €`;
+    totalPriceEl.textContent = `${(totalFund + totalPatient).toFixed(2)} €`;
   },
 
   /**
@@ -1239,25 +1289,42 @@ const App = {
     };
     
     if (incomeType === 'nhif') {
-      // NHIF service selected
-      const nhifService = formData.get('nhifService');
-      if (!nhifService) {
-        Utils.showToast('Моля изберете НЗОК услуга', 'warning');
+      // NHIF services selected (multiple)
+      const checkboxes = document.querySelectorAll('#nhif-services-container input[type="checkbox"]:checked');
+      
+      if (checkboxes.length === 0) {
+        Utils.showToast('Моля изберете поне една НЗОК услуга', 'warning');
         return;
       }
       
-      const [code, name] = nhifService.split('|');
-      const priceData = this.nhifPrices[code];
+      // Calculate totals and collect service names
+      let totalAmount = 0;
+      const serviceNames = [];
+      const serviceCodes = [];
       
-      if (priceData) {
-        const fundPrice = ageGroup === 'under18' ? priceData.priceUnder18 : priceData.priceOver18;
-        const patientPay = priceData.patientPay || 0;
+      checkboxes.forEach(cb => {
+        const code = cb.value;
+        const priceData = this.nhifPrices[code];
         
-        data.amount = fundPrice + patientPay;
-        data.description = name;
-        data.category = 'nhif';
-        data.nhifCode = code;
-      }
+        if (priceData) {
+          let fundPrice, patientPay;
+          if (ageGroup === 'under18') {
+            fundPrice = priceData.priceUnder18 || 0;
+            patientPay = priceData.patientPayUnder18 || 0;
+          } else {
+            fundPrice = priceData.priceOver18 || 0;
+            patientPay = priceData.patientPayOver18 || 0;
+          }
+          totalAmount += fundPrice + patientPay;
+          serviceNames.push(priceData.name);
+          serviceCodes.push(code);
+        }
+      });
+      
+      data.amount = totalAmount;
+      data.description = serviceNames.join(' + ');
+      data.category = 'nhif';
+      data.nhifCode = serviceCodes.join(',');
     } else {
       // Custom entry
       const customAmount = parseFloat(formData.get('customAmount'));
