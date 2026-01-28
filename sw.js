@@ -1,5 +1,5 @@
 // Service Worker for Rodopi Dent PWA
-const CACHE_VERSION = 'v1.1.0';
+const CACHE_VERSION = 'v3.6.0';
 const CACHE_NAME = `rodopi-dent-${CACHE_VERSION}`;
 
 // Files to cache for offline use
