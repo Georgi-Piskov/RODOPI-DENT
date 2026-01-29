@@ -3332,103 +3332,54 @@ button {
 /* Period Selector */
 .dashboard-period-selector {
   display: flex;
-  flex-direction: column;
-  gap: var(--spacing-4);
+  flex-wrap: wrap;
+  gap: 12px;
   margin-bottom: var(--spacing-5);
   align-items: flex-start;
 }
 
-.period-buttons {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.period-btn--large {
-  display: flex;
-  flex-direction: column;
+.period-btn {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: 16px 24px;
-  min-width: 100px;
+  gap: 6px;
+  padding: 14px 24px;
   background: white;
   border: 2px solid var(--color-gray-200);
   border-radius: var(--radius-xl);
   cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-gray-600);
   transition: all 0.2s ease;
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
-.period-btn--large:hover {
-  border-color: var(--color-primary);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
-}
-
-.period-btn--large.active {
-  background: linear-gradient(135deg, var(--color-primary), #1d4ed8);
-  border-color: var(--color-primary);
-  color: white;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
-}
-
-.period-btn__icon {
-  font-size: 24px;
-  margin-bottom: 4px;
-}
-
-.period-btn__text {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.period-btn--large.active .period-btn__text {
-  color: white;
-}
-
-/* Legacy period-btn for backwards compat */
-.period-toggle {
-  display: flex;
-  background: var(--color-gray-100);
-  border-radius: var(--radius-lg);
-  padding: 4px;
-  gap: 4px;
-}
-
-.period-btn {
-  padding: 10px 16px;
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  color: var(--color-gray-500);
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-
 .period-btn:hover {
-  background: var(--color-gray-200);
-  color: var(--color-gray-700);
+  border-color: var(--color-primary);
+  background: var(--color-gray-50);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(37, 99, 235, 0.1);
 }
 
 .period-btn.active {
-  background: var(--color-primary);
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  border-color: #1d4ed8;
   color: white;
-  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
 }
 
 .custom-date-range {
   display: flex;
   align-items: center;
-  gap: var(--spacing-3);
+  gap: 12px;
   background: white;
   padding: 16px 20px;
   border-radius: var(--radius-xl);
   border: 2px solid var(--color-gray-200);
   box-shadow: var(--shadow-md);
   flex-wrap: wrap;
+  width: 100%;
+  margin-top: 8px;
 }
 
 .date-input-group {
@@ -3451,7 +3402,7 @@ button {
   font-weight: 500;
   color: var(--color-gray-700);
   background: var(--color-gray-50);
-  width: 120px;
+  width: 130px;
   text-align: center;
 }
 
@@ -3460,29 +3411,6 @@ button {
   border-color: var(--color-primary);
   background: white;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.date-input-hidden {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.custom-date-range input[type="date"] {
-  padding: 8px 12px;
-  border: 1px solid var(--color-gray-300);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  color: var(--color-gray-700);
-  background: var(--color-gray-50);
-  cursor: pointer;
-}
-
-.custom-date-range input[type="date"]:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  background: white;
 }
 
 .date-separator {

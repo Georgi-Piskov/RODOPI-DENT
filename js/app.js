@@ -456,11 +456,15 @@ const App = {
     // Period buttons
     document.querySelectorAll('.period-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
-        const period = e.target.dataset.period;
+        const button = e.target.closest('.period-btn');
+        if (!button) return;
+        
+        const period = button.dataset.period;
+        if (!period) return;
         
         // Update active state
         document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
-        e.target.classList.add('active');
+        button.classList.add('active');
         
         // Show/hide custom date range
         const customRange = document.getElementById('custom-date-range');
