@@ -1076,17 +1076,27 @@ const App = {
 
   /**
    * Populate NHIF services as checkboxes (supports multiple selection)
+   * Filters by age group - only shows services with non-zero price for that group
    */
-  populateNHIFServices() {
+  populateNHIFServices(ageGroup = 'under18') {
     const container = document.getElementById('nhif-services-container');
     if (!container) return;
     
     // Style the container
     container.style.cssText = 'max-height:200px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;background:white;';
     
+    // Filter by age group - only show services with price > 0 for selected group
+    const filteredPrices = Object.values(this.nhifPrices).filter(p => {
+      if (ageGroup === 'under18') {
+        return p.priceUnder18 > 0;
+      } else {
+        return p.priceOver18 > 0;
+      }
+    });
+    
     // Group by category
     const byCategory = {};
-    Object.values(this.nhifPrices).forEach(p => {
+    filteredPrices.forEach(p => {
       const cat = p.category || 'Други';
       if (!byCategory[cat]) byCategory[cat] = [];
       byCategory[cat].push(p);
@@ -1096,11 +1106,13 @@ const App = {
     Object.entries(byCategory).forEach(([category, services]) => {
       html += `<div style="margin:0;"><div style="background:#2563eb;color:white;padding:4px 8px;font-size:11px;font-weight:700;text-transform:uppercase;position:sticky;top:0;">${category}</div>`;
       services.forEach(s => {
+        const price = ageGroup === 'under18' ? s.priceUnder18 : s.priceOver18;
         html += `
           <label style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;border-bottom:1px solid #f1f5f9;">
-            <input type="checkbox" name="nhifServices" value="${s.code}" data-name="${s.name}" style="width:16px;height:16px;accent-color:#22c55e;">
+            <input type="checkbox" name="nhifServices" value="${s.id || s.code}" data-name="${s.name}" data-price="${price}" style="width:16px;height:16px;accent-color:#22c55e;">
             <span style="background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:700;min-width:32px;text-align:center;">${s.code}</span>
-            <span style="font-size:12px;color:#374151;line-height:1.2;">${s.name}</span>
+            <span style="font-size:12px;color:#374151;line-height:1.2;flex:1;">${s.name}</span>
+            <span style="font-size:11px;color:#22c55e;font-weight:600;">${price.toFixed(2)}€</span>
           </label>
         `;
       });
@@ -1173,7 +1185,10 @@ const App = {
         e.target.style.background = '#dbeafe';
         e.target.style.borderColor = '#2563eb';
         e.target.style.color = '#2563eb';
-        document.querySelector('#income-form input[name="ageGroup"]').value = e.target.dataset.age;
+        const ageGroup = e.target.dataset.age;
+        document.querySelector('#income-form input[name="ageGroup"]').value = ageGroup;
+        // Repopulate services for selected age group
+        this.populateNHIFServices(ageGroup);
         this.updateNHIFPriceDisplay();
       });
     });
