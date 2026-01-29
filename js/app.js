@@ -850,8 +850,18 @@ const App = {
         <div class="modal__content modal__content--wide">
           <h2>💰 Добави приход</h2>
           
-          <!-- Patient Name Input -->
-          <div class="form-group" style="margin-bottom:12px;">
+          <!-- Patient Name Display (from appointment) or Input (manual) -->
+          <div id="income-patient-display" style="background:linear-gradient(135deg,#dbeafe,#e0e7ff);border:2px solid #3b82f6;border-radius:10px;padding:12px;margin-bottom:12px;display:none;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:24px;">👤</span>
+              <div>
+                <div id="income-patient-name" style="font-weight:700;font-size:16px;color:#1e40af;"></div>
+                <div id="income-patient-phone" style="font-size:12px;color:#6b7280;"></div>
+              </div>
+            </div>
+          </div>
+          
+          <div id="income-patient-input-group" class="form-group" style="margin-bottom:12px;">
             <label style="font-weight:600;">👤 Име на пациент</label>
             <input type="text" id="income-patient-input" name="patientNameInput" placeholder="Въведете име на пациент..." style="width:100%;padding:10px 12px;border:2px solid #e2e8f0;border-radius:8px;font-size:14px;">
           </div>
@@ -1266,19 +1276,25 @@ const App = {
    */
   openIncomeModal(eventId = '', patientName = '', patientPhone = '') {
     const modal = document.getElementById('income-modal');
-    const patientInfo = document.getElementById('income-patient-info');
+    const patientDisplay = document.getElementById('income-patient-display');
+    const patientInputGroup = document.getElementById('income-patient-input-group');
+    const patientInput = document.getElementById('income-patient-input');
     const form = document.getElementById('income-form');
     
-    // Show/hide patient info
+    // Show patient display (from appointment) or input field (manual entry)
     if (patientName) {
+      // From appointment - show patient info, hide input
       document.getElementById('income-patient-name').textContent = patientName;
-      document.getElementById('income-patient-phone').textContent = patientPhone;
-      patientInfo.hidden = false;
-      form.querySelector('input[name="patientName"]').value = patientName;
+      document.getElementById('income-patient-phone').textContent = patientPhone || '';
+      patientDisplay.style.display = 'block';
+      patientInputGroup.style.display = 'none';
+      patientInput.value = patientName;
       form.querySelector('input[name="eventId"]').value = eventId;
     } else {
-      patientInfo.hidden = true;
-      form.querySelector('input[name="patientName"]').value = '';
+      // Manual entry - show input, hide display
+      patientDisplay.style.display = 'none';
+      patientInputGroup.style.display = 'block';
+      patientInput.value = '';
       form.querySelector('input[name="eventId"]').value = '';
     }
     
@@ -1291,6 +1307,12 @@ const App = {
     if (customAmountEl) customAmountEl.value = '';
     if (customDescEl) customDescEl.value = '';
     
+    // Reset extra patient pay
+    const extraPayEl = document.getElementById('extra-patient-pay');
+    const extraDescEl = document.getElementById('extra-patient-desc');
+    if (extraPayEl) extraPayEl.value = '';
+    if (extraDescEl) extraDescEl.value = '';
+    
     // Reset NHIF checkboxes
     document.querySelectorAll('#nhif-services-container input[type="checkbox"]').forEach(cb => {
       cb.checked = false;
@@ -1300,6 +1322,9 @@ const App = {
     document.querySelectorAll('.age-btn').forEach(b => b.classList.remove('active'));
     document.querySelector('.age-btn[data-age="under18"]')?.classList.add('active');
     form.querySelector('input[name="ageGroup"]').value = 'under18';
+    
+    // Repopulate services for default age group
+    this.populateNHIFServices('under18');
     
     document.querySelectorAll('.payment-btn').forEach(b => b.classList.remove('active'));
     document.querySelector('.payment-btn[data-method="cash"]')?.classList.add('active');
