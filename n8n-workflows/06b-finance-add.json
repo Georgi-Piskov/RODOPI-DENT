@@ -19,7 +19,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body;\n\n// Required fields\nconst required = ['date', 'type', 'amount'];\nconst missing = required.filter(field => body[field] === undefined && body[field] !== 0);\n\nif (missing.length > 0) {\n  return [{\n    json: {\n      success: false,\n      error: `Липсващи полета: ${missing.join(', ')}`,\n      valid: false\n    }\n  }];\n}\n\n// Validate type\nconst validTypes = ['income', 'expense'];\nif (!validTypes.includes(body.type)) {\n  return [{\n    json: {\n      success: false,\n      error: 'type трябва да е income или expense',\n      valid: false\n    }\n  }];\n}\n\n// Generate unique ID\nconst id = 'fin_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);\n\n// Amount: positive for income, negative for expense\nlet amount = parseFloat(body.amount);\nif (body.type === 'expense' && amount > 0) {\n  amount = -amount;\n}\n\nreturn [{\n  json: {\n    id: id,\n    date: body.date,\n    type: body.type,\n    amount: amount,\n    description: body.description || '',\n    paymentMethod: body.paymentMethod || 'cash',\n    category: body.category || (body.type === 'income' ? 'private' : 'other'),\n    patientName: body.patientName || '',\n    nhifCode: body.nhifCode || '',\n    procedureCode: body.procedureCode || '',\n    procedureName: body.procedureName || '',\n    nhifAmount: parseFloat(body.nhifAmount) || 0,\n    patientAmount: parseFloat(body.patientAmount) || 0,\n    eventId: body.eventId || '',\n    createdAt: new Date().toISOString(),\n    valid: true\n  }\n}];"
+        "jsCode": "const body = $input.first().json.body;\n\n// Required fields\nconst required = ['date', 'type', 'amount'];\nconst missing = required.filter(field => body[field] === undefined && body[field] !== 0);\n\nif (missing.length > 0) {\n  return [{\n    json: {\n      success: false,\n      error: `Липсващи полета: ${missing.join(', ')}`,\n      valid: false\n    }\n  }];\n}\n\n// Validate type\nconst validTypes = ['income', 'expense'];\nif (!validTypes.includes(body.type)) {\n  return [{\n    json: {\n      success: false,\n      error: 'type трябва да е income или expense',\n      valid: false\n    }\n  }];\n}\n\n// Generate unique ID\nconst id = 'fin_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);\n\n// Amount: positive for income, negative for expense\nlet amount = parseFloat(body.amount);\nif (body.type === 'expense' && amount > 0) {\n  amount = -amount;\n}\n\nreturn [{\n  json: {\n    id: id,\n    date: body.date,\n    type: body.type,\n    amount: amount,\n    description: body.description || '',\n    paymentMethod: body.paymentMethod || 'cash',\n    category: body.category || (body.type === 'income' ? 'private' : 'other'),\n    patientName: body.patientName || '',\n    procedureCode: body.procedureCode || '',\n    procedureName: body.procedureName || '',\n    nhifAmount: parseFloat(body.nhifAmount) || 0,\n    patientAmount: parseFloat(body.patientAmount) || 0,\n    serviceCategory: body.serviceCategory || '',\n    remainingPayment: parseFloat(body.remainingPayment) || 0,\n    createdAt: new Date().toISOString(),\n    valid: true\n  }\n}];"
       },
       "id": "prepare-record",
       "name": "Prepare Record",
@@ -72,7 +72,9 @@
             "amount": "={{ $json.amount }}",
             "description": "={{ $json.description }}",
             "paymentMethod": "={{ $json.paymentMethod }}",
-            "createdAt": "={{ $json.createdAt }}"
+            "createdAt": "={{ $json.createdAt }}",
+            "serviceCategory": "={{ $json.serviceCategory }}",
+            "remainingPayment": "={{ $json.remainingPayment }}"
           }
         },
         "options": {}

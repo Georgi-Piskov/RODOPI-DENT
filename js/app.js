@@ -929,12 +929,41 @@ const App = {
               </div>
             </div>
             
+            <!-- Service Category Dropdown -->
+            <div class="form-group">
+              <label>📁 Категория услуга</label>
+              <select name="serviceCategory" style="width:100%;padding:10px 12px;border:2px solid #e2e8f0;border-radius:8px;font-size:14px;cursor:pointer;">
+                <option value="">-- Изберете категория --</option>
+                <option value="Прегледи">🔍 Прегледи</option>
+                <option value="Терапия">💊 Терапия</option>
+                <option value="Протетика">🦷 Протетика</option>
+                <option value="Ортодонтия">📐 Ортодонтия</option>
+                <option value="Пародонтология">🩺 Пародонтология</option>
+                <option value="Деца Терапия">👶 Деца Терапия</option>
+                <option value="Деца Ортодонтия">👶 Деца Ортодонтия</option>
+              </select>
+            </div>
+            
             <!-- Common fields -->
             <div class="form-group">
               <label>Плащане</label>
               <div class="payment-toggle" style="display:flex;gap:4px;">
                 <button type="button" class="payment-btn active" data-method="cash" style="flex:1;padding:8px 12px;background:#dcfce7;border:2px solid #22c55e;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;color:#22c55e;">💵 В брой</button>
                 <button type="button" class="payment-btn" data-method="bank" style="flex:1;padding:8px 12px;background:#f1f5f9;border:2px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;color:#64748b;">🏦 По банков път</button>
+              </div>
+            </div>
+            
+            <!-- Remaining Payment - Expandable -->
+            <div class="form-group">
+              <button type="button" id="toggle-remaining-payment" onclick="App.toggleRemainingPayment()" style="display:flex;align-items:center;gap:6px;background:none;border:1px dashed #94a3b8;border-radius:6px;padding:8px 12px;cursor:pointer;font-size:13px;color:#64748b;width:100%;justify-content:center;">
+                <span id="remaining-payment-icon">➕</span> Остатък за доплащане
+              </button>
+              <div id="remaining-payment-section" style="display:none;margin-top:8px;padding:10px;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;">
+                <label style="font-size:12px;color:#92400e;font-weight:600;">💳 Остава пациентът да доплати:</label>
+                <div style="display:flex;gap:8px;margin-top:6px;">
+                  <input type="number" name="remainingPayment" step="0.01" min="0" placeholder="0.00" style="flex:1;padding:8px 10px;border:1px solid #fbbf24;border-radius:6px;font-size:14px;">
+                  <span style="color:#92400e;font-size:14px;line-height:36px;font-weight:600;">€</span>
+                </div>
               </div>
             </div>
             
@@ -1407,10 +1436,33 @@ const App = {
   },
 
   /**
+   * Toggle remaining payment section visibility
+   */
+  toggleRemainingPayment() {
+    const section = document.getElementById('remaining-payment-section');
+    const icon = document.getElementById('remaining-payment-icon');
+    if (section.style.display === 'none') {
+      section.style.display = 'block';
+      icon.textContent = '➖';
+    } else {
+      section.style.display = 'none';
+      icon.textContent = '➕';
+      // Clear the value when hiding
+      section.querySelector('input[name="remainingPayment"]').value = '';
+    }
+  },
+
+  /**
    * Close a modal by ID
    */
   closeModal(modalId) {
     document.getElementById(modalId).hidden = true;
+    // Reset remaining payment section when closing
+    const remainingSection = document.getElementById('remaining-payment-section');
+    if (remainingSection) {
+      remainingSection.style.display = 'none';
+      document.getElementById('remaining-payment-icon').textContent = '➕';
+    }
   },
 
   /**
@@ -1433,12 +1485,20 @@ const App = {
       return;
     }
     
+    // Get service category
+    const serviceCategory = formData.get('serviceCategory') || '';
+    
+    // Get remaining payment if any
+    const remainingPayment = parseFloat(document.querySelector('input[name="remainingPayment"]')?.value) || 0;
+    
     const baseData = {
       date: this.selectedDate || Utils.today(),
       type: 'income',
       paymentMethod: paymentMethod,
       eventId: eventId || '',
-      patientName: patientName
+      patientName: patientName,
+      serviceCategory: serviceCategory,
+      remainingPayment: remainingPayment
     };
     
     const recordsToSave = [];

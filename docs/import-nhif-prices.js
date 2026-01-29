@@ -127,17 +127,19 @@ function updateFinancesStructure() {
   const newHeaders = [
     'id',
     'date',
-    'type',           // income / expense
-    'patientName',    // НОВО - име на пациент
-    'category',       // nhif / patient_extra / private / materials / etc.
-    'procedureCode',  // НОВО - код на процедура (101, 301, etc.)
-    'procedureName',  // НОВО - име на процедура
-    'nhifAmount',     // НОВО - сума от НЗОК
-    'patientAmount',  // НОВО - доплащане от пациент
-    'amount',         // обща сума
+    'type',             // income / expense
+    'patientName',      // име на пациент / контрагент
+    'category',         // nhif / patient_extra / private / materials / etc.
+    'procedureCode',    // код на процедура (101, 301, etc.)
+    'procedureName',    // име на процедура
+    'nhifAmount',       // сума от НЗОК
+    'patientAmount',    // доплащане от пациент
+    'amount',           // обща сума
     'description',
     'paymentMethod',
-    'createdAt'
+    'createdAt',
+    'serviceCategory',  // НОВО - категория услуга (Прегледи, Терапия, Протетика...)
+    'remainingPayment'  // НОВО - остатък за доплащане
   ];
   
   // Провери дали вече има данни
@@ -168,7 +170,7 @@ function updateFinancesStructure() {
   
   sheet.setFrozenRows(1);
   
-  SpreadsheetApp.getUi().alert('✅ Структурата на Finances е обновена! Нови колони: patientName, procedureCode, procedureName, nhifAmount, patientAmount');
+  SpreadsheetApp.getUi().alert('✅ Структурата на Finances е обновена! Нови колони: patientName, procedureCode, procedureName, nhifAmount, patientAmount, serviceCategory, remainingPayment');
 }
 
 function setupDatabase() {
