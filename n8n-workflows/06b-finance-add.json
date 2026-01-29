@@ -55,7 +55,7 @@
         "sheetName": {
           "__rl": true,
           "mode": "name",
-          "value": "Finance"
+          "value": "Finances"
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -63,17 +63,15 @@
             "id": "={{ $json.id }}",
             "date": "={{ $json.date }}",
             "type": "={{ $json.type }}",
-            "amount": "={{ $json.amount }}",
-            "description": "={{ $json.description }}",
-            "paymentMethod": "={{ $json.paymentMethod }}",
-            "category": "={{ $json.category }}",
             "patientName": "={{ $json.patientName }}",
-            "nhifCode": "={{ $json.nhifCode }}",
+            "category": "={{ $json.category }}",
             "procedureCode": "={{ $json.procedureCode }}",
             "procedureName": "={{ $json.procedureName }}",
             "nhifAmount": "={{ $json.nhifAmount }}",
             "patientAmount": "={{ $json.patientAmount }}",
-            "eventId": "={{ $json.eventId }}",
+            "amount": "={{ $json.amount }}",
+            "description": "={{ $json.description }}",
+            "paymentMethod": "={{ $json.paymentMethod }}",
             "createdAt": "={{ $json.createdAt }}"
           }
         },
