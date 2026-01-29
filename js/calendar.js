@@ -988,20 +988,21 @@ const Calendar = {
   },
 
   /**
-   * Calculate event top position
+   * Calculate event top position (1 hour = 90px, 1 minute = 1.5px)
    */
   getEventTop(startTime) {
     if (!startTime) return 0;
     const [hours, minutes] = startTime.split(':').map(Number);
     const hourOffset = hours - this.workingHours.start;
-    return (hourOffset * 60) + minutes;
+    return (hourOffset * 90) + (minutes * 1.5);
   },
 
   /**
-   * Calculate event height
+   * Calculate event height (1 minute = 1.5px)
    */
   getEventHeight(duration) {
-    return Math.max(duration, 45); // Minimum 45px for 3 lines of content
+    const height = duration * 1.5;
+    return Math.max(height, 55); // Minimum 55px for 3 lines of content
   },
 
   /**

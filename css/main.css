@@ -2159,7 +2159,7 @@ button {
 
 /* Hour Slots */
 .week-view__hour-slot {
-  height: 60px;
+  height: 90px;
   border-bottom: 1px solid var(--color-gray-300);
   position: relative;
 }
@@ -2322,7 +2322,7 @@ button {
 
 /* Hour Slots */
 .hour-slot {
-  height: 60px;
+  height: 90px;
   border-bottom: 1px solid var(--color-gray-100);
   position: relative;
 }
