@@ -588,6 +588,10 @@ const Calendar = {
         view: this.currentView
       });
       
+      // DEBUG: Log the API response to see structure
+      console.log('Calendar API response:', response);
+      console.log('Events sample:', response.data?.events?.[0]);
+      
       if (response.success && response.data?.events) {
         this.events = response.data.events;
       } else {
