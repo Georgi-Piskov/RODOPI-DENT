@@ -1050,19 +1050,24 @@ const App = {
       console.log('NHIF prices load error:', error);
     }
     
-    // Always set fallback prices from import-nhif-prices.js (in EUR)
+    // Always set fallback prices from import-nhif-prices.js (in EUR) - Актуализирано 2026
     if (!this.nhifPrices || Object.keys(this.nhifPrices).length === 0) {
       this.nhifPrices = {
-        '101': { code: '101', name: 'Обстоен преглед със снемане на орален статус', priceUnder18: 16.77, priceOver18: 16.77, patientPayUnder18: 0, patientPayOver18: 0, category: 'Преглед' },
-        '301': { code: '301', name: 'Обтурация с химичен композит', priceUnder18: 45.77, priceOver18: 43.73, patientPayUnder18: 0, patientPayOver18: 2.05, category: 'Лечение' },
-        '508': { code: '508', name: 'Екстракция на временен зъб с анестезия', priceUnder18: 18.39, priceOver18: 0, patientPayUnder18: 0, patientPayOver18: 0, category: 'Хирургия' },
-        '509': { code: '509', name: 'Екстракция на постоянен зъб с анестезия', priceUnder18: 45.77, priceOver18: 43.73, patientPayUnder18: 0, patientPayOver18: 2.05, category: 'Хирургия' },
-        '332': { code: '332', name: 'Лечение на пулпит/периодонтит на временен зъб', priceUnder18: 24.63, priceOver18: 0, patientPayUnder18: 2.40, patientPayOver18: 0, category: 'Ендодонтия' },
-        '333': { code: '333', name: 'Лечение на пулпит/периодонтит на постоянен зъб', priceUnder18: 79.42, priceOver18: 0, patientPayUnder18: 3.08, patientPayOver18: 0, category: 'Ендодонтия' },
-        '832': { code: '832', name: 'Горна цяла плакова зъбна протеза', priceUnder18: 147.19, priceOver18: 0, patientPayUnder18: 0, patientPayOver18: 0, category: 'Протетика' },
-        '833': { code: '833', name: 'Долна цяла плакова зъбна протеза', priceUnder18: 147.19, priceOver18: 0, patientPayUnder18: 0, patientPayOver18: 0, category: 'Протетика' }
+        // ДО 18 ГОДИНИ
+        '101_u18': { code: '101', name: 'Обстоен преглед със снемане на орален статус (до 18г.)', priceUnder18: 16.76, priceOver18: 0, patientPayUnder18: 0, patientPayOver18: 0, category: 'Преглед' },
+        '301_u18': { code: '301', name: 'Обтурация с химичен композит (до 18г.)', priceUnder18: 45.67, priceOver18: 0, patientPayUnder18: 0, patientPayOver18: 0, category: 'Лечение' },
+        '508': { code: '508', name: 'Екстракция на временен зъб с анестезия', priceUnder18: 18.35, priceOver18: 0, patientPayUnder18: 0, patientPayOver18: 0, category: 'Хирургия' },
+        '509_u18': { code: '509', name: 'Екстракция на постоянен зъб с анестезия (до 18г.)', priceUnder18: 45.67, priceOver18: 0, patientPayUnder18: 0, patientPayOver18: 0, category: 'Хирургия' },
+        '332': { code: '332', name: 'Лечение на пулпит или периодонтит на временен зъб', priceUnder18: 24.58, priceOver18: 0, patientPayUnder18: 0, patientPayOver18: 0, category: 'Ендодонтия' },
+        '333': { code: '333', name: 'Лечение на пулпит или периодонтит на постоянен зъб', priceUnder18: 79.27, priceOver18: 0, patientPayUnder18: 0, patientPayOver18: 0, category: 'Ендодонтия' },
+        // НАД 18 ГОДИНИ
+        '101_o18': { code: '101', name: 'Обстоен преглед със снемане на орален статус (над 18г.)', priceUnder18: 0, priceOver18: 16.76, patientPayUnder18: 0, patientPayOver18: 0, category: 'Преглед' },
+        '301_o18': { code: '301', name: 'Обтурация с химичен композит (над 18г.)', priceUnder18: 0, priceOver18: 43.63, patientPayUnder18: 0, patientPayOver18: 0, category: 'Лечение' },
+        '509_o18': { code: '509', name: 'Екстракция на постоянен зъб с анестезия (над 18г.)', priceUnder18: 0, priceOver18: 43.63, patientPayUnder18: 0, patientPayOver18: 0, category: 'Хирургия' },
+        '832': { code: '832', name: 'Горна цяла протеза', priceUnder18: 0, priceOver18: 146.88, patientPayUnder18: 0, patientPayOver18: 0, category: 'Протетика' },
+        '833': { code: '833', name: 'Долна цяла протеза', priceUnder18: 0, priceOver18: 146.88, patientPayUnder18: 0, patientPayOver18: 0, category: 'Протетика' }
       };
-      console.log('Using fallback NHIF prices');
+      console.log('Using fallback NHIF prices (2026)');
     }
     
     // Populate NHIF services checkboxes
