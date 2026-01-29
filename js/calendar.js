@@ -943,20 +943,23 @@ const Calendar = {
       const width = 100 / event.totalColumns;
       const left = event.column * width;
       
-      // Truncate long names
-      const displayName = (event.patientName || event.title || '').substring(0, 25);
+      // Build display text: Name + Time + Procedure
+      const patientName = (event.patientName || event.title || '').substring(0, 20);
       const displayTime = event.startTime || '';
+      const procedure = event.procedure ? event.procedure.substring(0, 25) : '';
       
-      // Color class
-      const colorClass = event.color ? `calendar-event--color-${event.color}` : '';
+      // Color class - use colorId (from API) or color as fallback
+      const eventColor = event.colorId || event.color || '';
+      const colorClass = eventColor ? `calendar-event--color-${eventColor}` : '';
       
       return `
         <div class="calendar-event calendar-event--${event.status || 'confirmed'} ${colorClass}" 
              data-event-id="${event.id}"
              style="top: ${top}px; height: ${height}px; left: ${left}%; width: calc(${width}% - 4px);"
-             title="${event.patientName || event.title} - ${event.startTime}${event.patientPhone ? ' (' + event.patientPhone + ')' : ''}">
-          <div class="calendar-event__title">${displayName}</div>
+             title="${event.patientName || event.title} - ${event.startTime}${event.procedure ? ' | ' + event.procedure : ''}${event.patientPhone ? ' (' + event.patientPhone + ')' : ''}">
+          <div class="calendar-event__title">${patientName}</div>
           <div class="calendar-event__time">${displayTime}</div>
+          ${procedure ? `<div class="calendar-event__procedure">${procedure}</div>` : ''}
         </div>
       `;
     }).join('');
