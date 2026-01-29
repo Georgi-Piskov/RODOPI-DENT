@@ -1025,13 +1025,15 @@ const App = {
     try {
       const response = await API.getNHIFPrices();
       if (response.success && response.data) {
-        // Transform array to object keyed by code for easy lookup
+        // Transform array to object keyed by ID (not code!) for easy lookup
         const prices = response.data.prices || response.data || [];
         if (Array.isArray(prices)) {
           this.nhifPrices = {};
           prices.forEach(p => {
-            this.nhifPrices[p.code] = {
-              id: p.id,
+            // Use ID as key since codes can be duplicated (e.g. 101 for both under18 and over18)
+            const key = p.id || `${p.code}_${p.priceUnder18 > 0 ? 'u18' : 'o18'}`;
+            this.nhifPrices[key] = {
+              id: p.id || key,
               code: p.code,
               name: p.name,
               priceUnder18: parseFloat(p.priceUnder18) || 0,
@@ -1340,8 +1342,8 @@ const App = {
     let totalPatient = 0;
     
     checkboxes.forEach(cb => {
-      const code = cb.value;
-      const priceData = this.nhifPrices[code];
+      const id = cb.value; // Now using ID instead of code
+      const priceData = this.nhifPrices[id];
       
       if (priceData) {
         if (ageGroup === 'under18') {
