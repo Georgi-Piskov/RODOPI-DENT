@@ -793,6 +793,16 @@ const App = {
           <!-- Left: Calendar -->
           <div class="workday-calendar">
             <div id="admin-calendar" class="admin-calendar"></div>
+            
+            <!-- Patients with outstanding debt panel -->
+            <div id="debt-panel" style="margin-top:16px;background:#fef3c7;border:2px solid #f59e0b;border-radius:10px;padding:12px;">
+              <h4 style="margin:0 0 10px 0;font-size:14px;color:#92400e;display:flex;align-items:center;gap:6px;">
+                💳 Пациенти с дължими суми
+              </h4>
+              <div id="debt-list" style="max-height:200px;overflow-y:auto;">
+                <p style="color:#a16207;font-size:12px;text-align:center;">Зареждане...</p>
+              </div>
+            </div>
           </div>
           
           <!-- Center: Day Appointments -->
@@ -1488,7 +1498,7 @@ const App = {
     // Get service category
     const serviceCategory = formData.get('serviceCategory') || '';
     
-    // Get remaining payment if any
+    // Get remaining payment if any (debt - NOT added to amount, just tracked)
     const remainingPayment = parseFloat(document.querySelector('input[name="remainingPayment"]')?.value) || 0;
     
     const baseData = {
@@ -1498,10 +1508,11 @@ const App = {
       eventId: eventId || '',
       patientName: patientName,
       serviceCategory: serviceCategory,
-      remainingPayment: remainingPayment
+      remainingPayment: 0 // Default to 0, will set on first record only
     };
     
     const recordsToSave = [];
+    let isFirstRecord = true; // Track if this is the first record to attach remainingPayment
     
     if (incomeType === 'nhif') {
       // NHIF services selected (multiple) - create separate record for each
@@ -1527,16 +1538,24 @@ const App = {
             patientPay = priceData.patientPayOver18 || 0;
           }
           
-          recordsToSave.push({
+          const record = {
             ...baseData,
             category: 'nhif',
             procedureCode: priceData.code,
             procedureName: priceData.name,
             nhifAmount: nhifAmount,
             patientAmount: patientPay,
-            amount: nhifAmount + patientPay,
+            amount: nhifAmount + patientPay, // amount does NOT include remainingPayment
             description: `${priceData.code} ${priceData.name}`
-          });
+          };
+          
+          // Attach remainingPayment only to first record
+          if (isFirstRecord && remainingPayment > 0) {
+            record.remainingPayment = remainingPayment;
+            isFirstRecord = false;
+          }
+          
+          recordsToSave.push(record);
         }
       });
       
@@ -1573,7 +1592,8 @@ const App = {
         procedureName: customDescription,
         nhifAmount: 0,
         patientAmount: customAmount,
-        amount: customAmount,
+        amount: customAmount, // amount does NOT include remainingPayment
+        remainingPayment: remainingPayment, // Attach debt to this single record
         description: customDescription
       });
     }
@@ -2114,12 +2134,142 @@ const App = {
   },
 
   /**
+   * Load patients with outstanding debt for the day
+   * Matches today's appointments with finance records that have remainingPayment > 0
+   */
+  async loadDebtPatients() {
+    const container = document.getElementById('debt-list');
+    if (!container) return;
+    
+    container.innerHTML = '<p style="color:#a16207;font-size:12px;text-align:center;">Зареждане...</p>';
+    
+    try {
+      // Get all finance records with remainingPayment > 0
+      const response = await API.getFinance({});
+      const allRecords = response.data?.records || [];
+      
+      // Filter records with outstanding debt
+      const debtRecords = allRecords.filter(r => 
+        r.type === 'income' && 
+        parseFloat(r.remainingPayment) > 0
+      );
+      
+      if (debtRecords.length === 0) {
+        container.innerHTML = '<p style="color:#22c55e;font-size:12px;text-align:center;">✓ Няма пациенти с дължими суми</p>';
+        return;
+      }
+      
+      // Get today's appointments to check if any debtors are coming
+      const todayAppointments = this.appointments || [];
+      const todayPatientNames = todayAppointments.map(a => 
+        (a.summary || a.title || '').toLowerCase().split(' ')[0] // First word of name
+      );
+      
+      // Build HTML
+      let html = '';
+      debtRecords.forEach(record => {
+        const patientName = record.patientName || 'Неизвестен';
+        const debt = parseFloat(record.remainingPayment).toFixed(2);
+        const recordDate = record.date || '';
+        const recordId = record.id || '';
+        
+        // Check if patient is coming today
+        const patientFirstName = patientName.toLowerCase().split(' ')[0];
+        const isComingToday = todayPatientNames.some(n => n && n.includes(patientFirstName));
+        
+        html += `
+          <div style="background:${isComingToday ? '#fef9c3' : 'white'};border:1px solid ${isComingToday ? '#eab308' : '#fcd34d'};border-radius:6px;padding:8px;margin-bottom:6px;font-size:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-weight:600;color:#78350f;">${patientName}</div>
+                <div style="color:#a16207;font-size:10px;">от ${Utils.formatDateBG(recordDate)}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span style="font-weight:700;color:#dc2626;">${debt} €</span>
+                <button onclick="App.markDebtPaid('${recordId}', ${record.remainingPayment}, '${patientName.replace(/'/g, "\\'")}')" 
+                  style="background:#22c55e;color:white;border:none;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:600;" title="Платил">
+                  ✓
+                </button>
+                <button onclick="App.dismissDebt('${recordId}')" 
+                  style="background:#ef4444;color:white;border:none;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:600;" title="Отказал">
+                  ✗
+                </button>
+              </div>
+            </div>
+            ${isComingToday ? '<div style="color:#ca8a04;font-size:10px;font-weight:600;margin-top:4px;">⚠️ Идва днес!</div>' : ''}
+          </div>
+        `;
+      });
+      
+      container.innerHTML = html;
+      
+    } catch (error) {
+      console.error('Debt load error:', error);
+      container.innerHTML = '<p style="color:#ef4444;font-size:12px;text-align:center;">Грешка при зареждане</p>';
+    }
+  },
+
+  /**
+   * Mark debt as paid - converts remainingPayment to income
+   */
+  async markDebtPaid(recordId, amount, patientName) {
+    if (!confirm(`Потвърдете плащане от ${patientName} на сума ${parseFloat(amount).toFixed(2)} €?`)) {
+      return;
+    }
+    
+    try {
+      // Add new income record for the paid debt
+      const response = await API.addFinanceRecord({
+        date: Utils.today(),
+        type: 'income',
+        amount: parseFloat(amount),
+        patientName: patientName,
+        category: 'debt_payment',
+        procedureCode: '',
+        procedureName: 'Доплатено задължение',
+        nhifAmount: 0,
+        patientAmount: parseFloat(amount),
+        description: `Доплатено задължение от ${patientName}`,
+        paymentMethod: 'cash',
+        serviceCategory: '',
+        remainingPayment: 0
+      });
+      
+      if (response.success) {
+        // TODO: Update original record to set remainingPayment to 0
+        // For now, we'll need to manually update or create a new workflow
+        Utils.showToast('Плащането е записано', 'success');
+        this.loadDebtPatients();
+        this.loadWorkdayFinance(this.selectedDate);
+      } else {
+        Utils.showToast('Грешка при запис', 'error');
+      }
+    } catch (error) {
+      console.error('Mark paid error:', error);
+      Utils.showToast('Грешка при запис', 'error');
+    }
+  },
+
+  /**
+   * Dismiss debt (patient refused to pay)
+   */
+  async dismissDebt(recordId) {
+    if (!confirm('Сигурни ли сте, че искате да махнете това задължение?')) {
+      return;
+    }
+    
+    // TODO: Create workflow to update remainingPayment to 0 without adding income
+    Utils.showToast('Функцията изисква допълнителен n8n workflow за обновяване на записи', 'warning');
+  },
+
+  /**
    * Get icon for finance category
    */
   getCategoryIcon(category) {
     const icons = {
       nhif: '🏥',
       private: '💎',
+      debt_payment: '💳',
       materials: '🧪',
       lab: '🔬',
       utilities: '💡',
@@ -2224,6 +2374,7 @@ const App = {
           this.selectedDate = selectedDate;
           this.loadWorkdayAppointments(selectedDate);
           this.loadWorkdayFinance(selectedDate);
+          this.loadDebtPatients(); // Refresh debt panel for new date
         } else {
           this.loadDayAppointments(selectedDate);
         }
@@ -2252,6 +2403,7 @@ const App = {
         this.selectedDate = today;
         this.loadWorkdayAppointments(today);
         this.loadWorkdayFinance(today);
+        this.loadDebtPatients(); // Load patients with outstanding debt
       } else {
         this.loadDayAppointments(today);
       }
