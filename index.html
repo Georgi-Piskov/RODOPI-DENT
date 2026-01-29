@@ -198,23 +198,23 @@
       </nav>
       <div class="admin-content">
         <!-- Date Range Selector -->
-        <div class="dashboard-period-selector">
-          <button type="button" class="period-btn active" data-period="today">📅 Днес</button>
-          <button type="button" class="period-btn" data-period="week">📆 Седмица</button>
-          <button type="button" class="period-btn" data-period="month">🗓️ Месец</button>
-          <button type="button" class="period-btn" data-period="custom">📊 Период</button>
+        <div class="dashboard-period-selector" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px;">
+          <button type="button" class="period-btn active" data-period="today" style="padding:16px 28px;font-size:16px;font-weight:600;border-radius:16px;border:2px solid #e2e8f0;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:white;cursor:pointer;box-shadow:0 6px 20px rgba(37,99,235,0.4);">📅 Днес</button>
+          <button type="button" class="period-btn" data-period="week" style="padding:16px 28px;font-size:16px;font-weight:600;border-radius:16px;border:2px solid #e2e8f0;background:white;color:#475569;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.06);">📆 Седмица</button>
+          <button type="button" class="period-btn" data-period="month" style="padding:16px 28px;font-size:16px;font-weight:600;border-radius:16px;border:2px solid #e2e8f0;background:white;color:#475569;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.06);">🗓️ Месец</button>
+          <button type="button" class="period-btn" data-period="custom" style="padding:16px 28px;font-size:16px;font-weight:600;border-radius:16px;border:2px solid #e2e8f0;background:white;color:#475569;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.06);">📊 Период</button>
         </div>
-        <div id="custom-date-range" class="custom-date-range" hidden>
-          <div class="date-input-group">
-            <label>От:</label>
-            <input type="date" id="date-from" class="date-picker" />
+        <div id="custom-date-range" class="custom-date-range" hidden style="display:none;gap:16px;background:white;padding:20px;border-radius:16px;border:2px solid #e2e8f0;box-shadow:0 4px 12px rgba(0,0,0,0.08);margin-bottom:24px;flex-wrap:wrap;align-items:center;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <label style="font-weight:600;color:#475569;">От:</label>
+            <input type="date" id="date-from" style="padding:12px 16px;border:2px solid #cbd5e1;border-radius:12px;font-size:15px;background:#f8fafc;" />
           </div>
-          <span class="date-separator">→</span>
-          <div class="date-input-group">
-            <label>До:</label>
-            <input type="date" id="date-to" class="date-picker" />
+          <span style="color:#94a3b8;font-weight:700;font-size:24px;">→</span>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <label style="font-weight:600;color:#475569;">До:</label>
+            <input type="date" id="date-to" style="padding:12px 16px;border:2px solid #cbd5e1;border-radius:12px;font-size:15px;background:#f8fafc;" />
           </div>
-          <button type="button" class="btn btn--primary" id="apply-date-range">✓ Приложи</button>
+          <button type="button" class="btn btn--primary" id="apply-date-range" style="padding:12px 24px;background:#3b82f6;color:white;border:none;border-radius:12px;font-weight:600;cursor:pointer;">✓ Приложи</button>
         </div>
         
         <!-- Finance Stats -->

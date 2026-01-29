@@ -453,7 +453,10 @@ const App = {
    * Setup dashboard event listeners
    */
   setupDashboardListeners() {
-    // Period buttons
+    // Period buttons - with inline style updates
+    const activeStyle = 'padding:16px 28px;font-size:16px;font-weight:600;border-radius:16px;border:2px solid #1d4ed8;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:white;cursor:pointer;box-shadow:0 6px 20px rgba(37,99,235,0.4);';
+    const inactiveStyle = 'padding:16px 28px;font-size:16px;font-weight:600;border-radius:16px;border:2px solid #e2e8f0;background:white;color:#475569;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.06);';
+    
     document.querySelectorAll('.period-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         const button = e.target.closest('.period-btn');
@@ -462,16 +465,22 @@ const App = {
         const period = button.dataset.period;
         if (!period) return;
         
-        // Update active state
-        document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+        // Update active state and styles
+        document.querySelectorAll('.period-btn').forEach(b => {
+          b.classList.remove('active');
+          b.style.cssText = inactiveStyle;
+        });
         button.classList.add('active');
+        button.style.cssText = activeStyle;
         
         // Show/hide custom date range
         const customRange = document.getElementById('custom-date-range');
         if (period === 'custom') {
           customRange.hidden = false;
+          customRange.style.display = 'flex';
         } else {
           customRange.hidden = true;
+          customRange.style.display = 'none';
           this.dashboardPeriod = period;
           await this.loadDashboardData(period);
         }
