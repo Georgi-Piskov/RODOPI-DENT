@@ -203,6 +203,16 @@ const API = {
     });
   },
 
+  /**
+   * Update finance record
+   */
+  async updateFinanceRecord(id, updates) {
+    return this.request(CONFIG.ENDPOINTS.FINANCE_UPDATE, {
+      method: 'POST',
+      body: JSON.stringify({ id, ...updates })
+    });
+  },
+
   // ============================================
   // Google Calendar Endpoints
   // ============================================

@@ -2219,7 +2219,7 @@ const App = {
     
     try {
       // Add new income record for the paid debt
-      const response = await API.addFinanceRecord({
+      const addResponse = await API.addFinanceRecord({
         date: Utils.today(),
         type: 'income',
         amount: parseFloat(amount),
@@ -2235,10 +2235,18 @@ const App = {
         remainingPayment: 0
       });
       
-      if (response.success) {
-        // TODO: Update original record to set remainingPayment to 0
-        // For now, we'll need to manually update or create a new workflow
-        Utils.showToast('Плащането е записано', 'success');
+      if (addResponse.success) {
+        // Update original record to set remainingPayment to 0
+        const updateResponse = await API.updateFinanceRecord(recordId, {
+          remainingPayment: 0
+        });
+        
+        if (updateResponse.success) {
+          Utils.showToast('Плащането е записано и дългът е нулиран', 'success');
+        } else {
+          Utils.showToast('Плащането е записано, но дългът не е нулиран', 'warning');
+        }
+        
         this.loadDebtPatients();
         this.loadWorkdayFinance(this.selectedDate);
       } else {
@@ -2251,15 +2259,29 @@ const App = {
   },
 
   /**
-   * Dismiss debt (patient refused to pay)
+   * Dismiss debt (patient refused to pay or cancelled)
    */
   async dismissDebt(recordId) {
-    if (!confirm('Сигурни ли сте, че искате да махнете това задължение?')) {
+    if (!confirm('Сигурни ли сте, че искате да махнете това задължение? (Няма да се записва приход)')) {
       return;
     }
     
-    // TODO: Create workflow to update remainingPayment to 0 without adding income
-    Utils.showToast('Функцията изисква допълнителен n8n workflow за обновяване на записи', 'warning');
+    try {
+      // Update original record to set remainingPayment to 0 without adding income
+      const response = await API.updateFinanceRecord(recordId, {
+        remainingPayment: 0
+      });
+      
+      if (response.success) {
+        Utils.showToast('Задължението е премахнато', 'success');
+        this.loadDebtPatients();
+      } else {
+        Utils.showToast('Грешка при обновяване', 'error');
+      }
+    } catch (error) {
+      console.error('Dismiss debt error:', error);
+      Utils.showToast('Грешка при обновяване', 'error');
+    }
   },
 
   /**
