@@ -478,9 +478,6 @@ const App = {
       });
     });
     
-    // Setup Bulgarian date format inputs
-    this.setupBulgarianDateInputs();
-    
     // Apply custom date range
     document.getElementById('apply-date-range')?.addEventListener('click', async () => {
       const fromDate = document.getElementById('date-from').value;
@@ -492,75 +489,14 @@ const App = {
         Utils.showToast('Моля въведете и двете дати', 'warning');
       }
     });
-  },
-  
-  /**
-   * Setup Bulgarian date format inputs (DD.MM.YYYY)
-   */
-  setupBulgarianDateInputs() {
-    const fromDisplay = document.getElementById('date-from-display');
-    const toDisplay = document.getElementById('date-to-display');
-    const fromHidden = document.getElementById('date-from');
-    const toHidden = document.getElementById('date-to');
     
-    if (!fromDisplay || !toDisplay) return;
-    
-    // Helper: Convert DD.MM.YYYY to YYYY-MM-DD
-    const bgToIso = (bgDate) => {
-      const parts = bgDate.split('.');
-      if (parts.length === 3) {
-        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-      }
-      return '';
-    };
-    
-    // Helper: Convert YYYY-MM-DD to DD.MM.YYYY
-    const isoToBg = (isoDate) => {
-      if (!isoDate) return '';
-      const parts = isoDate.split('-');
-      if (parts.length === 3) {
-        return `${parts[2]}.${parts[1]}.${parts[0]}`;
-      }
-      return '';
-    };
-    
-    // Auto-format as user types
-    const formatDateInput = (input, hiddenInput) => {
-      input.addEventListener('input', (e) => {
-        let value = e.target.value.replace(/[^0-9.]/g, '');
-        
-        // Auto-add dots
-        if (value.length === 2 && !value.includes('.')) {
-          value += '.';
-        } else if (value.length === 5 && value.split('.').length === 2) {
-          value += '.';
-        }
-        
-        // Limit length
-        if (value.length > 10) {
-          value = value.substring(0, 10);
-        }
-        
-        e.target.value = value;
-        
-        // Update hidden input if valid
-        if (value.length === 10) {
-          const isoDate = bgToIso(value);
-          if (isoDate) {
-            hiddenInput.value = isoDate;
-          }
-        }
-      });
-      
-      // Set today's date as default
-      const today = new Date();
-      const todayBg = `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}.${today.getFullYear()}`;
-      input.value = todayBg;
-      hiddenInput.value = Utils.today();
-    };
-    
-    formatDateInput(fromDisplay, fromHidden);
-    formatDateInput(toDisplay, toHidden);
+    // Set default dates for custom range
+    const dateFrom = document.getElementById('date-from');
+    const dateTo = document.getElementById('date-to');
+    if (dateFrom && dateTo) {
+      dateFrom.value = Utils.today();
+      dateTo.value = Utils.today();
+    }
   },
 
   /**

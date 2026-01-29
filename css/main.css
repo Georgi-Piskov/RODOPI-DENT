@@ -3335,88 +3335,89 @@ button {
   flex-wrap: wrap;
   gap: 12px;
   margin-bottom: var(--spacing-5);
-  align-items: flex-start;
+  align-items: center;
 }
 
 .period-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 14px 24px;
-  background: white;
-  border: 2px solid var(--color-gray-200);
-  border-radius: var(--radius-xl);
+  gap: 8px;
+  padding: 16px 28px !important;
+  background: white !important;
+  border: 2px solid #e2e8f0 !important;
+  border-radius: 16px !important;
   cursor: pointer;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--color-gray-600);
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  color: #475569 !important;
+  transition: all 0.25s ease !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
 }
 
 .period-btn:hover {
-  border-color: var(--color-primary);
-  background: var(--color-gray-50);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(37, 99, 235, 0.1);
+  border-color: #3b82f6 !important;
+  background: #f8fafc !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.15) !important;
 }
 
 .period-btn.active {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  border-color: #1d4ed8;
-  color: white;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%) !important;
+  border-color: #1d4ed8 !important;
+  color: white !important;
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4) !important;
+  transform: translateY(-1px) !important;
 }
 
 .custom-date-range {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   background: white;
-  padding: 16px 20px;
-  border-radius: var(--radius-xl);
-  border: 2px solid var(--color-gray-200);
-  box-shadow: var(--shadow-md);
+  padding: 20px 24px;
+  border-radius: 16px;
+  border: 2px solid #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
   flex-wrap: wrap;
   width: 100%;
-  margin-top: 8px;
+  margin-top: 12px;
 }
 
 .date-input-group {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .date-input-group label {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-gray-600);
+  color: #475569;
 }
 
-.date-input-bg {
-  padding: 10px 14px;
-  border: 2px solid var(--color-gray-300);
-  border-radius: var(--radius-lg);
+.date-picker {
+  padding: 12px 16px;
+  border: 2px solid #cbd5e1;
+  border-radius: 12px;
   font-size: 15px;
   font-weight: 500;
-  color: var(--color-gray-700);
-  background: var(--color-gray-50);
-  width: 130px;
-  text-align: center;
+  color: #1e293b;
+  background: #f8fafc;
+  cursor: pointer;
+  min-width: 160px;
 }
 
-.date-input-bg:focus {
+.date-picker:focus {
   outline: none;
-  border-color: var(--color-primary);
+  border-color: #3b82f6;
   background: white;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
 }
 
 .date-separator {
-  color: var(--color-gray-400);
-  font-weight: 600;
-  font-size: 20px;
+  color: #94a3b8;
+  font-weight: 700;
+  font-size: 24px;
 }
 
 /* Finance Stats Grid */
