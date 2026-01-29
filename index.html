@@ -199,17 +199,37 @@
       <div class="admin-content">
         <!-- Date Range Selector -->
         <div class="dashboard-period-selector">
-          <div class="period-toggle">
-            <button type="button" class="period-btn active" data-period="today">📅 Днес</button>
-            <button type="button" class="period-btn" data-period="week">📆 Седмица</button>
-            <button type="button" class="period-btn" data-period="month">🗓️ Месец</button>
-            <button type="button" class="period-btn" data-period="custom">📊 Период</button>
+          <div class="period-buttons">
+            <button type="button" class="period-btn period-btn--large active" data-period="today">
+              <span class="period-btn__icon">📅</span>
+              <span class="period-btn__text">Днес</span>
+            </button>
+            <button type="button" class="period-btn period-btn--large" data-period="week">
+              <span class="period-btn__icon">📆</span>
+              <span class="period-btn__text">Седмица</span>
+            </button>
+            <button type="button" class="period-btn period-btn--large" data-period="month">
+              <span class="period-btn__icon">🗓️</span>
+              <span class="period-btn__text">Месец</span>
+            </button>
+            <button type="button" class="period-btn period-btn--large" data-period="custom">
+              <span class="period-btn__icon">📊</span>
+              <span class="period-btn__text">Период</span>
+            </button>
           </div>
           <div id="custom-date-range" class="custom-date-range" hidden>
-            <input type="date" id="date-from" />
+            <div class="date-input-group">
+              <label>От:</label>
+              <input type="text" id="date-from-display" class="date-input-bg" placeholder="ДД.ММ.ГГГГ" maxlength="10" />
+              <input type="date" id="date-from" class="date-input-hidden" />
+            </div>
             <span class="date-separator">→</span>
-            <input type="date" id="date-to" />
-            <button type="button" class="btn btn--sm btn--primary" id="apply-date-range">✓ Приложи</button>
+            <div class="date-input-group">
+              <label>До:</label>
+              <input type="text" id="date-to-display" class="date-input-bg" placeholder="ДД.ММ.ГГГГ" maxlength="10" />
+              <input type="date" id="date-to" class="date-input-hidden" />
+            </div>
+            <button type="button" class="btn btn--primary" id="apply-date-range">✓ Приложи</button>
           </div>
         </div>
         
