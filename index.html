@@ -199,15 +199,17 @@
       <div class="admin-content">
         <!-- Date Range Selector -->
         <div class="dashboard-period-selector">
-          <button type="button" class="period-btn active" data-period="today">Днес</button>
-          <button type="button" class="period-btn" data-period="week">Седмица</button>
-          <button type="button" class="period-btn" data-period="month">Месец</button>
-          <button type="button" class="period-btn" data-period="custom">Период</button>
+          <div class="period-toggle">
+            <button type="button" class="period-btn active" data-period="today">📅 Днес</button>
+            <button type="button" class="period-btn" data-period="week">📆 Седмица</button>
+            <button type="button" class="period-btn" data-period="month">🗓️ Месец</button>
+            <button type="button" class="period-btn" data-period="custom">📊 Период</button>
+          </div>
           <div id="custom-date-range" class="custom-date-range" hidden>
             <input type="date" id="date-from" />
-            <span>—</span>
+            <span class="date-separator">→</span>
             <input type="date" id="date-to" />
-            <button type="button" class="btn btn--sm btn--primary" id="apply-date-range">Приложи</button>
+            <button type="button" class="btn btn--sm btn--primary" id="apply-date-range">✓ Приложи</button>
           </div>
         </div>
         

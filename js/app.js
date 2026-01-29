@@ -844,16 +844,27 @@ const App = {
                 </div>
               </div>
               
-              <div style="background:#f0fdf4;border:2px solid #22c55e;border-radius:6px;padding:10px 12px;margin:8px 0;">
-                <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;color:#475569;">
+              <div style="background:#f0fdf4;border:2px solid #22c55e;border-radius:8px;padding:12px;margin:12px 0;">
+                <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:#475569;">
                   <span>НЗОК плаща:</span>
                   <strong id="nhif-fund-price" style="color:#374151;">0.00 €</strong>
                 </div>
-                <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;color:#475569;border-bottom:1px dashed #cbd5e1;">
-                  <span>Пациент доплаща:</span>
+                <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:#475569;border-bottom:1px dashed #cbd5e1;">
+                  <span>Пациент доплаща (НЗОК):</span>
                   <strong id="nhif-patient-price" style="color:#374151;">0.00 €</strong>
                 </div>
-                <div style="display:flex;justify-content:space-between;padding:6px 0 0;font-size:15px;font-weight:700;color:#22c55e;">
+                
+                <!-- Допълнително доплащане - ръчно въвеждане -->
+                <div style="margin-top:10px;padding-top:10px;border-top:1px solid #d1fae5;">
+                  <div style="font-size:12px;color:#059669;font-weight:600;margin-bottom:6px;">➕ Допълнително доплащане:</div>
+                  <div style="display:flex;gap:8px;margin-bottom:6px;">
+                    <input type="number" id="extra-patient-pay" name="extraPatientPay" step="0.01" min="0" placeholder="0.00" style="width:90px;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                    <span style="color:#6b7280;font-size:13px;line-height:32px;">€</span>
+                  </div>
+                  <input type="text" id="extra-patient-desc" name="extraPatientDesc" placeholder="Какво е доплатено..." style="width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
+                </div>
+                
+                <div style="display:flex;justify-content:space-between;padding:8px 0 0;font-size:16px;font-weight:700;color:#22c55e;margin-top:8px;border-top:2px solid #22c55e;">
                   <span>Общо:</span>
                   <strong id="nhif-total-price" style="font-size:18px;">0.00 €</strong>
                 </div>
@@ -923,9 +934,9 @@ const App = {
             </div>
             <div class="form-group">
               <label>Плащане</label>
-              <div class="payment-toggle">
-                <button type="button" class="expense-payment-btn active" data-method="cash">💵 В брой</button>
-                <button type="button" class="expense-payment-btn" data-method="bank">🏦 По банков път</button>
+              <div class="payment-toggle" style="display:flex;gap:4px;">
+                <button type="button" class="expense-payment-btn active" data-method="cash" style="flex:1;padding:10px 12px;background:#fee2e2;border:2px solid #ef4444;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;color:#ef4444;">💵 В брой</button>
+                <button type="button" class="expense-payment-btn" data-method="bank" style="flex:1;padding:10px 12px;background:#f1f5f9;border:2px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;color:#64748b;">🏦 По банков път</button>
               </div>
             </div>
             <input type="hidden" name="paymentMethod" value="cash">
@@ -1074,6 +1085,9 @@ const App = {
     container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
       cb.addEventListener('change', () => this.updateNHIFPriceDisplay());
     });
+    
+    // Add listener for extra patient pay input
+    document.getElementById('extra-patient-pay')?.addEventListener('input', () => this.updateNHIFPriceDisplay());
   },
 
   /**
@@ -1277,6 +1291,7 @@ const App = {
     const fundPriceEl = document.getElementById('nhif-fund-price');
     const patientPriceEl = document.getElementById('nhif-patient-price');
     const totalPriceEl = document.getElementById('nhif-total-price');
+    const extraPayEl = document.getElementById('extra-patient-pay');
     
     let totalFund = 0;
     let totalPatient = 0;
@@ -1296,9 +1311,12 @@ const App = {
       }
     });
     
+    // Add extra patient payment if any
+    const extraPay = parseFloat(extraPayEl?.value) || 0;
+    
     fundPriceEl.textContent = `${totalFund.toFixed(2)} €`;
     patientPriceEl.textContent = `${totalPatient.toFixed(2)} €`;
-    totalPriceEl.textContent = `${(totalFund + totalPatient).toFixed(2)} €`;
+    totalPriceEl.textContent = `${(totalFund + totalPatient + extraPay).toFixed(2)} €`;
   },
 
   /**
@@ -1360,10 +1378,23 @@ const App = {
         }
       });
       
+      // Add extra patient payment if any
+      const extraPay = parseFloat(document.getElementById('extra-patient-pay')?.value) || 0;
+      const extraDesc = document.getElementById('extra-patient-desc')?.value || '';
+      
+      if (extraPay > 0) {
+        totalAmount += extraPay;
+        if (extraDesc) {
+          serviceNames.push(`+ ${extraDesc}`);
+        }
+      }
+      
       data.amount = totalAmount;
       data.description = serviceNames.join(' + ');
       data.category = 'nhif';
       data.nhifCode = serviceCodes.join(',');
+      data.extraPatientPay = extraPay;
+      data.extraPatientDesc = extraDesc;
     } else {
       // Custom entry
       const customAmount = parseFloat(formData.get('customAmount'));
