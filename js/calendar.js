@@ -2127,6 +2127,10 @@ const Calendar = {
       colorId: formData.get('colorId') || 'green'
     };
     
+    // DEBUG: Log what we're sending
+    console.log('Submitting event data:', data);
+    console.log('colorId from form:', formData.get('colorId'));
+    
     const submitBtn = document.getElementById('event-submit-btn');
     submitBtn.disabled = true;
     submitBtn.textContent = 'Запазване...';
