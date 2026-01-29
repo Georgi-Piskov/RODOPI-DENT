@@ -106,7 +106,77 @@ function onOpen() {
   ui.createMenu('🦷 Родопи Дент')
     .addItem('Настрой базата данни', 'setupDatabase')
     .addItem('Импортирай НЗОК цени', 'importNHIFPrices')
+    .addItem('Обнови Finances структура', 'updateFinancesStructure')
     .addSeparator()
     .addItem('Добави тестови записи', 'addTestAppointments')
     .addToUi();
+}
+
+/**
+ * Обновява структурата на листа Finances с новите колони
+ */
+function updateFinancesStructure() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('Finances');
+  
+  if (!sheet) {
+    sheet = ss.insertSheet('Finances');
+  }
+  
+  // Нови заглавия с допълнителни колони
+  const newHeaders = [
+    'id',
+    'date',
+    'type',           // income / expense
+    'patientName',    // НОВО - име на пациент
+    'category',       // nhif / patient_extra / private / materials / etc.
+    'procedureCode',  // НОВО - код на процедура (101, 301, etc.)
+    'procedureName',  // НОВО - име на процедура
+    'nhifAmount',     // НОВО - сума от НЗОК
+    'patientAmount',  // НОВО - доплащане от пациент
+    'amount',         // обща сума
+    'description',
+    'paymentMethod',
+    'createdAt'
+  ];
+  
+  // Провери дали вече има данни
+  const lastRow = sheet.getLastRow();
+  
+  if (lastRow === 0) {
+    // Празен лист - добави заглавия
+    sheet.getRange(1, 1, 1, newHeaders.length).setValues([newHeaders]);
+  } else {
+    // Има данни - добави само заглавията на първия ред
+    const existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    // Провери кои колони липсват и ги добави
+    newHeaders.forEach((header, index) => {
+      if (existingHeaders.indexOf(header) === -1) {
+        // Добави липсващата колона в края
+        const newCol = sheet.getLastColumn() + 1;
+        sheet.getRange(1, newCol).setValue(header);
+      }
+    });
+  }
+  
+  // Форматиране
+  sheet.getRange(1, 1, 1, sheet.getLastColumn())
+    .setBackground('#22c55e')
+    .setFontColor('#ffffff')
+    .setFontWeight('bold');
+  
+  sheet.setFrozenRows(1);
+  
+  SpreadsheetApp.getUi().alert('✅ Структурата на Finances е обновена! Нови колони: patientName, procedureCode, procedureName, nhifAmount, patientAmount');
+}
+
+function setupDatabase() {
+  // празна функция за съвместимост
+  SpreadsheetApp.getUi().alert('Използвай "Импортирай НЗОК цени" и "Обнови Finances структура"');
+}
+
+function addTestAppointments() {
+  // празна функция за съвместимост
+  SpreadsheetApp.getUi().alert('Функцията не е налична');
 }

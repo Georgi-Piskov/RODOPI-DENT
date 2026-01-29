@@ -810,6 +810,19 @@ const App = {
             <div class="workday-section-header">
               <h3>💰 Финанси за деня</h3>
             </div>
+            
+            <!-- Search by patient name -->
+            <div style="margin-bottom:10px;">
+              <input type="text" id="finance-search-input" placeholder="🔍 Търси по име на пациент..." style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;">
+            </div>
+            
+            <!-- Filter buttons -->
+            <div style="display:flex;gap:4px;margin-bottom:10px;">
+              <button type="button" class="finance-filter-btn active" data-filter="all" style="flex:1;padding:6px 8px;background:#e2e8f0;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;">Всички</button>
+              <button type="button" class="finance-filter-btn" data-filter="nhif" style="flex:1;padding:6px 8px;background:#f1f5f9;border:none;border-radius:4px;cursor:pointer;font-size:11px;">🏥 НЗОК</button>
+              <button type="button" class="finance-filter-btn" data-filter="patient" style="flex:1;padding:6px 8px;background:#f1f5f9;border:none;border-radius:4px;cursor:pointer;font-size:11px;">💎 Доплащане</button>
+            </div>
+            
             <div class="finance-day-summary">
               <div class="finance-mini-stat income">
                 <span class="label">Приходи:</span>
@@ -837,10 +850,10 @@ const App = {
         <div class="modal__content modal__content--wide">
           <h2>💰 Добави приход</h2>
           
-          <!-- Patient info (when opened from appointment) -->
-          <div id="income-patient-info" class="patient-info-card" hidden>
-            <strong id="income-patient-name"></strong>
-            <span id="income-patient-phone"></span>
+          <!-- Patient Name Input -->
+          <div class="form-group" style="margin-bottom:12px;">
+            <label style="font-weight:600;">👤 Име на пациент</label>
+            <input type="text" id="income-patient-input" name="patientNameInput" placeholder="Въведете име на пациент..." style="width:100%;padding:10px 12px;border:2px solid #e2e8f0;border-radius:8px;font-size:14px;">
           </div>
           
           <!-- Tabs for NHIF / Custom -->
@@ -1373,6 +1386,7 @@ const App = {
 
   /**
    * Handle income form submission (NHIF or Custom)
+   * Creates separate records for each procedure
    */
   async handleIncomeSubmit(form) {
     const formData = new FormData(form);
@@ -1380,18 +1394,28 @@ const App = {
     const ageGroup = formData.get('ageGroup');
     const paymentMethod = formData.get('paymentMethod');
     const eventId = formData.get('eventId');
-    const patientName = formData.get('patientName');
     
-    let data = {
+    // Get patient name from input field
+    const patientName = document.getElementById('income-patient-input')?.value?.trim() || '';
+    
+    if (!patientName) {
+      Utils.showToast('Моля въведете име на пациент', 'warning');
+      document.getElementById('income-patient-input')?.focus();
+      return;
+    }
+    
+    const baseData = {
       date: this.selectedDate || Utils.today(),
       type: 'income',
       paymentMethod: paymentMethod,
       eventId: eventId || '',
-      patientName: patientName || ''
+      patientName: patientName
     };
     
+    const recordsToSave = [];
+    
     if (incomeType === 'nhif') {
-      // NHIF services selected (multiple)
+      // NHIF services selected (multiple) - create separate record for each
       const checkboxes = document.querySelectorAll('#nhif-services-container input[type="checkbox"]:checked');
       
       if (checkboxes.length === 0) {
@@ -1399,79 +1423,101 @@ const App = {
         return;
       }
       
-      // Calculate totals and collect service names
-      let totalAmount = 0;
-      const serviceNames = [];
-      const serviceCodes = [];
-      
+      // Create separate record for each procedure
       checkboxes.forEach(cb => {
-        const code = cb.value;
-        const priceData = this.nhifPrices[code];
+        const id = cb.value;
+        const priceData = this.nhifPrices[id];
         
         if (priceData) {
-          let fundPrice, patientPay;
+          let nhifAmount, patientPay;
           if (ageGroup === 'under18') {
-            fundPrice = priceData.priceUnder18 || 0;
+            nhifAmount = priceData.priceUnder18 || 0;
             patientPay = priceData.patientPayUnder18 || 0;
           } else {
-            fundPrice = priceData.priceOver18 || 0;
+            nhifAmount = priceData.priceOver18 || 0;
             patientPay = priceData.patientPayOver18 || 0;
           }
-          totalAmount += fundPrice + patientPay;
-          serviceNames.push(priceData.name);
-          serviceCodes.push(code);
+          
+          recordsToSave.push({
+            ...baseData,
+            category: 'nhif',
+            procedureCode: priceData.code,
+            procedureName: priceData.name,
+            nhifAmount: nhifAmount,
+            patientAmount: patientPay,
+            amount: nhifAmount + patientPay,
+            description: `${priceData.code} ${priceData.name}`
+          });
         }
       });
       
-      // Add extra patient payment if any
+      // Add extra patient payment as separate record if any
       const extraPay = parseFloat(document.getElementById('extra-patient-pay')?.value) || 0;
-      const extraDesc = document.getElementById('extra-patient-desc')?.value || '';
+      const extraDesc = document.getElementById('extra-patient-desc')?.value?.trim() || 'Доплащане';
       
       if (extraPay > 0) {
-        totalAmount += extraPay;
-        if (extraDesc) {
-          serviceNames.push(`+ ${extraDesc}`);
-        }
+        recordsToSave.push({
+          ...baseData,
+          category: 'patient_extra',
+          procedureCode: '',
+          procedureName: extraDesc,
+          nhifAmount: 0,
+          patientAmount: extraPay,
+          amount: extraPay,
+          description: `Доплащане: ${extraDesc}`
+        });
       }
-      
-      data.amount = totalAmount;
-      data.description = serviceNames.join(' + ');
-      data.category = 'nhif';
-      data.nhifCode = serviceCodes.join(',');
-      data.extraPatientPay = extraPay;
-      data.extraPatientDesc = extraDesc;
     } else {
-      // Custom entry
+      // Custom entry - single record
       const customAmount = parseFloat(formData.get('customAmount'));
-      const customDescription = formData.get('customDescription');
+      const customDescription = formData.get('customDescription')?.trim() || 'Приход';
       
       if (!customAmount || customAmount <= 0) {
         Utils.showToast('Моля въведете сума', 'warning');
         return;
       }
       
-      data.amount = customAmount;
-      data.description = customDescription || 'Приход';
-      data.category = 'private';
-      data.nhifCode = '';
+      recordsToSave.push({
+        ...baseData,
+        category: 'private',
+        procedureCode: '',
+        procedureName: customDescription,
+        nhifAmount: 0,
+        patientAmount: customAmount,
+        amount: customAmount,
+        description: customDescription
+      });
     }
 
-    // Save to n8n/Google Sheets
-    try {
-      const response = await API.addFinanceRecord(data);
-      if (response.success) {
-        Utils.showToast('Приходът е записан', 'success');
-      } else {
-        Utils.showToast('Грешка при запис', 'error');
-        console.error('Finance save error:', response);
+    // Save all records to n8n/Google Sheets
+    let successCount = 0;
+    let errorCount = 0;
+    
+    for (const record of recordsToSave) {
+      try {
+        const response = await API.addFinanceRecord(record);
+        if (response.success) {
+          successCount++;
+        } else {
+          errorCount++;
+          console.error('Finance save error:', response);
+        }
+      } catch (error) {
+        errorCount++;
+        console.error('Finance save error:', error);
       }
-    } catch (error) {
-      Utils.showToast('Грешка при запис', 'error');
-      console.error('Finance save error:', error);
+    }
+    
+    if (successCount > 0) {
+      Utils.showToast(`Записани ${successCount} процедури`, 'success');
+    }
+    if (errorCount > 0) {
+      Utils.showToast(`${errorCount} грешки при запис`, 'error');
     }
     
     this.closeModal('income-modal');
     form.reset();
+    document.getElementById('income-patient-input').value = '';
     this.loadWorkdayFinance(this.selectedDate);
   },
 
@@ -1832,54 +1878,14 @@ const App = {
       const response = await API.getFinance({ date });
       const records = response.data?.records || [];
       
-      // Calculate totals - using type field
-      let income = 0, expense = 0;
-      records.forEach(r => {
-        const amount = parseFloat(r.amount) || 0;
-        if (r.type === 'income') {
-          income += amount;
-        } else if (r.type === 'expense') {
-          expense += amount;
-        }
-      });
+      // Store records for filtering
+      this.financeRecords = records;
       
-      // Update summary in EUR
-      if (incomeEl) incomeEl.textContent = `${income.toFixed(2)} €`;
-      if (expenseEl) expenseEl.textContent = `${expense.toFixed(2)} €`;
-      if (balanceEl) {
-        const balance = income - expense;
-        balanceEl.textContent = `${balance.toFixed(2)} €`;
-        balanceEl.style.color = balance >= 0 ? 'var(--color-success)' : 'var(--color-danger)';
-      }
+      // Setup search and filter listeners (only once)
+      this.setupFinanceFilters();
       
-      // Render records
-      if (records.length === 0) {
-        container.innerHTML = '<p class="text-muted">Няма записи за деня</p>';
-        return;
-      }
-      
-      let html = '';
-      records.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-      
-      records.forEach(r => {
-        const amount = parseFloat(r.amount);
-        const isIncome = r.type === 'income';
-        const icon = isIncome ? '💰' : '💸';
-        const categoryIcon = this.getCategoryIcon(r.category);
-        
-        html += `
-          <div class="finance-record ${isIncome ? 'income' : 'expense'}">
-            <span class="icon">${icon}</span>
-            <span class="desc">
-              ${categoryIcon} ${r.description || 'Без описание'}
-              ${r.patientName ? `<small>(${r.patientName})</small>` : ''}
-            </span>
-            <span class="amount">${isIncome ? '+' : '-'}${amount.toFixed(2)} €</span>
-          </div>
-        `;
-      });
-      
-      container.innerHTML = html;
+      // Render with current filter
+      this.renderFinanceRecords();
       
     } catch (error) {
       console.error('Finance load error:', error);
@@ -1888,6 +1894,133 @@ const App = {
       if (expenseEl) expenseEl.textContent = '0.00 €';
       if (balanceEl) balanceEl.textContent = '0.00 €';
     }
+  },
+  
+  /**
+   * Setup finance search and filter listeners
+   */
+  setupFinanceFilters() {
+    const searchInput = document.getElementById('finance-search-input');
+    const filterBtns = document.querySelectorAll('.finance-filter-btn');
+    
+    // Remove old listeners by cloning
+    if (searchInput && !searchInput.dataset.initialized) {
+      searchInput.addEventListener('input', () => this.renderFinanceRecords());
+      searchInput.dataset.initialized = 'true';
+    }
+    
+    filterBtns.forEach(btn => {
+      if (!btn.dataset.initialized) {
+        btn.addEventListener('click', (e) => {
+          filterBtns.forEach(b => {
+            b.classList.remove('active');
+            b.style.background = '#f1f5f9';
+          });
+          e.target.classList.add('active');
+          e.target.style.background = '#e2e8f0';
+          this.currentFinanceFilter = e.target.dataset.filter;
+          this.renderFinanceRecords();
+        });
+        btn.dataset.initialized = 'true';
+      }
+    });
+  },
+  
+  /**
+   * Render finance records with search and filter
+   */
+  renderFinanceRecords() {
+    const container = document.getElementById('day-finance-list');
+    const incomeEl = document.getElementById('day-income');
+    const expenseEl = document.getElementById('day-expense');
+    const balanceEl = document.getElementById('day-balance');
+    const searchInput = document.getElementById('finance-search-input');
+    
+    if (!container || !this.financeRecords) return;
+    
+    const searchTerm = (searchInput?.value || '').toLowerCase().trim();
+    const filter = this.currentFinanceFilter || 'all';
+    
+    // Filter records
+    let filteredRecords = this.financeRecords.filter(r => {
+      // Search by patient name
+      if (searchTerm && !(r.patientName || '').toLowerCase().includes(searchTerm)) {
+        return false;
+      }
+      
+      // Filter by category
+      if (filter === 'nhif' && r.category !== 'nhif') return false;
+      if (filter === 'patient' && r.category !== 'patient_extra' && r.category !== 'private') return false;
+      
+      return true;
+    });
+    
+    // Calculate totals from ALL records (not filtered)
+    let income = 0, expense = 0;
+    this.financeRecords.forEach(r => {
+      const amount = parseFloat(r.amount) || 0;
+      if (r.type === 'income') {
+        income += amount;
+      } else if (r.type === 'expense') {
+        expense += amount;
+      }
+    });
+    
+    // Update summary in EUR
+    if (incomeEl) incomeEl.textContent = `${income.toFixed(2)} €`;
+    if (expenseEl) expenseEl.textContent = `${expense.toFixed(2)} €`;
+    if (balanceEl) {
+      const balance = income - expense;
+      balanceEl.textContent = `${balance.toFixed(2)} €`;
+      balanceEl.style.color = balance >= 0 ? 'var(--color-success)' : 'var(--color-danger)';
+    }
+    
+    // Render filtered records
+    if (filteredRecords.length === 0) {
+      container.innerHTML = '<p class="text-muted">Няма записи</p>';
+      return;
+    }
+    
+    let html = '';
+    filteredRecords.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    
+    filteredRecords.forEach(r => {
+      const amount = parseFloat(r.amount);
+      const isIncome = r.type === 'income';
+      const icon = isIncome ? '💰' : '💸';
+      const categoryIcon = this.getCategoryIcon(r.category);
+      const nhifAmount = parseFloat(r.nhifAmount) || 0;
+      const patientAmount = parseFloat(r.patientAmount) || 0;
+      
+      // Show procedure code if available
+      const procedureInfo = r.procedureCode ? `<span style="background:#dbeafe;color:#1e40af;padding:1px 4px;border-radius:3px;font-size:10px;font-weight:600;">${r.procedureCode}</span> ` : '';
+      
+      html += `
+        <div class="finance-record ${isIncome ? 'income' : 'expense'}" style="padding:8px;border-bottom:1px solid #f1f5f9;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="flex:1;">
+              <div style="font-weight:600;font-size:13px;color:#1e293b;margin-bottom:2px;">
+                ${r.patientName || 'Без име'}
+              </div>
+              <div style="font-size:12px;color:#64748b;">
+                ${procedureInfo}${categoryIcon} ${r.procedureName || r.description || 'Без описание'}
+              </div>
+              ${nhifAmount > 0 || patientAmount > 0 ? `
+                <div style="font-size:10px;color:#94a3b8;margin-top:2px;">
+                  ${nhifAmount > 0 ? `НЗОК: ${nhifAmount.toFixed(2)}€` : ''}
+                  ${patientAmount > 0 ? `Доплащане: ${patientAmount.toFixed(2)}€` : ''}
+                </div>
+              ` : ''}
+            </div>
+            <div style="font-weight:700;font-size:14px;color:${isIncome ? '#22c55e' : '#ef4444'};">
+              ${isIncome ? '+' : '-'}${amount.toFixed(2)} €
+            </div>
+          </div>
+        </div>
+      `;
+    });
+    
+    container.innerHTML = html;
   },
 
   /**
