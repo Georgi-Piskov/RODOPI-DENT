@@ -2070,13 +2070,14 @@ const Calendar = {
       form.notes.value = event.notes || event.description || '';
       form.eventId.value = event.id || event.googleEventId || '';
       
-      // Set color if exists
-      if (event.color) {
+      // Set color if exists (use colorId from API)
+      const eventColor = event.colorId || event.color;
+      if (eventColor) {
         document.querySelectorAll('.color-picker__option').forEach(b => b.classList.remove('active'));
-        const colorBtn = document.querySelector(`.color-picker__option--${event.color}`);
+        const colorBtn = document.querySelector(`.color-picker__option--${eventColor}`);
         if (colorBtn) {
           colorBtn.classList.add('active');
-          form.colorId.value = event.color;
+          form.colorId.value = eventColor;
         }
       }
     } else {
