@@ -947,23 +947,41 @@ const Calendar = {
       const width = 100 / event.totalColumns;
       const left = event.column * width;
       
-      // Build display text: Name + Time + Procedure
-      const patientName = (event.patientName || event.title || '').substring(0, 20);
+      // Extract procedure from description if not directly available
+      let procedure = event.procedure || '';
+      if (!procedure && event.description) {
+        // Try to extract from description: "🦷 Процедура: Преглед"
+        const match = event.description.match(/(?:процедура|procedure|🦷)[:\s]*([^\n]+)/i);
+        if (match) {
+          procedure = match[1].trim();
+        }
+      }
+      
+      // Build display text
+      const patientName = (event.patientName || event.title || '').substring(0, 25);
       const displayTime = event.startTime || '';
-      const procedure = event.procedure ? event.procedure.substring(0, 25) : '';
+      const procedureText = procedure ? procedure.substring(0, 30) : '';
       
       // Color class - use colorId (from API) or color as fallback
       const eventColor = event.colorId || event.color || '';
       const colorClass = eventColor ? `calendar-event--color-${eventColor}` : '';
       
+      // Build tooltip
+      const tooltip = [
+        event.patientName || event.title,
+        displayTime,
+        procedureText ? `Процедура: ${procedureText}` : '',
+        event.patientPhone ? `Тел: ${event.patientPhone}` : ''
+      ].filter(Boolean).join(' | ');
+      
       return `
         <div class="calendar-event calendar-event--${event.status || 'confirmed'} ${colorClass}" 
              data-event-id="${event.id}"
              style="top: ${top}px; height: ${height}px; left: ${left}%; width: calc(${width}% - 4px);"
-             title="${event.patientName || event.title} - ${event.startTime}${event.procedure ? ' | ' + event.procedure : ''}${event.patientPhone ? ' (' + event.patientPhone + ')' : ''}">
-          <div class="calendar-event__title">${patientName}</div>
-          <div class="calendar-event__time">${displayTime}</div>
-          ${procedure ? `<div class="calendar-event__procedure">${procedure}</div>` : ''}
+             title="${tooltip}">
+          <div class="calendar-event__name">${patientName}</div>
+          ${procedureText ? `<div class="calendar-event__procedure">🦷 ${procedureText}</div>` : ''}
+          <div class="calendar-event__time">🕐 ${displayTime}</div>
         </div>
       `;
     }).join('');
@@ -983,7 +1001,7 @@ const Calendar = {
    * Calculate event height
    */
   getEventHeight(duration) {
-    return Math.max(duration, 20); // Minimum 20px
+    return Math.max(duration, 45); // Minimum 45px for 3 lines of content
   },
 
   /**
