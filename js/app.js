@@ -960,12 +960,16 @@ const App = {
           <h2>💸 Добави разход</h2>
           <form id="expense-form">
             <div class="form-group">
+              <label>Контрагент / Доставчик</label>
+              <input type="text" name="vendorName" placeholder="Име на фирма или лице..." required>
+            </div>
+            <div class="form-group">
               <label>Сума (€)</label>
-              <input type="number" name="amount" step="0.01" min="0" required autofocus>
+              <input type="number" name="amount" step="0.01" min="0" required>
             </div>
             <div class="form-group">
               <label>Описание</label>
-              <input type="text" name="description" placeholder="Материали, фактура, куриер..." required>
+              <input type="text" name="description" placeholder="Материали, фактура, куриер...">
             </div>
             <div class="form-group">
               <label>Категория</label>
@@ -1557,7 +1561,8 @@ const App = {
       amount: parseFloat(formData.get('amount')), // Positive amount, type indicates expense
       description: formData.get('description'),
       paymentMethod: formData.get('paymentMethod'),
-      category: formData.get('category')
+      category: formData.get('category'),
+      patientName: formData.get('vendorName') || '' // Use patientName field for vendor/contractor name
     };
 
     // Save to n8n/Google Sheets
