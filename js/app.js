@@ -643,14 +643,17 @@ const App = {
     const container = document.getElementById('recent-records');
     if (!container) return;
     
+    // Store records for editing
+    this.dashboardRecords = records;
+    
     if (records.length === 0) {
       container.innerHTML = '<p class="text-muted">Няма записи</p>';
       return;
     }
     
-    let html = '<table class="records-table"><thead><tr><th>Дата</th><th>Описание</th><th>Категория</th><th>Сума</th></tr></thead><tbody>';
+    let html = '<table class="records-table"><thead><tr><th>Дата</th><th>Описание</th><th>Категория</th><th>Сума</th><th style="width:60px">Редакция</th></tr></thead><tbody>';
     
-    records.forEach(r => {
+    records.forEach((r, index) => {
       const isIncome = r.type === 'income';
       const icon = isIncome ? '💰' : '💸';
       const amountClass = isIncome ? 'amount--positive' : 'amount--negative';
@@ -662,12 +665,189 @@ const App = {
           <td>${icon} ${r.description || 'Без описание'} ${r.patientName ? `<small>(${r.patientName})</small>` : ''}</td>
           <td>${categoryIcon} ${r.category || '-'}</td>
           <td class="${amountClass}">${isIncome ? '+' : '-'}${parseFloat(r.amount).toFixed(2)} €</td>
+          <td style="text-align:center">
+            <button type="button" class="btn btn--icon edit-record-btn" data-index="${index}" title="Редактирай">
+              ✏️
+            </button>
+          </td>
         </tr>
       `;
     });
     
     html += '</tbody></table>';
     container.innerHTML = html;
+    
+    // Add edit button listeners
+    container.querySelectorAll('.edit-record-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const index = parseInt(e.target.closest('.edit-record-btn').dataset.index);
+        this.openEditFinanceModal(this.dashboardRecords[index]);
+      });
+    });
+  },
+
+  /**
+   * Open edit finance modal
+   */
+  openEditFinanceModal(record) {
+    // Remove existing modal if any
+    document.getElementById('edit-finance-modal')?.remove();
+    
+    const isIncome = record.type === 'income';
+    const categoryOptions = isIncome ? `
+      <option value="nhif" ${record.category === 'nhif' ? 'selected' : ''}>🏥 НЗОК</option>
+      <option value="private" ${record.category === 'private' ? 'selected' : ''}>💎 Частни</option>
+      <option value="other" ${record.category === 'other' ? 'selected' : ''}>📦 Други</option>
+    ` : `
+      <option value="materials" ${record.category === 'materials' ? 'selected' : ''}>🧪 Материали</option>
+      <option value="lab" ${record.category === 'lab' ? 'selected' : ''}>🔬 Лаборатория</option>
+      <option value="utilities" ${record.category === 'utilities' ? 'selected' : ''}>💡 Комунални</option>
+      <option value="rent" ${record.category === 'rent' ? 'selected' : ''}>🏢 Наем</option>
+      <option value="salary" ${record.category === 'salary' ? 'selected' : ''}>👤 Заплати</option>
+      <option value="other" ${record.category === 'other' ? 'selected' : ''}>📦 Други</option>
+    `;
+    
+    const serviceCategoryOptions = isIncome ? `
+      <div class="form-group">
+        <label class="form-group__label">Категория услуга</label>
+        <select id="edit-serviceCategory" class="form-group__input">
+          <option value="" ${!record.serviceCategory ? 'selected' : ''}>-- Без --</option>
+          <option value="Прегледи" ${record.serviceCategory === 'Прегледи' ? 'selected' : ''}>Прегледи</option>
+          <option value="Терапия" ${record.serviceCategory === 'Терапия' ? 'selected' : ''}>Терапия</option>
+          <option value="Протетика" ${record.serviceCategory === 'Протетика' ? 'selected' : ''}>Протетика</option>
+          <option value="Хирургия" ${record.serviceCategory === 'Хирургия' ? 'selected' : ''}>Хирургия</option>
+          <option value="Ортодонтия" ${record.serviceCategory === 'Ортодонтия' ? 'selected' : ''}>Ортодонтия</option>
+          <option value="Профилактика" ${record.serviceCategory === 'Профилактика' ? 'selected' : ''}>Профилактика</option>
+          <option value="Други" ${record.serviceCategory === 'Други' ? 'selected' : ''}>Други</option>
+        </select>
+      </div>
+    ` : '';
+    
+    const remainingPaymentField = isIncome ? `
+      <div class="form-group">
+        <label class="form-group__label">Остатък за плащане (дълг)</label>
+        <input type="number" id="edit-remainingPayment" class="form-group__input" 
+               value="${record.remainingPayment || 0}" min="0" step="0.01">
+      </div>
+    ` : '';
+    
+    const modalHtml = `
+      <div id="edit-finance-modal" class="modal" style="display:flex">
+        <div class="modal__backdrop"></div>
+        <div class="modal__content" style="max-width:500px">
+          <div class="modal__header">
+            <h2 class="modal__title">${isIncome ? '💰 Редакция на приход' : '💸 Редакция на разход'}</h2>
+            <button type="button" class="modal__close" id="close-edit-modal">&times;</button>
+          </div>
+          <form id="edit-finance-form" class="modal__body">
+            <input type="hidden" id="edit-record-id" value="${record.id}">
+            <input type="hidden" id="edit-record-type" value="${record.type}">
+            
+            <div class="form-group">
+              <label class="form-group__label">Дата</label>
+              <input type="text" class="form-group__input" value="${Utils.formatDateBG(record.date)}" readonly disabled>
+            </div>
+            
+            ${record.patientName ? `
+            <div class="form-group">
+              <label class="form-group__label">Пациент</label>
+              <input type="text" class="form-group__input" value="${record.patientName}" readonly disabled>
+            </div>
+            ` : ''}
+            
+            <div class="form-group">
+              <label class="form-group__label">Категория</label>
+              <select id="edit-category" class="form-group__input">
+                ${categoryOptions}
+              </select>
+            </div>
+            
+            ${serviceCategoryOptions}
+            
+            <div class="form-group">
+              <label class="form-group__label">Описание</label>
+              <input type="text" id="edit-description" class="form-group__input" value="${record.description || ''}">
+            </div>
+            
+            <div class="form-group">
+              <label class="form-group__label">Сума (€)</label>
+              <input type="number" id="edit-amount" class="form-group__input" 
+                     value="${record.amount || 0}" min="0" step="0.01" required>
+            </div>
+            
+            ${remainingPaymentField}
+            
+            <div class="form-group">
+              <label class="form-group__label">Начин на плащане</label>
+              <select id="edit-paymentMethod" class="form-group__input">
+                <option value="cash" ${record.paymentMethod === 'cash' ? 'selected' : ''}>💵 В брой</option>
+                <option value="bank" ${record.paymentMethod === 'bank' ? 'selected' : ''}>🏦 Банка</option>
+              </select>
+            </div>
+            
+            <div class="modal__footer" style="margin-top:1.5rem;display:flex;gap:1rem;justify-content:flex-end">
+              <button type="button" class="btn btn--secondary" id="cancel-edit-btn">Отказ</button>
+              <button type="submit" class="btn btn--primary">💾 Запази</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Close modal handlers
+    const closeModal = () => document.getElementById('edit-finance-modal')?.remove();
+    document.getElementById('close-edit-modal').addEventListener('click', closeModal);
+    document.getElementById('cancel-edit-btn').addEventListener('click', closeModal);
+    document.getElementById('edit-finance-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'edit-finance-modal') closeModal();
+    });
+    
+    // Form submit handler
+    document.getElementById('edit-finance-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await this.handleEditFinanceSubmit(record);
+    });
+  },
+
+  /**
+   * Handle edit finance form submission
+   */
+  async handleEditFinanceSubmit(originalRecord) {
+    const id = document.getElementById('edit-record-id').value;
+    const isIncome = document.getElementById('edit-record-type').value === 'income';
+    
+    const updates = {
+      category: document.getElementById('edit-category').value,
+      description: document.getElementById('edit-description').value,
+      amount: parseFloat(document.getElementById('edit-amount').value) || 0,
+      paymentMethod: document.getElementById('edit-paymentMethod').value
+    };
+    
+    // Add income-specific fields
+    if (isIncome) {
+      const serviceCategory = document.getElementById('edit-serviceCategory')?.value;
+      const remainingPayment = document.getElementById('edit-remainingPayment')?.value;
+      if (serviceCategory !== undefined) updates.serviceCategory = serviceCategory;
+      if (remainingPayment !== undefined) updates.remainingPayment = parseFloat(remainingPayment) || 0;
+    }
+    
+    try {
+      Utils.showLoading();
+      await API.updateFinanceRecord(id, updates);
+      Utils.hideLoading();
+      Utils.showToast('✅ Записът е обновен успешно!', 'success');
+      
+      // Close modal and reload data
+      document.getElementById('edit-finance-modal')?.remove();
+      await this.loadDashboardData(this.dashboardPeriod);
+      
+    } catch (error) {
+      Utils.hideLoading();
+      console.error('Edit finance error:', error);
+      Utils.showToast('❌ Грешка при обновяване', 'error');
+    }
   },
 
   /**

@@ -19,7 +19,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body;\n\n// Required: id of record to update\nif (!body.id) {\n  return [{\n    json: {\n      success: false,\n      error: 'Липсва ID на записа',\n      valid: false\n    }\n  }];\n}\n\n// Build update object with only provided fields\nconst updates = {};\n\nif (body.remainingPayment !== undefined) {\n  updates.remainingPayment = parseFloat(body.remainingPayment) || 0;\n}\n\nif (body.amount !== undefined) {\n  updates.amount = parseFloat(body.amount);\n}\n\nif (body.patientAmount !== undefined) {\n  updates.patientAmount = parseFloat(body.patientAmount);\n}\n\nif (body.description !== undefined) {\n  updates.description = body.description;\n}\n\nif (body.paymentMethod !== undefined) {\n  updates.paymentMethod = body.paymentMethod;\n}\n\nif (body.serviceCategory !== undefined) {\n  updates.serviceCategory = body.serviceCategory;\n}\n\nreturn [{\n  json: {\n    id: body.id,\n    updates: updates,\n    valid: true\n  }\n}];"
+        "jsCode": "const body = $input.first().json.body;\n\n// Required: id of record to update\nif (!body.id) {\n  return [{\n    json: {\n      success: false,\n      error: 'Липсва ID на записа',\n      valid: false\n    }\n  }];\n}\n\n// Build update object with only provided fields\nconst updates = {};\n\nif (body.remainingPayment !== undefined) {\n  updates.remainingPayment = parseFloat(body.remainingPayment) || 0;\n}\n\nif (body.amount !== undefined) {\n  updates.amount = parseFloat(body.amount);\n}\n\nif (body.patientAmount !== undefined) {\n  updates.patientAmount = parseFloat(body.patientAmount);\n}\n\nif (body.description !== undefined) {\n  updates.description = body.description;\n}\n\nif (body.paymentMethod !== undefined) {\n  updates.paymentMethod = body.paymentMethod;\n}\n\nif (body.serviceCategory !== undefined) {\n  updates.serviceCategory = body.serviceCategory;\n}\n\nif (body.category !== undefined) {\n  updates.category = body.category;\n}\n\nreturn [{\n  json: {\n    id: body.id,\n    updates: updates,\n    valid: true\n  }\n}];"
       },
       "id": "prepare-update",
       "name": "Prepare Update",
@@ -128,7 +128,8 @@
             "patientAmount": "={{ $json.patientAmount }}",
             "description": "={{ $json.description }}",
             "paymentMethod": "={{ $json.paymentMethod }}",
-            "serviceCategory": "={{ $json.serviceCategory }}"
+            "serviceCategory": "={{ $json.serviceCategory }}",
+            "category": "={{ $json.category }}"
           },
           "matchingColumns": ["id"]
         },
