@@ -651,7 +651,7 @@ const App = {
       return;
     }
     
-    let html = '<table class="records-table"><thead><tr><th>Дата</th><th>Описание</th><th>Категория</th><th>Сума</th><th style="width:60px">Редакция</th></tr></thead><tbody>';
+    let html = '<table class="records-table"><thead><tr><th>Дата</th><th>Описание</th><th>Категория</th><th>Сума</th><th style="width:90px">Действия</th></tr></thead><tbody>';
     
     records.forEach((r, index) => {
       const isIncome = r.type === 'income';
@@ -669,6 +669,9 @@ const App = {
             <button type="button" class="btn btn--icon edit-record-btn" data-index="${index}" title="Редактирай">
               ✏️
             </button>
+            <button type="button" class="btn btn--icon delete-record-btn" data-index="${index}" data-id="${r.id}" title="Изтрий" style="color:#ef4444">
+              🗑️
+            </button>
           </td>
         </tr>
       `;
@@ -684,6 +687,42 @@ const App = {
         this.openEditFinanceModal(this.dashboardRecords[index]);
       });
     });
+    
+    // Add delete button listeners
+    container.querySelectorAll('.delete-record-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const target = e.target.closest('.delete-record-btn');
+        const index = parseInt(target.dataset.index);
+        const record = this.dashboardRecords[index];
+        await this.confirmDeleteFinance(record);
+      });
+    });
+  },
+
+  /**
+   * Confirm and delete finance record
+   */
+  async confirmDeleteFinance(record) {
+    const isIncome = record.type === 'income';
+    const typeText = isIncome ? 'приход' : 'разход';
+    const confirmed = confirm(`Сигурни ли сте, че искате да изтриете този ${typeText}?\n\n${record.description || 'Без описание'}\nСума: ${parseFloat(record.amount).toFixed(2)} €`);
+    
+    if (!confirmed) return;
+    
+    try {
+      Utils.showLoading();
+      await API.deleteFinanceRecord(record.id);
+      Utils.hideLoading();
+      Utils.showToast('✅ Записът е изтрит успешно!', 'success');
+      
+      // Reload data
+      await this.loadDashboardData(this.dashboardPeriod);
+      
+    } catch (error) {
+      Utils.hideLoading();
+      console.error('Delete finance error:', error);
+      Utils.showToast('❌ Грешка при изтриване', 'error');
+    }
   },
 
   /**

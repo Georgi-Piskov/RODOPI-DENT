@@ -213,6 +213,16 @@ const API = {
     });
   },
 
+  /**
+   * Delete finance record
+   */
+  async deleteFinanceRecord(id) {
+    return this.request(CONFIG.ENDPOINTS.FINANCE_DELETE, {
+      method: 'POST',
+      body: JSON.stringify({ id })
+    });
+  },
+
   // ============================================
   // Google Calendar Endpoints
   // ============================================

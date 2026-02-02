@@ -28,6 +28,7 @@ const CONFIG = {
     FINANCE: '/finance-webhook',
     FINANCE_ADD: '/finance-add',
     FINANCE_UPDATE: '/finance-update',
+    FINANCE_DELETE: '/finance-delete',
     NHIF_PRICES: '/nhif-prices',
     
     // Calendar endpoints (admin)
