@@ -132,6 +132,48 @@ const Utils = {
   },
 
   /**
+   * Show loading overlay
+   */
+  showLoading() {
+    let overlay = document.getElementById('loading-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'loading-overlay';
+      overlay.innerHTML = `
+        <div class="loading-spinner"></div>
+        <p>Зареждане...</p>
+      `;
+      overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        color: white;
+        font-size: 1.2rem;
+      `;
+      document.body.appendChild(overlay);
+    }
+    overlay.style.display = 'flex';
+  },
+
+  /**
+   * Hide loading overlay
+   */
+  hideLoading() {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) {
+      overlay.style.display = 'none';
+    }
+  },
+
+  /**
    * Show toast notification
    */
   showToast(message, type = 'info', duration = 3000) {
