@@ -199,6 +199,17 @@ const Calendar = {
     
     // Modal events
     this.setupModalListeners();
+    
+    // Resize handler for responsive calendar
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        if (this.currentView === 'week') {
+          this.renderView();
+        }
+      }, 200);
+    });
   },
   
   /**
@@ -704,6 +715,22 @@ const Calendar = {
   },
 
   /**
+   * Check if we're on mobile device
+   */
+  isMobile() {
+    return window.innerWidth <= 768;
+  },
+
+  /**
+   * Get visible days count based on screen size
+   */
+  getVisibleDaysCount() {
+    if (window.innerWidth <= 480) return 3;
+    if (window.innerWidth <= 768) return 3;
+    return 7;
+  },
+
+  /**
    * Render week view
    */
   renderWeekView() {
@@ -711,6 +738,8 @@ const Calendar = {
     const weekStart = this.getWeekStart(this.currentDate);
     const today = this.getToday();
     const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+    const isMobile = this.isMobile();
+    const visibleDays = this.getVisibleDaysCount();
     
     // Generate week days
     const weekDays = [];
@@ -723,16 +752,40 @@ const Calendar = {
         day: days[i],
         dayNum: d.getDate(),
         isToday: dateStr === today,
-        isWeekend: i >= 5
+        isWeekend: i >= 5,
+        index: i
       });
     }
     
+    // On mobile, find today's index and show 3 days centered around today
+    let visibleIndexes = [];
+    if (isMobile) {
+      const todayIndex = weekDays.findIndex(wd => wd.isToday);
+      const centerIndex = todayIndex >= 0 ? todayIndex : Math.floor(visibleDays / 2);
+      
+      // Calculate start index, ensuring we stay within bounds
+      let startIdx = centerIndex - Math.floor(visibleDays / 2);
+      if (startIdx < 0) startIdx = 0;
+      if (startIdx + visibleDays > 7) startIdx = 7 - visibleDays;
+      
+      for (let i = startIdx; i < startIdx + visibleDays; i++) {
+        visibleIndexes.push(i);
+      }
+    } else {
+      visibleIndexes = [0, 1, 2, 3, 4, 5, 6];
+    }
+    
+    // Filter to visible days only on mobile
+    const displayDays = isMobile 
+      ? weekDays.filter(wd => visibleIndexes.includes(wd.index))
+      : weekDays;
+    
     let html = `
-      <div class="week-view">
+      <div class="week-view" style="--visible-days: ${displayDays.length}">
         <!-- Header row with day names -->
-        <div class="week-view__header">
+        <div class="week-view__header" style="grid-template-columns: ${isMobile ? '45px' : '60px'} repeat(${displayDays.length}, 1fr)">
           <div class="week-view__corner"></div>
-          ${weekDays.map(wd => `
+          ${displayDays.map(wd => `
             <div class="week-view__day-header ${wd.isToday ? 'week-view__day-header--today' : ''} ${wd.isWeekend ? 'week-view__day-header--weekend' : ''}">
               <span class="week-view__day-name">${wd.day}</span>
               <span class="week-view__day-num">${wd.dayNum}</span>
@@ -748,8 +801,8 @@ const Calendar = {
           </div>
           
           <!-- Day columns -->
-          <div class="week-view__days">
-            ${weekDays.map(wd => `
+          <div class="week-view__days" style="grid-template-columns: repeat(${displayDays.length}, 1fr); min-width: 0;">
+            ${displayDays.map(wd => `
               <div class="week-view__day-column ${wd.isToday ? 'week-view__day-column--today' : ''} ${wd.isWeekend ? 'week-view__day-column--weekend' : ''}" data-date="${wd.date}">
                 ${hours.map(h => `<div class="week-view__hour-slot" data-hour="${h}" data-date="${wd.date}"></div>`).join('')}
                 <div class="week-view__events">
