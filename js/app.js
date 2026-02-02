@@ -1323,7 +1323,7 @@ const App = {
   },
 
   /**
-   * Populate NHIF services as checkboxes (supports multiple selection)
+   * Populate NHIF services as checkboxes with quantity counters (supports multiple selection)
    * Filters by age group - only shows services with non-zero price for that group
    */
   populateNHIFServices(ageGroup = 'under18') {
@@ -1356,10 +1356,15 @@ const App = {
       services.forEach(s => {
         const price = ageGroup === 'under18' ? s.priceUnder18 : s.priceOver18;
         html += `
-          <label style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;border-bottom:1px solid #f1f5f9;">
-            <input type="checkbox" name="nhifServices" value="${s.id || s.code}" data-name="${s.name}" data-price="${price}" style="width:16px;height:16px;accent-color:#22c55e;">
+          <label style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;border-bottom:1px solid #f1f5f9;" data-service-id="${s.id || s.code}">
+            <input type="checkbox" name="nhifServices" value="${s.id || s.code}" data-name="${s.name}" data-price="${price}" data-code="${s.code}" style="width:16px;height:16px;accent-color:#22c55e;">
             <span style="background:#f1f5f9;color:#475569;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:700;min-width:32px;text-align:center;">${s.code}</span>
             <span style="font-size:12px;color:#374151;line-height:1.2;flex:1;">${s.name}</span>
+            <div class="qty-controls" style="display:none;align-items:center;gap:2px;margin-right:4px;">
+              <button type="button" class="qty-btn qty-minus" style="width:20px;height:20px;border:1px solid #d1d5db;background:#f9fafb;border-radius:3px;cursor:pointer;font-size:12px;line-height:1;">−</button>
+              <span class="qty-value" style="min-width:16px;text-align:center;font-size:12px;font-weight:600;color:#374151;">1</span>
+              <button type="button" class="qty-btn qty-plus" style="width:20px;height:20px;border:1px solid #d1d5db;background:#f9fafb;border-radius:3px;cursor:pointer;font-size:12px;line-height:1;">+</button>
+            </div>
             <span style="font-size:11px;color:#22c55e;font-weight:600;">${price.toFixed(2)}€</span>
           </label>
         `;
@@ -1369,9 +1374,52 @@ const App = {
     
     container.innerHTML = html;
     
-    // Add change listeners
+    // Add change listeners for checkboxes
     container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-      cb.addEventListener('change', () => this.updateNHIFPriceDisplay());
+      cb.addEventListener('change', (e) => {
+        const label = e.target.closest('label');
+        const qtyControls = label.querySelector('.qty-controls');
+        const qtyValue = label.querySelector('.qty-value');
+        
+        if (e.target.checked) {
+          qtyControls.style.display = 'flex';
+          qtyValue.textContent = '1';
+        } else {
+          qtyControls.style.display = 'none';
+          qtyValue.textContent = '1';
+        }
+        
+        this.updateNHIFPriceDisplay();
+      });
+    });
+    
+    // Add quantity button listeners
+    container.querySelectorAll('.qty-minus').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const label = e.target.closest('label');
+        const qtyValue = label.querySelector('.qty-value');
+        let qty = parseInt(qtyValue.textContent) || 1;
+        if (qty > 1) {
+          qtyValue.textContent = qty - 1;
+          this.updateNHIFPriceDisplay();
+        }
+      });
+    });
+    
+    container.querySelectorAll('.qty-plus').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const label = e.target.closest('label');
+        const qtyValue = label.querySelector('.qty-value');
+        let qty = parseInt(qtyValue.textContent) || 1;
+        if (qty < 10) { // Max 10 per procedure
+          qtyValue.textContent = qty + 1;
+          this.updateNHIFPriceDisplay();
+        }
+      });
     });
     
     // Add listener for extra patient pay input
@@ -1588,7 +1636,7 @@ const App = {
   },
 
   /**
-   * Update NHIF price display based on selected services (multiple)
+   * Update NHIF price display based on selected services (multiple) with quantities
    */
   updateNHIFPriceDisplay() {
     const checkboxes = document.querySelectorAll('#nhif-services-container input[type="checkbox"]:checked');
@@ -1603,16 +1651,18 @@ const App = {
     let totalPatient = 0;
     
     checkboxes.forEach(cb => {
-      const id = cb.value; // Now using ID instead of code
+      const id = cb.value;
       const priceData = this.nhifPrices[id];
+      const label = cb.closest('label');
+      const qty = parseInt(label.querySelector('.qty-value')?.textContent) || 1;
       
       if (priceData) {
         if (ageGroup === 'under18') {
-          totalFund += priceData.priceUnder18 || 0;
-          totalPatient += priceData.patientPayUnder18 || 0;
+          totalFund += (priceData.priceUnder18 || 0) * qty;
+          totalPatient += (priceData.patientPayUnder18 || 0) * qty;
         } else {
-          totalFund += priceData.priceOver18 || 0;
-          totalPatient += priceData.patientPayOver18 || 0;
+          totalFund += (priceData.priceOver18 || 0) * qty;
+          totalPatient += (priceData.patientPayOver18 || 0) * qty;
         }
       }
     });
@@ -1695,7 +1745,7 @@ const App = {
     let isFirstRecord = true; // Track if this is the first record to attach remainingPayment
     
     if (incomeType === 'nhif') {
-      // NHIF services selected (multiple) - create separate record for each
+      // NHIF services selected (multiple) - create separate record for EACH quantity
       const checkboxes = document.querySelectorAll('#nhif-services-container input[type="checkbox"]:checked');
       
       if (checkboxes.length === 0) {
@@ -1703,10 +1753,12 @@ const App = {
         return;
       }
       
-      // Create separate record for each procedure
+      // Create separate record for each procedure (and each quantity)
       checkboxes.forEach(cb => {
         const id = cb.value;
         const priceData = this.nhifPrices[id];
+        const label = cb.closest('label');
+        const qty = parseInt(label.querySelector('.qty-value')?.textContent) || 1;
         
         if (priceData) {
           let nhifAmount, patientPay;
@@ -1718,24 +1770,27 @@ const App = {
             patientPay = priceData.patientPayOver18 || 0;
           }
           
-          const record = {
-            ...baseData,
-            category: 'nhif',
-            procedureCode: priceData.code,
-            procedureName: priceData.name,
-            nhifAmount: nhifAmount,
-            patientAmount: patientPay,
-            amount: nhifAmount + patientPay, // amount does NOT include remainingPayment
-            description: `${priceData.code} ${priceData.name}`
-          };
-          
-          // Attach remainingPayment only to first record
-          if (isFirstRecord && remainingPayment > 0) {
-            record.remainingPayment = remainingPayment;
-            isFirstRecord = false;
+          // Create separate record for EACH quantity (not multiplied)
+          for (let i = 0; i < qty; i++) {
+            const record = {
+              ...baseData,
+              category: 'nhif',
+              procedureCode: priceData.code,
+              procedureName: priceData.name,
+              nhifAmount: nhifAmount,
+              patientAmount: patientPay,
+              amount: nhifAmount + patientPay, // amount does NOT include remainingPayment
+              description: `${priceData.code} ${priceData.name}`
+            };
+            
+            // Attach remainingPayment only to first record
+            if (isFirstRecord && remainingPayment > 0) {
+              record.remainingPayment = remainingPayment;
+              isFirstRecord = false;
+            }
+            
+            recordsToSave.push(record);
           }
-          
-          recordsToSave.push(record);
         }
       });
       
