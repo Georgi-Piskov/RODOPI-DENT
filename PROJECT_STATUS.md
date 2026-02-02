@@ -1,7 +1,7 @@
 # 📊 ТЕКУЩО СЪСТОЯНИЕ НА ПРОЕКТА - RODOPI DENT
 
-> **Последна актуализация:** 29 януари 2026  
-> **Версия:** 3.21 (Финансов модул v2 + НЗОК 2026)
+> **Последна актуализация:** 2 февруари 2026  
+> **Версия:** 3.22 (КРИТИЧЕН Timezone Fix)
 
 ---
 
@@ -295,10 +295,16 @@ checkForConflicts(date, startTime, endTime, excludeEventId)
 - [x] Get Calendar Event използва директен ID lookup
 
 ### ⚠️ ИЗИСКВА ДЕЙСТВИЕ ОТ ПОТРЕБИТЕЛЯ
-1. **n8n Workflow 06b** - Ре-импортирай файла `06b-finance-add.json` (обновен с нови полета: procedureCode, procedureName, nhifAmount, patientAmount)
-2. **Google Sheets** - Изпълни `updateFinancesStructure()` в Apps Script за добавяне на нови колони към Finances листа
-3. **Google Sheets** - Изпълни `importNHIFPrices()` в Apps Script за официалните НЗОК цени 2026
-4. **Браузър кеш** - Изчисти Service Worker: F12 → Application → Clear Storage → Clear site data
+1. **КРИТИЧНО: Ре-импортирай ВСИЧКИ n8n workflows** (поправен timezone bug):
+   - `10-telegram-callback.json`
+   - `11-calendar-events.json`
+   - `13-calendar-update.json`
+   - `15-public-slots.json`
+   - `16-public-booking.json`
+2. **n8n Workflow 06b** - Ре-импортирай файла `06b-finance-add.json` (обновен с нови полета: procedureCode, procedureName, nhifAmount, patientAmount)
+3. **Google Sheets** - Изпълни `updateFinancesStructure()` в Apps Script за добавяне на нови колони към Finances листа
+4. **Google Sheets** - Изпълни `importNHIFPrices()` в Apps Script за официалните НЗОК цени 2026
+5. **Браузър кеш** - Изчисти Service Worker: F12 → Application → Clear Storage → Clear site data
 
 ### Бъдещи подобрения
 - [ ] **Канали за известия** - Telegram/WhatsApp преди SMS за пестене на разходи
@@ -311,6 +317,20 @@ checkForConflicts(date, startTime, endTime, excludeEventId)
 ---
 
 ## 📜 ИСТОРИЯ НА ПРОМЕНИТЕ
+
+### 02.02.2026 - v3.22 (КРИТИЧЕН TIMEZONE FIX)
+🚨 **ПРОБЛЕМ:** Часовете в календара се показваха с 1-2 часа разлика от Google Calendar.
+
+**ПРИЧИНА:** n8n workflows извличаха часа директно от ISO стринга (напр. `slice(11, 16)`), без да конвертират към `Europe/Sofia` timezone. Ако n8n сървърът е в UTC или друга timezone, часовете бяха грешни.
+
+**РЕШЕНИЕ:** Всички workflows вече използват `Intl.DateTimeFormat` с `timeZone: 'Europe/Sofia'` за правилно конвертиране.
+
+**Засегнати файлове:**
+- `10-telegram-callback.json` - Process Action node
+- `11-calendar-events.json` - Transform Events node
+- `13-calendar-update.json` - Format Response node
+- `15-public-slots.json` - Calculate Available Slots node
+- `16-public-booking.json` - Check Conflict node
 
 ### 29.01.2026 - v3.15 → v3.21
 1. **v3.15:** Модерни бутони за период - inline стилове в JavaScript

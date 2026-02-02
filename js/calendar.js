@@ -589,8 +589,19 @@ const Calendar = {
       });
       
       // DEBUG: Log the API response to see structure
-      console.log('Calendar API response:', response);
-      console.log('Events sample:', response.data?.events?.[0]);
+      console.log('=== CALENDAR DEBUG ===');
+      console.log('API Response:', response);
+      if (response.data?.events?.[0]) {
+        const sample = response.data.events[0];
+        console.log('First event:', {
+          title: sample.title || sample.patientName,
+          date: sample.date,
+          startTime: sample.startTime,
+          endTime: sample.endTime,
+          rawEvent: sample
+        });
+      }
+      console.log('=== END DEBUG ===');
       
       if (response.success && response.data?.events) {
         this.events = response.data.events;
