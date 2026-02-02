@@ -1,8 +1,8 @@
 // API client for Rodopi Dent PWA
 
 const API = {
-  // Request timeout in milliseconds
-  TIMEOUT: 5000,
+  // Request timeout in milliseconds (15 seconds for n8n webhooks)
+  TIMEOUT: 15000,
 
   /**
    * Base fetch wrapper with error handling and timeout
