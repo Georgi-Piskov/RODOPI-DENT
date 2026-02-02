@@ -2014,7 +2014,49 @@ const Calendar = {
               </div>
               <div class="form-group">
                 <label>Час *</label>
-                <input type="time" name="startTime" required>
+                <select name="startTime" required>
+                  <option value="08:00">08:00</option>
+                  <option value="08:15">08:15</option>
+                  <option value="08:30">08:30</option>
+                  <option value="08:45">08:45</option>
+                  <option value="09:00" selected>09:00</option>
+                  <option value="09:15">09:15</option>
+                  <option value="09:30">09:30</option>
+                  <option value="09:45">09:45</option>
+                  <option value="10:00">10:00</option>
+                  <option value="10:15">10:15</option>
+                  <option value="10:30">10:30</option>
+                  <option value="10:45">10:45</option>
+                  <option value="11:00">11:00</option>
+                  <option value="11:15">11:15</option>
+                  <option value="11:30">11:30</option>
+                  <option value="11:45">11:45</option>
+                  <option value="12:00">12:00</option>
+                  <option value="12:15">12:15</option>
+                  <option value="12:30">12:30</option>
+                  <option value="12:45">12:45</option>
+                  <option value="13:00">13:00</option>
+                  <option value="13:15">13:15</option>
+                  <option value="13:30">13:30</option>
+                  <option value="13:45">13:45</option>
+                  <option value="14:00">14:00</option>
+                  <option value="14:15">14:15</option>
+                  <option value="14:30">14:30</option>
+                  <option value="14:45">14:45</option>
+                  <option value="15:00">15:00</option>
+                  <option value="15:15">15:15</option>
+                  <option value="15:30">15:30</option>
+                  <option value="15:45">15:45</option>
+                  <option value="16:00">16:00</option>
+                  <option value="16:15">16:15</option>
+                  <option value="16:30">16:30</option>
+                  <option value="16:45">16:45</option>
+                  <option value="17:00">17:00</option>
+                  <option value="17:15">17:15</option>
+                  <option value="17:30">17:30</option>
+                  <option value="17:45">17:45</option>
+                  <option value="18:00">18:00</option>
+                </select>
               </div>
             </div>
             <div class="event-form__row">
