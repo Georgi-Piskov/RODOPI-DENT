@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <!-- Background gradient circle -->
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="tooth-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff"/>
+      <stop offset="100%" style="stop-color:#e2e8f0"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="96" cy="96" r="92" fill="url(#bg-grad)"/>
+  <circle cx="96" cy="96" r="88" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
+  
+  <!-- Tooth shape - centered and larger -->
+  <g transform="translate(96, 85) scale(1.8)">
+    <path d="M0 -35 
+             C-18 -35, -28 -18, -28 0
+             C-28 12, -25 25, -16 42
+             C-12 50, -7 54, -4 54
+             C-1 54, 0 48, 0 42
+             C0 48, 1 54, 4 54
+             C7 54, 12 50, 16 42
+             C25 25, 28 12, 28 0
+             C28 -18, 18 -35, 0 -35Z" 
+          fill="url(#tooth-grad)" 
+          stroke="white" 
+          stroke-width="1"/>
+    
+    <!-- Shine effect -->
+    <ellipse cx="-12" cy="-18" rx="6" ry="9" fill="rgba(255,255,255,0.4)"/>
+  </g>
+  
+  <!-- Text "РД" (Родопи Дент initials) -->
+  <text x="96" y="178" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="white" letter-spacing="2">РОДОПИ ДЕНТ</text>
+</svg>
