@@ -1066,7 +1066,8 @@ const Calendar = {
    */
   getEventHeight(duration) {
     const height = duration * 1.5;
-    return Math.max(height, 55); // Minimum 55px for 3 lines of content
+    // Minimum 22px for 15-min events (enough for 1 line of text)
+    return Math.max(height, 22);
   },
 
   /**
