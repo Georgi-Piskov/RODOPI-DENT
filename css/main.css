@@ -2505,7 +2505,7 @@ button {
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   border-right: none;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
-  min-height: 45px;
+  /* min-height removed - controlled by JS getEventHeight() */
   display: flex;
   flex-direction: column;
   justify-content: flex-start;

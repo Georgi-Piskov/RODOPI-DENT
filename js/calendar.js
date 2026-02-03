@@ -1066,8 +1066,8 @@ const Calendar = {
    */
   getEventHeight(duration) {
     const height = duration * 1.5;
-    // Minimum 35px to keep text readable, but allows 15-min events to be smaller than 30-min
-    return Math.max(height, 35);
+    // Minimum 40px to keep text readable
+    return Math.max(height, 40);
   },
 
   /**
