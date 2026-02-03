@@ -1052,22 +1052,23 @@ const Calendar = {
   },
 
   /**
-   * Calculate event top position (1 hour = 90px, 1 minute = 1.5px)
+   * Calculate event top position (1 hour = 120px, 1 minute = 2px)
    */
   getEventTop(startTime) {
     if (!startTime) return 0;
     const [hours, minutes] = startTime.split(':').map(Number);
     const hourOffset = hours - this.workingHours.start;
-    return (hourOffset * 90) + (minutes * 1.5);
+    return (hourOffset * 120) + (minutes * 2);
   },
 
   /**
-   * Calculate event height (1 minute = 1.5px)
+   * Calculate event height (1 minute = 2px)
+   * 15 min = 35px, 30 min = 60px, 60 min = 120px
    */
   getEventHeight(duration) {
-    const height = duration * 1.5;
-    // Minimum 40px to keep text readable
-    return Math.max(height, 40);
+    const height = duration * 2;
+    // Minimum 35px for 15-min events to be compact but readable
+    return Math.max(height, 35);
   },
 
   /**

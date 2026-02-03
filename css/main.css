@@ -2167,7 +2167,7 @@ button {
 }
 
 .week-view__time-label {
-  height: 90px;
+  height: 120px;
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;
@@ -2207,7 +2207,7 @@ button {
 
 /* Hour Slots */
 .week-view__hour-slot {
-  height: 90px;
+  height: 120px;
   border-bottom: 1px solid var(--color-gray-300);
   position: relative;
 }
@@ -2469,7 +2469,7 @@ button {
 
 /* Hour Slots */
 .hour-slot {
-  height: 90px;
+  height: 120px;
   border-bottom: 1px solid var(--color-gray-100);
   position: relative;
 }
