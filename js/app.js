@@ -506,6 +506,83 @@ const App = {
       dateFrom.value = Utils.today();
       dateTo.value = Utils.today();
     }
+    
+    // Patient search functionality
+    const searchInput = document.getElementById('patient-search');
+    const searchBtn = document.getElementById('search-patient-btn');
+    const clearBtn = document.getElementById('clear-search-btn');
+    
+    const performSearch = async () => {
+      const query = searchInput?.value?.trim();
+      if (!query) {
+        Utils.showToast('Моля въведете име на пациент', 'warning');
+        return;
+      }
+      
+      try {
+        Utils.showLoading();
+        // Fetch ALL records (no date filter) to search through all history
+        const response = await API.getFinance({ startDate: '2020-01-01', endDate: Utils.today() });
+        const allRecords = response.data?.records || [];
+        
+        // Filter by patient name (case insensitive)
+        const queryLower = query.toLowerCase();
+        const patientRecords = allRecords.filter(r => 
+          r.patientName && r.patientName.toLowerCase().includes(queryLower)
+        );
+        
+        Utils.hideLoading();
+        
+        // Show results
+        this.isPatientSearch = true;
+        clearBtn.hidden = false;
+        
+        // Update title
+        const titleEl = document.getElementById('records-title');
+        if (titleEl) {
+          titleEl.textContent = `🔍 Резултати за "${query}" (${patientRecords.length} записа)`;
+        }
+        
+        // Calculate patient totals
+        let totalPaid = 0;
+        patientRecords.forEach(r => {
+          if (r.type === 'income') {
+            totalPaid += parseFloat(r.amount) || 0;
+          }
+        });
+        
+        // Update stats to show patient info
+        document.getElementById('stat-income').textContent = `${totalPaid.toFixed(2)} €`;
+        document.getElementById('stat-expense').textContent = '-';
+        document.getElementById('stat-balance').textContent = '-';
+        document.getElementById('stat-patients').textContent = patientRecords.length > 0 ? '1' : '0';
+        
+        // Render patient records
+        this.allDashboardRecords = patientRecords;
+        this.renderRecentRecords(patientRecords);
+        
+        if (patientRecords.length === 0) {
+          Utils.showToast('Няма намерени записи за този пациент', 'info');
+        }
+        
+      } catch (error) {
+        Utils.hideLoading();
+        console.error('Patient search error:', error);
+        Utils.showToast('❌ Грешка при търсене', 'error');
+      }
+    };
+    
+    searchBtn?.addEventListener('click', performSearch);
+    searchInput?.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') performSearch();
+    });
+    
+    clearBtn?.addEventListener('click', async () => {
+      searchInput.value = '';
+      clearBtn.hidden = true;
+      this.isPatientSearch = false;
+      await this.loadDashboardData(this.dashboardPeriod);
+    });
   },
 
   /**
@@ -578,8 +655,15 @@ const App = {
       this.renderCategoryBreakdown('income-breakdown', incomeByCategory, 'income');
       this.renderCategoryBreakdown('expense-breakdown', expenseByCategory, 'expense');
       
-      // Render recent records
-      this.renderRecentRecords(records.slice(0, 10));
+      // Store all records and render ALL of them (not just last 10)
+      this.allDashboardRecords = records;
+      this.renderRecentRecords(records);
+      
+      // Update records title with count
+      const titleEl = document.getElementById('records-title');
+      if (titleEl) {
+        titleEl.textContent = `📋 Записи за периода (${records.length})`;
+      }
       
     } catch (error) {
       console.error('Dashboard load error:', error);

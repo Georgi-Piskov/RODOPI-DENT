@@ -217,6 +217,14 @@
           <button type="button" class="btn btn--primary" id="apply-date-range" style="padding:12px 24px;background:#3b82f6;color:white;border:none;border-radius:12px;font-weight:600;cursor:pointer;">✓ Приложи</button>
         </div>
         
+        <!-- Patient Search -->
+        <div class="patient-search-box" style="display:flex;gap:12px;background:white;padding:16px 20px;border-radius:16px;border:2px solid #e2e8f0;box-shadow:0 4px 12px rgba(0,0,0,0.08);margin-bottom:24px;align-items:center;flex-wrap:wrap;">
+          <span style="font-size:20px;">🔍</span>
+          <input type="text" id="patient-search" placeholder="Търси пациент по име..." style="flex:1;min-width:200px;padding:12px 16px;border:2px solid #cbd5e1;border-radius:12px;font-size:15px;background:#f8fafc;" />
+          <button type="button" class="btn btn--primary" id="search-patient-btn" style="padding:12px 24px;background:#22c55e;color:white;border:none;border-radius:12px;font-weight:600;cursor:pointer;">Търси</button>
+          <button type="button" class="btn btn--outline" id="clear-search-btn" style="padding:12px 24px;background:white;color:#475569;border:2px solid #e2e8f0;border-radius:12px;font-weight:600;cursor:pointer;" hidden>✕ Изчисти</button>
+        </div>
+        
         <!-- Finance Stats -->
         <div class="stats-grid stats-grid--finance">
           <div class="stat-card stat-card--income">
@@ -257,9 +265,9 @@
           </div>
         </div>
         
-        <!-- Recent Records -->
+        <!-- Records for Period -->
         <div class="dashboard-card dashboard-card--full">
-          <h3>📋 Последни записи</h3>
+          <h3 id="records-title">📋 Записи за периода</h3>
           <div id="recent-records" class="records-list">
             <p class="text-muted">Зареждане...</p>
           </div>
