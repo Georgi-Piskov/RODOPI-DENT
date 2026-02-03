@@ -726,6 +726,54 @@ const App = {
   },
 
   /**
+   * Confirm and delete finance record from Workday view
+   */
+  async confirmDeleteFinanceWorkday(recordId) {
+    // Find record from stored records
+    const record = this.financeRecords?.find(r => r.id === recordId);
+    if (!record) {
+      Utils.showToast('❌ Записът не е намерен', 'error');
+      return;
+    }
+    
+    const isIncome = record.type === 'income';
+    const typeText = isIncome ? 'приход' : 'разход';
+    const confirmed = confirm(`Сигурни ли сте, че искате да изтриете този ${typeText}?\n\n${record.patientName || 'Без име'}\n${record.description || record.procedureName || 'Без описание'}\nСума: ${parseFloat(record.amount).toFixed(2)} €`);
+    
+    if (!confirmed) return;
+    
+    try {
+      Utils.showLoading();
+      await API.deleteFinanceRecord(recordId);
+      Utils.hideLoading();
+      Utils.showToast('✅ Записът е изтрит успешно!', 'success');
+      
+      // Reload workday finance data
+      await this.loadWorkdayFinance(this.selectedDate);
+      
+    } catch (error) {
+      Utils.hideLoading();
+      console.error('Delete finance error:', error);
+      Utils.showToast('❌ Грешка при изтриване', 'error');
+    }
+  },
+
+  /**
+   * Show edit finance modal (for workday view)
+   */
+  async showEditFinanceModal(recordId) {
+    // Find record from stored records
+    const record = this.financeRecords?.find(r => r.id === recordId);
+    if (!record) {
+      Utils.showToast('❌ Записът не е намерен', 'error');
+      return;
+    }
+    
+    // Use the existing openEditFinanceModal
+    this.openEditFinanceModal(record);
+  },
+
+  /**
    * Open edit finance modal
    */
   openEditFinanceModal(record) {
@@ -880,7 +928,14 @@ const App = {
       
       // Close modal and reload data
       document.getElementById('edit-finance-modal')?.remove();
-      await this.loadDashboardData(this.dashboardPeriod);
+      
+      // Reload appropriate view
+      const currentPath = window.location.hash.slice(1);
+      if (currentPath === '/admin/workday' && this.selectedDate) {
+        await this.loadWorkdayFinance(this.selectedDate);
+      } else {
+        await this.loadDashboardData(this.dashboardPeriod);
+      }
       
     } catch (error) {
       Utils.hideLoading();
@@ -2396,8 +2451,14 @@ const App = {
                 </div>
               ` : ''}
             </div>
-            <div style="font-weight:700;font-size:14px;color:${isIncome ? '#22c55e' : '#ef4444'};">
-              ${isIncome ? '+' : '-'}${amount.toFixed(2)} €
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+              <div style="font-weight:700;font-size:14px;color:${isIncome ? '#22c55e' : '#ef4444'};">
+                ${isIncome ? '+' : '-'}${amount.toFixed(2)} €
+              </div>
+              <div style="display:flex;gap:4px;">
+                <button type="button" onclick="App.showEditFinanceModal('${r.id}')" style="padding:3px 6px;background:#3b82f6;color:white;border:none;border-radius:4px;cursor:pointer;font-size:10px;" title="Редактирай">✏️</button>
+                <button type="button" onclick="App.confirmDeleteFinanceWorkday('${r.id}')" style="padding:3px 6px;background:#ef4444;color:white;border:none;border-radius:4px;cursor:pointer;font-size:10px;" title="Изтрий">🗑️</button>
+              </div>
             </div>
           </div>
         </div>
