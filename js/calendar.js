@@ -1038,14 +1038,18 @@ const Calendar = {
         event.patientPhone ? `Тел: ${event.patientPhone}` : ''
       ].filter(Boolean).join(' | ');
       
+      // For 15-min events, show only name (no time/procedure)
+      const duration = event.duration || 30;
+      const isCompact = duration <= 15;
+      
       return `
-        <div class="calendar-event calendar-event--${event.status || 'confirmed'} ${colorClass}" 
+        <div class="calendar-event calendar-event--${event.status || 'confirmed'} ${colorClass}${isCompact ? ' calendar-event--compact' : ''}" 
              data-event-id="${event.id}"
              style="top: ${top}px; height: ${height}px; left: ${left}%; width: calc(${width}% - 4px);"
              title="${tooltip}">
           <div class="calendar-event__name">${patientName}</div>
-          ${procedureText ? `<div class="calendar-event__procedure">🦷 ${procedureText}</div>` : ''}
-          <div class="calendar-event__time">🕐 ${displayTime}</div>
+          ${!isCompact && procedureText ? `<div class="calendar-event__procedure">🦷 ${procedureText}</div>` : ''}
+          ${!isCompact ? `<div class="calendar-event__time">🕐 ${displayTime}</div>` : ''}
         </div>
       `;
     }).join('');
