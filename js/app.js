@@ -626,7 +626,7 @@ const App = {
       const patients = new Set();
       
       records.forEach(r => {
-        const amount = parseFloat(r.amount) || 0;
+        const amount = Math.abs(parseFloat(r.amount) || 0); // Use absolute value
         
         if (r.type === 'income') {
           totalIncome += amount;
@@ -642,7 +642,7 @@ const App = {
       
       // Update stats
       document.getElementById('stat-income').textContent = `${totalIncome.toFixed(2)} €`;
-      document.getElementById('stat-expense').textContent = `${totalExpense.toFixed(2)} €`;
+      document.getElementById('stat-expense').textContent = `-${totalExpense.toFixed(2)} €`;
       
       const balance = totalIncome - totalExpense;
       const balanceEl = document.getElementById('stat-balance');
