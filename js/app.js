@@ -25,6 +25,7 @@ const App = {
   setupRoutes() {
     // Public routes
     Router.register('/', () => this.renderHome());
+    Router.register('/about', () => this.renderAbout());
     Router.register('/booking', () => this.renderBooking());
     
     // Admin routes
@@ -99,6 +100,13 @@ const App = {
    */
   renderHome() {
     Router.render('page-home');
+  },
+
+  /**
+   * Render about page
+   */
+  renderAbout() {
+    Router.render('page-about');
   },
 
   /**

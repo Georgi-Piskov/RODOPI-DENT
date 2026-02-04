@@ -38,6 +38,7 @@
         </a>
         <nav id="main-nav" class="header__nav">
           <a href="#/" class="nav-link">Начало</a>
+          <a href="#/about" class="nav-link">За нас</a>
           <a href="#/booking" class="nav-link">Запази час</a>
           <a href="#/admin" class="nav-link nav-link--admin">Вход</a>
         </nav>
@@ -54,6 +55,7 @@
       <div class="mobile-nav__backdrop"></div>
       <nav class="mobile-nav__drawer">
         <a href="#/" class="nav-link">Начало</a>
+        <a href="#/about" class="nav-link">За нас</a>
         <a href="#/booking" class="nav-link">Запази час</a>
         <a href="#/admin" class="nav-link">Вход</a>
       </nav>
@@ -99,13 +101,138 @@
         <div class="info-card">
           <span class="info-card__icon">📍</span>
           <h3>Адрес</h3>
-          <p>гр. Смолян<br>ул. "Родопи" 1</p>
+          <p>гр. Смолян<br>ул. Миньорска 3</p>
         </div>
         <div class="info-card">
           <span class="info-card__icon">📞</span>
           <h3>Телефон</h3>
-          <p>0888 123 456</p>
+          <p>087 644 2777</p>
         </div>
+      </section>
+    </div>
+  </template>
+
+  <!-- About Page Template -->
+  <template id="page-about">
+    <div class="page page--about">
+      <!-- Hero Section -->
+      <section class="about-hero">
+        <div class="about-hero__overlay"></div>
+        <div class="about-hero__content">
+          <h1>Дентална практика<br><span class="about-hero__brand">"Родопи Дент"</span></h1>
+          <p class="about-hero__tagline">В дентална практика Родопи Дент можете да доверите усмивката си на професионалисти с дългогодишен опит</p>
+        </div>
+      </section>
+
+      <!-- Practice Image -->
+      <section class="about-image">
+        <img src="assets/473319003_939826941458694_1491880142050390232_n.jpg" alt="Дентална практика Родопи Дент" class="about-image__photo">
+      </section>
+
+      <!-- Team Section -->
+      <section class="about-team">
+        <h2 class="section-title">👨‍⚕️ Нашият екип</h2>
+        <div class="team-grid">
+          <div class="team-card">
+            <div class="team-card__avatar">
+              <span class="team-card__icon">👩‍⚕️</span>
+            </div>
+            <h3 class="team-card__name">д-р Виктория Милева-Пискова</h3>
+            <p class="team-card__role">Зъболекар</p>
+            <a href="tel:0885666114" class="team-card__phone">
+              <span>📞</span> 0885 666 114
+            </a>
+          </div>
+          <div class="team-card">
+            <div class="team-card__avatar">
+              <span class="team-card__icon">👨‍⚕️</span>
+            </div>
+            <h3 class="team-card__name">д-р Митко Чолаков</h3>
+            <p class="team-card__role">Зъболекар</p>
+            <a href="tel:0876898919" class="team-card__phone">
+              <span>📞</span> 0876 898 919
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Info Section -->
+      <section class="about-info">
+        <div class="about-info__grid">
+          <div class="about-info__card">
+            <div class="about-info__icon">🕐</div>
+            <h3>Работно време</h3>
+            <p><strong>Понеделник - Петък</strong></p>
+            <p>09:00 - 12:00</p>
+            <p>13:30 - 17:00</p>
+            <p class="about-info__closed">Събота и Неделя - почивни дни</p>
+          </div>
+          <div class="about-info__card">
+            <div class="about-info__icon">📍</div>
+            <h3>Адрес</h3>
+            <p><strong>ул. Миньорска 3</strong></p>
+            <p>гр. Смолян</p>
+            <p>България</p>
+            <a href="https://maps.google.com/?q=ул.Миньорска+3,+Смолян" target="_blank" class="about-info__link">🗺️ Виж на картата</a>
+          </div>
+          <div class="about-info__card">
+            <div class="about-info__icon">📞</div>
+            <h3>Контакти</h3>
+            <a href="tel:0876442777" class="about-info__phone">087 644 2777</a>
+            <p class="about-info__note">Обаждане за записване на час</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Services Preview -->
+      <section class="about-services">
+        <h2 class="section-title">🦷 Нашите услуги</h2>
+        <div class="services-grid">
+          <div class="service-item">
+            <span class="service-item__icon">🔍</span>
+            <span class="service-item__name">Профилактични прегледи</span>
+          </div>
+          <div class="service-item">
+            <span class="service-item__icon">🦷</span>
+            <span class="service-item__name">Лечение на кариес</span>
+          </div>
+          <div class="service-item">
+            <span class="service-item__icon">✨</span>
+            <span class="service-item__name">Почистване на зъбен камък</span>
+          </div>
+          <div class="service-item">
+            <span class="service-item__icon">🔧</span>
+            <span class="service-item__name">Екстракции</span>
+          </div>
+          <div class="service-item">
+            <span class="service-item__icon">🦴</span>
+            <span class="service-item__name">Протезиране</span>
+          </div>
+          <div class="service-item">
+            <span class="service-item__icon">💉</span>
+            <span class="service-item__name">Ендодонтия</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- NHIF Section -->
+      <section class="about-nhif">
+        <div class="nhif-badge">
+          <span class="nhif-badge__icon">🏥</span>
+          <div class="nhif-badge__text">
+            <strong>Работим с НЗОК</strong>
+            <p>Предлагаме безплатни и частично платени услуги по Националната здравноосигурителна каса</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- CTA Section -->
+      <section class="about-cta">
+        <h2>Готови сте да запазите час?</h2>
+        <p>Запазете си час онлайн бързо и лесно</p>
+        <a href="#/booking" class="btn btn--primary btn--lg">
+          📅 Запази час сега
+        </a>
       </section>
     </div>
   </template>

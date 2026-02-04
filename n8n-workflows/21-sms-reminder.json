@@ -1,0 +1,270 @@
+{
+  "name": "Rodopi Dent - SMS Reminder (Напомняне)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24,
+              "triggerAtHour": 12
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger-001",
+      "name": "Daily at 12:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Calculate tomorrow's date in Sofia timezone\nconst now = new Date();\nconst sofia = new Intl.DateTimeFormat('en-CA', {\n  timeZone: 'Europe/Sofia',\n  year: 'numeric',\n  month: '2-digit',\n  day: '2-digit'\n});\n\n// Get tomorrow\nconst tomorrow = new Date(now);\ntomorrow.setDate(tomorrow.getDate() + 1);\n\nconst tomorrowStr = sofia.format(tomorrow); // YYYY-MM-DD format\n\n// Also format for SMS display (DD.MM.YYYY)\nconst displayDate = new Intl.DateTimeFormat('bg-BG', {\n  timeZone: 'Europe/Sofia',\n  day: '2-digit',\n  month: '2-digit',\n  year: 'numeric'\n}).format(tomorrow);\n\nreturn [{\n  json: {\n    tomorrowISO: tomorrowStr,\n    tomorrowDisplay: displayDate,\n    timeMin: tomorrowStr + 'T00:00:00+02:00',\n    timeMax: tomorrowStr + 'T23:59:59+02:00'\n  }\n}];"
+      },
+      "id": "calc-tomorrow-001",
+      "name": "Calculate Tomorrow",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -980,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendarId": "rodopi.dent@gmail.com",
+        "returnAll": true,
+        "options": {
+          "timeMin": "={{ $json.timeMin }}",
+          "timeMax": "={{ $json.timeMax }}",
+          "singleEvents": true,
+          "orderBy": "startTime"
+        }
+      },
+      "id": "get-calendar-001",
+      "name": "Get Tomorrow Events",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.2,
+      "position": [
+        -760,
+        300
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "YOUR_GOOGLE_CALENDAR_CREDENTIAL_ID",
+          "name": "Google Calendar - Rodopi Dent"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get events and filter only confirmed ones\nconst items = $input.all();\nconst tomorrowDisplay = $('Calculate Tomorrow').first().json.tomorrowDisplay;\n\nconst confirmedEvents = [];\n\nfor (const item of items) {\n  const event = item.json;\n  \n  // Check if confirmed (colorId 10 = green = confirmed)\n  // Also check description for status\n  const isConfirmed = \n    event.colorId === '10' || \n    event.colorId === 10 ||\n    (event.description && event.description.toLowerCase().includes('confirmed')) ||\n    (event.extendedProperties?.private?.status === 'confirmed');\n  \n  if (!isConfirmed) continue;\n  \n  // Extract phone from description\n  // Format: \"📱 0888123456\" or \"Phone: 0888123456\"\n  let phone = '';\n  if (event.description) {\n    const phoneMatch = event.description.match(/(?:📱|Phone:|Телефон:)?\\s*([+]?[0-9\\s-]{8,15})/i);\n    if (phoneMatch) {\n      phone = phoneMatch[1].replace(/[\\s-]/g, '');\n    }\n  }\n  \n  if (!phone) continue; // Skip if no phone\n  \n  // Extract time from event\n  const startTime = event.start?.dateTime || event.start?.date;\n  let time = '';\n  if (startTime) {\n    const eventDate = new Date(startTime);\n    time = new Intl.DateTimeFormat('bg-BG', {\n      timeZone: 'Europe/Sofia',\n      hour: '2-digit',\n      minute: '2-digit',\n      hour12: false\n    }).format(eventDate);\n  }\n  \n  // Extract patient name from summary\n  const patientName = event.summary?.replace(/[✅🟢⏳🟡]/g, '').trim() || 'Пациент';\n  \n  confirmedEvents.push({\n    eventId: event.id,\n    patientName: patientName,\n    phone: phone,\n    date: tomorrowDisplay,\n    time: time,\n    summary: event.summary\n  });\n}\n\nif (confirmedEvents.length === 0) {\n  return [{ json: { noEvents: true, message: 'Няма потвърдени часове за утре' } }];\n}\n\nreturn confirmedEvents.map(e => ({ json: e }));"
+      },
+      "id": "filter-confirmed-001",
+      "name": "Filter Confirmed & Extract Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -540,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.noEvents }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-events-001",
+      "name": "Has Events?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.1,
+      "position": [
+        -320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare SMS for each patient\nconst event = $input.first().json;\n\n// Normalize Bulgarian phone number\nlet phone = event.phone.replace(/\\s+/g, '').replace(/[^0-9+]/g, '');\nif (phone.startsWith('0')) {\n  phone = '+359' + phone.substring(1);\n} else if (!phone.startsWith('+')) {\n  phone = '+359' + phone;\n}\n\n// Create reminder message\nconst message = `Родопи Дент: Напомняне - имате час утре (${event.date}) в ${event.time}. Очакваме ви!`;\n\nreturn [{\n  json: {\n    phone: phone,\n    message: message,\n    patientName: event.patientName,\n    eventId: event.eventId\n  }\n}];"
+      },
+      "id": "prepare-sms-001",
+      "name": "Prepare Reminder SMS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -100,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://fcm.googleapis.com/v1/projects/sms-sender-27028/messages:send",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"message\": {\n    \"token\": \"cdLIn7RwRYuNi7hvpHeUxU:APA91bEiNvE_SCHwrHE-O1nArEOf6Phpltza4HH3vxoRKr8bHlfX9nK_q_4r0xlC9YYvfGxZHNPL5X6uQ44H6dSqbTcwFYQ68ZLYh2G8JtOfpHLoWy7E4aI\",\n    \"data\": {\n      \"phone\": \"{{ $json.phone }}\",\n      \"message\": \"{{ $json.message }}\"\n    }\n  }\n}",
+        "options": {
+          "allowUnauthorizedCerts": false
+        }
+      },
+      "id": "send-fcm-001",
+      "name": "Send FCM to Android",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        120,
+        200
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "CzpmBZku5H7lKlEA",
+          "name": "RODOPI_DENT_SMS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 📱 SMS Напомняне за часове\n\n**Изпълнява се:** Всеки ден в 12:00 (Europe/Sofia)\n\n**Логика:**\n1. Взима всички събития от Google Calendar за УТРЕШНИЯ ден\n2. Филтрира само ПОТВЪРДЕНИ часове (colorId = 10 / зелен)\n3. Извлича телефон от описанието на събитието\n4. Изпраща SMS напомняне чрез Android телефона\n\n**SMS текст:**\n```\nРодопи Дент: Напомняне - имате час утре (DD.MM.YYYY) в HH:MM. Очакваме ви!\n```\n\n**Изисквания:**\n- Google Calendar credentials\n- FCM/Google API credentials (RODOPI_DENT_SMS)\n- Android телефонът трябва да е свързан и с интернет",
+        "height": 380,
+        "width": 360
+      },
+      "id": "sticky-note-001",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1200,
+        -80
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "no-op-001",
+      "name": "No Events - Skip",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -100,
+        400
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily at 12:00": {
+      "main": [
+        [
+          {
+            "node": "Calculate Tomorrow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Tomorrow": {
+      "main": [
+        [
+          {
+            "node": "Get Tomorrow Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Tomorrow Events": {
+      "main": [
+        [
+          {
+            "node": "Filter Confirmed & Extract Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Confirmed & Extract Data": {
+      "main": [
+        [
+          {
+            "node": "Has Events?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Events?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Reminder SMS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Events - Skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Reminder SMS": {
+      "main": [
+        [
+          {
+            "node": "Send FCM to Android",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Sofia"
+  },
+  "versionId": "reminder-v1-001",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "a7204f8cf331ce45a25a617a4d887233056efe67a0537cd171194c6ba0ab4002"
+  },
+  "id": "sms-reminder-workflow",
+  "tags": [
+    {
+      "id": "U4AUJ7Gip9wo0aTE",
+      "name": "Rodopi Dent"
+    }
+  ]
+}
