@@ -2258,6 +2258,8 @@ button {
   width: 10px;
   height: 10px;
   background: var(--color-danger);
+  border-radius: 50%;
+}
 
 /* Mobile Day Navigation (Week View) */
 .week-view__mobile-nav {
@@ -2269,52 +2271,57 @@ button {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
-    background: linear-gradient(135deg, var(--color-primary) 0%, #1e40af 100%);
-    border-radius: 8px;
-    margin-bottom: 8px;
-    gap: 8px;
+    padding: 10px 16px;
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    border-radius: 12px;
+    margin: 8px;
+    gap: 12px;
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
   }
   
   .week-view__mobile-nav-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     border: none;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.25);
     color: white;
-    font-size: 14px;
     cursor: pointer;
     transition: all 0.2s ease;
+    backdrop-filter: blur(4px);
+  }
+  
+  .week-view__mobile-nav-btn svg {
+    width: 20px;
+    height: 20px;
   }
   
   .week-view__mobile-nav-btn:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.35);
-    transform: scale(1.1);
+    background: rgba(255, 255, 255, 0.4);
+    transform: scale(1.05);
   }
   
   .week-view__mobile-nav-btn:active:not(:disabled) {
     transform: scale(0.95);
+    background: rgba(255, 255, 255, 0.5);
   }
   
   .week-view__mobile-nav-btn:disabled {
-    opacity: 0.3;
+    opacity: 0.25;
     cursor: not-allowed;
   }
   
   .week-view__mobile-nav-info {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 600;
     color: white;
     text-align: center;
     flex: 1;
     letter-spacing: 0.5px;
   }
-}
-  border-radius: 50%;
 }
 
 /* ============================================

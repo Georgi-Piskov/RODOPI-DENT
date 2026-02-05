@@ -676,10 +676,11 @@ const Calendar = {
 
   /**
    * Navigate mobile days (for week view slider)
+   * Moves by 1 day for smoother navigation
    */
   navigateMobileDays(direction) {
     const visibleDays = this.getVisibleDaysCount();
-    this.mobileStartDay += direction * visibleDays;
+    this.mobileStartDay += direction;
     
     // Clamp to valid range
     if (this.mobileStartDay < 0) this.mobileStartDay = 0;
@@ -871,13 +872,17 @@ const Calendar = {
         <!-- Mobile day navigation -->
         <div class="week-view__mobile-nav">
           <button class="week-view__mobile-nav-btn" id="mobile-days-prev" ${!canGoLeft ? 'disabled' : ''} title="Предишни дни">
-            ◀
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
           </button>
           <span class="week-view__mobile-nav-info">
             ${displayDays[0].day} ${displayDays[0].dayNum} - ${displayDays[displayDays.length-1].day} ${displayDays[displayDays.length-1].dayNum}
           </span>
           <button class="week-view__mobile-nav-btn" id="mobile-days-next" ${!canGoRight ? 'disabled' : ''} title="Следващи дни">
-            ▶
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
           </button>
         </div>
         ` : ''}
@@ -1155,23 +1160,30 @@ const Calendar = {
   },
 
   /**
-   * Calculate event top position (1 hour = 120px, 1 minute = 2px)
+   * Calculate event top position
+   * Desktop: 1 hour = 120px, 1 minute = 2px
+   * Mobile: 1 hour = 60px, 1 minute = 1px
    */
   getEventTop(startTime) {
     if (!startTime) return 0;
     const [hours, minutes] = startTime.split(':').map(Number);
     const hourOffset = hours - this.workingHours.start;
-    return (hourOffset * 120) + (minutes * 2);
+    const pxPerHour = this.isMobile() ? 60 : 120;
+    const pxPerMinute = this.isMobile() ? 1 : 2;
+    return (hourOffset * pxPerHour) + (minutes * pxPerMinute);
   },
 
   /**
-   * Calculate event height (1 minute = 2px)
-   * 15 min = 35px, 30 min = 60px, 60 min = 120px
+   * Calculate event height
+   * Desktop: 1 minute = 2px
+   * Mobile: 1 minute = 1px
    */
   getEventHeight(duration) {
-    const height = duration * 2;
-    // Minimum 35px for 15-min events to be compact but readable
-    return Math.max(height, 35);
+    const pxPerMinute = this.isMobile() ? 1 : 2;
+    const height = duration * pxPerMinute;
+    // Minimum height for readability
+    const minHeight = this.isMobile() ? 18 : 35;
+    return Math.max(height, minHeight);
   },
 
   /**
