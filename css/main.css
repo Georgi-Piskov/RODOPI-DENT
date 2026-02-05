@@ -78,6 +78,55 @@
   --max-width: 1200px;
 }
 
+/* SEO Content for noscript - visible only to search engines */
+.seo-content {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 2rem;
+  font-family: var(--font-family);
+  line-height: 1.8;
+  color: var(--color-gray-700);
+}
+
+.seo-content h1 {
+  color: var(--color-primary);
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.seo-content h2 {
+  color: var(--color-gray-800);
+  font-size: 1.5rem;
+  margin: 1.5rem 0 1rem;
+  border-bottom: 2px solid var(--color-primary);
+  padding-bottom: 0.5rem;
+}
+
+.seo-content ul {
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.seo-content li {
+  margin-bottom: 0.5rem;
+}
+
+.seo-content a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.seo-content a:hover {
+  text-decoration: underline;
+}
+
+.seo-content address {
+  font-style: normal;
+  background: var(--color-gray-100);
+  padding: 1rem;
+  border-radius: 8px;
+}
+
 /* Reset */
 *, *::before, *::after {
   box-sizing: border-box;
