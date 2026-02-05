@@ -1316,7 +1316,18 @@ button {
   width: 90%;
   max-height: 90vh;
   overflow-y: auto;
+  overflow-x: hidden;
   animation: modalSlideIn 0.2s ease-out;
+}
+
+@media (max-width: 600px) {
+  .modal__content {
+    width: calc(100% - 20px);
+    max-width: calc(100vw - 20px);
+    margin: 10px;
+    padding: var(--spacing-4);
+    border-radius: var(--radius-lg);
+  }
 }
 
 @keyframes modalSlideIn {
@@ -2798,6 +2809,17 @@ button {
   gap: var(--spacing-4);
 }
 
+@media (max-width: 480px) {
+  .event-form__row {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-3);
+  }
+  
+  .event-form {
+    gap: var(--spacing-3);
+  }
+}
+
 .event-form__row--full {
   grid-template-columns: 1fr;
 }
@@ -2808,6 +2830,25 @@ button {
   justify-content: flex-end;
   padding-top: var(--spacing-4);
   border-top: 1px solid var(--color-gray-200);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 480px) {
+  .event-form__actions {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+  
+  .event-form__actions .btn {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+  
+  .event-form__delete {
+    flex: 0 0 auto;
+  }
 }
 
 .event-form__delete {
@@ -3222,21 +3263,66 @@ button {
   .calendar-view__header {
     flex-direction: column;
     gap: var(--spacing-3);
+    padding: var(--spacing-3);
   }
   
   .calendar-view__controls {
     width: 100%;
-    justify-content: space-between;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-2);
   }
   
-  /* Hide week view on mobile, show day view instead */
-  .week-view {
-  .month-grid__events {
+  .calendar-view__controls .btn--success {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+  
+  .block-buttons {
     display: none;
+  }
+  
+  /* Modal mobile fixes */
+  .modal__content {
+    width: 95%;
+    max-width: none;
+    margin: 10px;
+    padding: var(--spacing-4);
+    max-height: calc(100vh - 20px);
   }
   
   .event-form__row {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .calendar-view__header {
+    padding: var(--spacing-2);
+  }
+  
+  .calendar-view__controls {
+    gap: 6px;
+  }
+  
+  .calendar-view__today-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+  
+  .view-selector__btn {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+  
+  .calendar-view__nav-btn {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .calendar-view__controls .btn--success {
+    font-size: 11px;
+    padding: 6px 8px;
   }
 }
 
