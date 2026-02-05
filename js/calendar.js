@@ -7,6 +7,9 @@ const Calendar = {
   events: [],
   isLoading: false,
   
+  // Mobile week view - start day index (0=Mon, 6=Sun)
+  mobileStartDay: 0,
+  
   // Selection mode for blocking
   selectionMode: false,
   selectedSlots: [],
@@ -41,6 +44,9 @@ const Calendar = {
     
     this.currentView = view;
     this.container = container;
+    
+    // Initialize mobile start day for week view
+    this.resetMobileStartDay();
     
     container.innerHTML = `
       <div class="calendar-view">
@@ -461,6 +467,8 @@ const Calendar = {
       d.setDate(d.getDate() + direction);
     } else if (this.currentView === 'week') {
       d.setDate(d.getDate() + (direction * 7));
+      // Reset mobile start day when changing weeks
+      this.resetMobileStartDay();
     } else {
       d.setMonth(d.getMonth() + direction);
     }
@@ -475,6 +483,8 @@ const Calendar = {
    */
   async goToToday() {
     this.currentDate = new Date();
+    // Reset mobile start day to center on today
+    this.resetMobileStartDay();
     await this.loadEvents();
     this.renderView();
     this.updateTitle();
@@ -665,6 +675,81 @@ const Calendar = {
   },
 
   /**
+   * Navigate mobile days (for week view slider)
+   */
+  navigateMobileDays(direction) {
+    const visibleDays = this.getVisibleDaysCount();
+    this.mobileStartDay += direction * visibleDays;
+    
+    // Clamp to valid range
+    if (this.mobileStartDay < 0) this.mobileStartDay = 0;
+    if (this.mobileStartDay + visibleDays > 7) this.mobileStartDay = 7 - visibleDays;
+    
+    this.renderView();
+  },
+  
+  /**
+   * Reset mobile start day to show today or beginning of week
+   */
+  resetMobileStartDay() {
+    if (!this.isMobile()) return;
+    
+    const weekStart = this.getWeekStart(this.currentDate);
+    const today = this.getToday();
+    const visibleDays = this.getVisibleDaysCount();
+    
+    // Find today's index in this week
+    let todayIndex = -1;
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(weekStart);
+      d.setDate(d.getDate() + i);
+      if (this.formatDate(d) === today) {
+        todayIndex = i;
+        break;
+      }
+    }
+    
+    if (todayIndex >= 0) {
+      // Center around today
+      this.mobileStartDay = Math.max(0, Math.min(7 - visibleDays, todayIndex - Math.floor(visibleDays / 2)));
+    } else {
+      // Default to beginning of week
+      this.mobileStartDay = 0;
+    }
+  },
+
+  /**
+   * Setup swipe navigation for mobile
+   */
+  setupSwipeNavigation() {
+    const weekView = document.querySelector('.week-view');
+    if (!weekView) return;
+    
+    let touchStartX = 0;
+    let touchEndX = 0;
+    const minSwipeDistance = 50;
+    
+    weekView.addEventListener('touchstart', (e) => {
+      touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+    
+    weekView.addEventListener('touchend', (e) => {
+      touchEndX = e.changedTouches[0].screenX;
+      const swipeDistance = touchEndX - touchStartX;
+      
+      if (Math.abs(swipeDistance) > minSwipeDistance) {
+        if (swipeDistance > 0) {
+          // Swipe right - go to previous days
+          this.navigateMobileDays(-1);
+        } else {
+          // Swipe left - go to next days
+          this.navigateMobileDays(1);
+        }
+      }
+    }, { passive: true });
+  },
+
+  /**
    * Render current view
    */
   renderView() {
@@ -757,18 +842,14 @@ const Calendar = {
       });
     }
     
-    // On mobile, find today's index and show 3 days centered around today
+    // On mobile, use mobileStartDay to determine visible range
     let visibleIndexes = [];
     if (isMobile) {
-      const todayIndex = weekDays.findIndex(wd => wd.isToday);
-      const centerIndex = todayIndex >= 0 ? todayIndex : Math.floor(visibleDays / 2);
+      // Ensure mobileStartDay is within valid bounds
+      if (this.mobileStartDay < 0) this.mobileStartDay = 0;
+      if (this.mobileStartDay + visibleDays > 7) this.mobileStartDay = 7 - visibleDays;
       
-      // Calculate start index, ensuring we stay within bounds
-      let startIdx = centerIndex - Math.floor(visibleDays / 2);
-      if (startIdx < 0) startIdx = 0;
-      if (startIdx + visibleDays > 7) startIdx = 7 - visibleDays;
-      
-      for (let i = startIdx; i < startIdx + visibleDays; i++) {
+      for (let i = this.mobileStartDay; i < this.mobileStartDay + visibleDays; i++) {
         visibleIndexes.push(i);
       }
     } else {
@@ -780,8 +861,26 @@ const Calendar = {
       ? weekDays.filter(wd => visibleIndexes.includes(wd.index))
       : weekDays;
     
+    // Check if we can navigate left/right on mobile
+    const canGoLeft = isMobile && this.mobileStartDay > 0;
+    const canGoRight = isMobile && this.mobileStartDay + visibleDays < 7;
+    
     let html = `
       <div class="week-view" style="--visible-days: ${displayDays.length}">
+        ${isMobile ? `
+        <!-- Mobile day navigation -->
+        <div class="week-view__mobile-nav">
+          <button class="week-view__mobile-nav-btn" id="mobile-days-prev" ${!canGoLeft ? 'disabled' : ''} title="Предишни дни">
+            ◀
+          </button>
+          <span class="week-view__mobile-nav-info">
+            ${displayDays[0].day} ${displayDays[0].dayNum} - ${displayDays[displayDays.length-1].day} ${displayDays[displayDays.length-1].dayNum}
+          </span>
+          <button class="week-view__mobile-nav-btn" id="mobile-days-next" ${!canGoRight ? 'disabled' : ''} title="Следващи дни">
+            ▶
+          </button>
+        </div>
+        ` : ''}
         <!-- Header row with day names -->
         <div class="week-view__header" style="grid-template-columns: ${isMobile ? '45px' : '60px'} repeat(${displayDays.length}, 1fr)">
           <div class="week-view__corner"></div>
@@ -1079,6 +1178,19 @@ const Calendar = {
    * Setup grid event listeners
    */
   setupGridListeners() {
+    // Mobile day navigation for week view
+    document.getElementById('mobile-days-prev')?.addEventListener('click', () => {
+      this.navigateMobileDays(-1);
+    });
+    document.getElementById('mobile-days-next')?.addEventListener('click', () => {
+      this.navigateMobileDays(1);
+    });
+    
+    // Touch swipe navigation for mobile week view
+    if (this.isMobile() && this.currentView === 'week') {
+      this.setupSwipeNavigation();
+    }
+    
     // Drag selection for blocking
     let isDragging = false;
     
