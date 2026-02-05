@@ -3278,8 +3278,9 @@ button {
     padding: 6px 10px;
   }
   
-  .block-buttons {
-    display: none;
+  .block-buttons .btn--warning {
+    font-size: 11px;
+    padding: 6px 8px;
   }
   
   /* Modal mobile fixes */
