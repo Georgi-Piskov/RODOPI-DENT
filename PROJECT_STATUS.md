@@ -1,7 +1,7 @@
 # 📊 ТЕКУЩО СЪСТОЯНИЕ НА ПРОЕКТА - RODOPI DENT
 
-> **Последна актуализация:** 4 февруари 2026  
-> **Версия:** 3.25 (Dashboard & Calendar Improvements)
+> **Последна актуализация:** 5 февруари 2026  
+> **Версия:** 3.26 (SEO Optimization & Google Search Console)
 
 ---
 
@@ -9,10 +9,10 @@
 
 ### Frontend (PWA)
 - **Хостинг:** GitHub Pages
-- **URL:** https://georgi-piskov.github.io/RODOPI-DENT/
+- **URL:** https://rodopident.com (custom domain)
 - **Технологии:** Vanilla JS, CSS, HTML (без frameworks)
 - **Рутиране:** Hash-based (#/booking, #/admin/calendar, etc.)
-- **Cache версия:** v=3.7
+- **Cache версия:** v=3.8
 
 ### Backend (n8n)
 - **URL:** https://n8n.simeontsvetanovn8nworkflows.site
@@ -30,18 +30,27 @@
 - **Telegram:** Bot за известия към доктора (RoдопиДентBot)
 - **Telegram Admin Chat ID:** 2146283697
 
+### SEO & Analytics (НОВО v3.26)
+- **Google Search Console:** Верифициран ✅
+- **Sitemap:** https://rodopident.com/sitemap.xml
+- **robots.txt:** Конфигуриран
+- **Schema.org:** LocalBusiness/Dentist структурирани данни
+
 ---
 
 ## 📁 СТРУКТУРА НА ФАЙЛОВЕТЕ
 
 ```
 RODOPI-DENT-system/
-├── index.html                    # Основен HTML (v=3.7)
-├── manifest.json                 # PWA manifest
-├── sw.js                         # Service Worker (v=3.7)
+├── index.html                    # Основен HTML (v=3.8 + SEO)
+├── manifest.json                 # PWA manifest (SEO подобрен)
+├── sw.js                         # Service Worker (v=3.8)
+├── robots.txt                    # SEO - указания за crawlers (НОВО)
+├── sitemap.xml                   # SEO - карта на сайта (НОВО)
+├── googlec061c7bb7a080f88.html   # Google Search Console verification (НОВО)
 │
 ├── css/
-│   └── main.css                  # Всички стилове (v=3.7)
+│   └── main.css                  # Всички стилове (v=3.8)
 │
 ├── js/
 │   ├── config.js                 # Конфигурация и endpoints
@@ -50,7 +59,7 @@ RODOPI-DENT-system/
 │   ├── auth.js                   # Google OAuth2
 │   ├── router.js                 # Hash рутиране
 │   ├── calendar.js               # Админ календар + pending ⚠️ НЕ ПИПАЙ
-│   └── app.js                    # Основно приложение с финанси (v=3.7)
+│   └── app.js                    # Основно приложение с финанси (v=3.8)
 │
 ├── n8n-workflows/
 │   ├── 01-slots-webhook.json     # Свободни часове
