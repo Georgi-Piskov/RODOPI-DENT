@@ -1,0 +1,11 @@
+# Robots.txt for Родопи Дент
+# https://rodopident.com
+
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://rodopident.com/sitemap.xml
+
+# Crawl-delay (optional, be nice to servers)
+Crawl-delay: 1
