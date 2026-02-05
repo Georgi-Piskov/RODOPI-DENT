@@ -1,12 +1,15 @@
 {
-  "name": "Родопи Дент",
+  "name": "Родопи Дент - Зъболекар Смолян",
   "short_name": "Родопи Дент",
-  "description": "Зъболекарска практика - Запазете час онлайн",
+  "description": "Зъболекарски кабинет в Смолян. Качествено дентално лечение, НЗОК услуги. Запазете час онлайн 24/7!",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2563eb",
   "orientation": "portrait-primary",
+  "categories": ["medical", "health"],
+  "lang": "bg",
+  "dir": "ltr",
   "icons": [
     {
       "src": "assets/logo.png",
