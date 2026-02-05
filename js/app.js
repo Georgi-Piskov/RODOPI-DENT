@@ -1998,11 +1998,17 @@ const App = {
       }
     } else {
       // Custom entry - single record
-      const customAmount = parseFloat(formData.get('customAmount'));
+      const customAmount = parseFloat(formData.get('customAmount')) || 0;
       const customDescription = formData.get('customDescription')?.trim() || 'Приход';
       
-      if (!customAmount || customAmount <= 0) {
-        Utils.showToast('Моля въведете сума', 'warning');
+      // Allow 0 amount if there's remaining payment (debt only record)
+      if (customAmount < 0) {
+        Utils.showToast('Сумата не може да бъде отрицателна', 'warning');
+        return;
+      }
+      
+      if (customAmount === 0 && remainingPayment <= 0) {
+        Utils.showToast('Моля въведете сума или остатък за доплащане', 'warning');
         return;
       }
       
@@ -2015,7 +2021,7 @@ const App = {
         patientAmount: customAmount,
         amount: customAmount, // amount does NOT include remainingPayment
         remainingPayment: remainingPayment, // Attach debt to this single record
-        description: customDescription
+        description: customDescription || (remainingPayment > 0 ? 'Остатък за доплащане' : 'Приход')
       });
     }
 
