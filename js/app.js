@@ -2491,15 +2491,15 @@ const App = {
     this.financeRecords.forEach(r => {
       const amount = parseFloat(r.amount) || 0;
       if (r.type === 'income') {
-        income += amount;
+        income += Math.abs(amount);
       } else if (r.type === 'expense') {
-        expense += amount;
+        expense += Math.abs(amount);
       }
     });
     
     // Update summary in EUR
     if (incomeEl) incomeEl.textContent = `${income.toFixed(2)} €`;
-    if (expenseEl) expenseEl.textContent = `${expense.toFixed(2)} €`;
+    if (expenseEl) expenseEl.textContent = `-${expense.toFixed(2)} €`;
     if (balanceEl) {
       const balance = income - expense;
       balanceEl.textContent = `${balance.toFixed(2)} €`;
