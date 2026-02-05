@@ -1142,9 +1142,12 @@ const Calendar = {
         event.patientPhone ? `Тел: ${event.patientPhone}` : ''
       ].filter(Boolean).join(' | ');
       
-      // For 15-min events, show only name (no time/procedure)
+      // Compact mode: show only name for short events
+      // On mobile: 15-30 min events are compact (not enough space)
+      // On desktop: only 15 min events are compact
       const duration = event.duration || 30;
-      const isCompact = duration <= 15;
+      const isMobile = this.isMobile();
+      const isCompact = isMobile ? (duration <= 30) : (duration <= 15);
       
       return `
         <div class="calendar-event calendar-event--${event.status || 'confirmed'} ${colorClass}${isCompact ? ' calendar-event--compact' : ''}" 
