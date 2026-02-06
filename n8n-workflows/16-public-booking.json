@@ -341,6 +341,31 @@
       "typeVersion": 4.2,
       "position": [1760, 500],
       "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.simeontsvetanovn8nworkflows.site/webhook/patients-upsert",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"name\": \"{{ $('Prepare Event Data').first().json.patientName }}\",\n  \"phone\": \"{{ $('Prepare Event Data').first().json.patientPhone }}\"\n}",
+        "options": {}
+      },
+      "id": "save-patient",
+      "name": "Save Patient to Sheet",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1760, 650],
+      "continueOnFail": true
     }
   ],
   "connections": {
@@ -450,6 +475,11 @@
           },
           {
             "node": "Send SMS to Patient",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save Patient to Sheet",
             "type": "main",
             "index": 0
           }

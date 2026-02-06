@@ -38,7 +38,7 @@
       "name": "Read Finance",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [220, 0],
+      "position": [220, -100],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "",
@@ -48,13 +48,53 @@
     },
     {
       "parameters": {
-        "jsCode": "const query = $('Webhook').first().json.query || {};\nlet records = $('Read Finance').all().map(item => item.json);\n\n// Filter by date\nif (query.date) {\n  records = records.filter(rec => rec.date === query.date);\n}\n\n// Filter by date range\nif (query.startDate && query.endDate) {\n  records = records.filter(rec => {\n    return rec.date >= query.startDate && rec.date <= query.endDate;\n  });\n}\n\n// Filter by type (income/expense)\nif (query.type) {\n  records = records.filter(rec => rec.type === query.type);\n}\n\n// Filter by category\nif (query.category) {\n  records = records.filter(rec => rec.category === query.category);\n}\n\n// Calculate totals (amounts are already +/- in EUR)\nconst totalIncome = records\n  .filter(r => r.type === 'income')\n  .reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);\n\nconst totalExpense = records\n  .filter(r => r.type === 'expense')\n  .reduce((sum, r) => sum + Math.abs(parseFloat(r.amount || 0)), 0);\n\n// Group by category\nconst byCategory = {};\nrecords.forEach(rec => {\n  const cat = rec.category || 'other';\n  if (!byCategory[cat]) {\n    byCategory[cat] = { income: 0, expense: 0, count: 0 };\n  }\n  byCategory[cat].count++;\n  if (rec.type === 'income') {\n    byCategory[cat].income += parseFloat(rec.amount || 0);\n  } else {\n    byCategory[cat].expense += Math.abs(parseFloat(rec.amount || 0));\n  }\n});\n\n// Sort by date descending\nrecords.sort((a, b) => (b.date || '').localeCompare(a.date || ''));\n\nreturn [{\n  json: {\n    success: true,\n    count: records.length,\n    totalIncome: Math.round(totalIncome * 100) / 100,\n    totalExpense: Math.round(totalExpense * 100) / 100,\n    balance: Math.round((totalIncome - totalExpense) * 100) / 100,\n    byCategory: byCategory,\n    records: records,\n    currency: 'EUR'\n  }\n}];"
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Patients"
+        },
+        "options": {
+          "returnAllMatches": true
+        }
+      },
+      "id": "read-patients",
+      "name": "Read Patients",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [220, 100],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch",
+        "output": "wait"
+      },
+      "id": "merge-data",
+      "name": "Wait for Both",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const query = $('Webhook').first().json.query || {};\nlet records = $('Read Finance').all().map(item => item.json);\nconst patients = $('Read Patients').all().map(item => item.json);\n\n// Create a map of patient name -> phone for quick lookup\nconst patientPhoneMap = {};\npatients.forEach(p => {\n  if (p.name) {\n    // Normalize name for matching (lowercase, trim)\n    const normalizedName = p.name.toLowerCase().trim();\n    patientPhoneMap[normalizedName] = p.phone || '';\n  }\n});\n\n// Filter by date\nif (query.date) {\n  records = records.filter(rec => rec.date === query.date);\n}\n\n// Filter by date range\nif (query.startDate && query.endDate) {\n  records = records.filter(rec => {\n    return rec.date >= query.startDate && rec.date <= query.endDate;\n  });\n}\n\n// Filter by type (income/expense)\nif (query.type) {\n  records = records.filter(rec => rec.type === query.type);\n}\n\n// Filter by category\nif (query.category) {\n  records = records.filter(rec => rec.category === query.category);\n}\n\n// Filter by patient name (search)\nif (query.search) {\n  const searchTerm = query.search.toLowerCase().trim();\n  records = records.filter(rec => {\n    const patientName = (rec.patientName || '').toLowerCase();\n    return patientName.includes(searchTerm);\n  });\n}\n\n// Add phone number to each record from Patients sheet\nrecords = records.map(rec => {\n  const normalizedName = (rec.patientName || '').toLowerCase().trim();\n  return {\n    ...rec,\n    patientPhone: patientPhoneMap[normalizedName] || ''\n  };\n});\n\n// Calculate totals (amounts are already +/- in EUR)\nconst totalIncome = records\n  .filter(r => r.type === 'income')\n  .reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);\n\nconst totalExpense = records\n  .filter(r => r.type === 'expense')\n  .reduce((sum, r) => sum + Math.abs(parseFloat(r.amount || 0)), 0);\n\n// Group by category\nconst byCategory = {};\nrecords.forEach(rec => {\n  const cat = rec.category || 'other';\n  if (!byCategory[cat]) {\n    byCategory[cat] = { income: 0, expense: 0, count: 0 };\n  }\n  byCategory[cat].count++;\n  if (rec.type === 'income') {\n    byCategory[cat].income += parseFloat(rec.amount || 0);\n  } else {\n    byCategory[cat].expense += Math.abs(parseFloat(rec.amount || 0));\n  }\n});\n\n// Sort by date descending\nrecords.sort((a, b) => (b.date || '').localeCompare(a.date || ''));\n\n// Also return patients list for search functionality\nreturn [{\n  json: {\n    success: true,\n    count: records.length,\n    totalIncome: Math.round(totalIncome * 100) / 100,\n    totalExpense: Math.round(totalExpense * 100) / 100,\n    balance: Math.round((totalIncome - totalExpense) * 100) / 100,\n    byCategory: byCategory,\n    records: records,\n    patients: patients,\n    currency: 'EUR'\n  }\n}];"
       },
       "id": "filter-calculate",
       "name": "Filter & Calculate",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 0]
+      "position": [660, 0]
     },
     {
       "parameters": {
@@ -75,7 +115,7 @@
       "name": "Respond",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [660, 0]
+      "position": [880, 0]
     }
   ],
   "connections": {
@@ -86,11 +126,38 @@
             "node": "Read Finance",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Read Patients",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
     },
     "Read Finance": {
+      "main": [
+        [
+          {
+            "node": "Wait for Both",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Patients": {
+      "main": [
+        [
+          {
+            "node": "Wait for Both",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Wait for Both": {
       "main": [
         [
           {

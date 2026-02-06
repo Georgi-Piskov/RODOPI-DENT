@@ -532,6 +532,7 @@ const App = {
         // Fetch ALL records (no date filter) to search through all history
         const response = await API.getFinance({ startDate: '2020-01-01', endDate: Utils.today() });
         const allRecords = response.data?.records || [];
+        const allPatients = response.data?.patients || [];
         
         // Filter by patient name (case insensitive)
         const queryLower = query.toLowerCase();
@@ -539,16 +540,24 @@ const App = {
           r.patientName && r.patientName.toLowerCase().includes(queryLower)
         );
         
+        // Find patient phone from Patients sheet (even if no finance records)
+        const matchedPatient = allPatients.find(p => 
+          p.name && p.name.toLowerCase().includes(queryLower)
+        );
+        const patientPhone = matchedPatient?.phone || 
+          (patientRecords.length > 0 ? patientRecords[0].patientPhone : '') || '';
+        
         Utils.hideLoading();
         
         // Show results
         this.isPatientSearch = true;
         clearBtn.hidden = false;
         
-        // Update title
+        // Update title with phone number
         const titleEl = document.getElementById('records-title');
         if (titleEl) {
-          titleEl.textContent = `🔍 Резултати за "${query}" (${patientRecords.length} записа)`;
+          const phoneDisplay = patientPhone ? ` 📞 ${patientPhone}` : '';
+          titleEl.textContent = `🔍 Резултати за "${query}"${phoneDisplay} (${patientRecords.length} записа)`;
         }
         
         // Calculate patient totals
