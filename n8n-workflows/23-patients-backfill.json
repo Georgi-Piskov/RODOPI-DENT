@@ -1,0 +1,288 @@
+{
+  "name": "Rodopi Dent - Patients Backfill from Calendar",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Date range: 1 year back to 3 months forward (to catch future appointments)\nconst now = new Date();\nconst oneYearAgo = new Date();\noneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);\nconst threeMonthsAhead = new Date();\nthreeMonthsAhead.setMonth(threeMonthsAhead.getMonth() + 3);\n\nreturn [{\n  json: {\n    startDate: oneYearAgo.toISOString().split('T')[0] + 'T00:00:00+02:00',\n    endDate: threeMonthsAhead.toISOString().split('T')[0] + 'T23:59:59+02:00'\n  }\n}];"
+      },
+      "id": "set-date-range",
+      "name": "Set Date Range",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "rodopi.dent@gmail.com"
+        },
+        "returnAll": true,
+        "options": {
+          "timeMax": "={{ $json.endDate }}",
+          "timeMin": "={{ $json.startDate }}",
+          "singleEvents": true,
+          "orderBy": "startTime"
+        }
+      },
+      "id": "get-calendar-events",
+      "name": "Get All Calendar Events",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.2,
+      "position": [440, 0],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "",
+          "name": "Google Calendar"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract patient name + phone from all calendar events\nconst events = $input.all();\nconst patients = new Map(); // phoneKey -> { name, phone }\n\n// Normalize phone to +359 international format\nfunction toInternational(p) {\n  let phone = String(p || '').replace(/[\\s()\\-.]/g, '');\n  if (phone.startsWith('00359')) phone = '+359' + phone.slice(5);\n  else if (phone.startsWith('0') && phone.length >= 10) phone = '+359' + phone.slice(1);\n  else if (/^[89]\\d{8}$/.test(phone)) phone = '+359' + phone;\n  else if (!phone.startsWith('+') && phone.length >= 9) phone = '+359' + phone;\n  return phone;\n}\n\n// Extract core 9-digit number for deduplication\nfunction phoneKey(p) {\n  return String(p || '').replace(/[\\s()\\-.+]/g, '').replace(/^359/, '').replace(/^0/, '');\n}\n\nfor (const item of events) {\n  const event = item.json;\n  const summary = (event.summary || '').trim();\n  // Strip any HTML tags from description\n  const description = (event.description || '').replace(/<[^>]*>/g, ' ');\n  \n  // Skip all-day events, events without title\n  if (!summary || event.start?.date) continue;\n  \n  // Skip blocked/system events\n  const lower = summary.toLowerCase();\n  if (lower.includes('блокиран') || lower.includes('почивка') || lower.includes('blocked') || lower.includes('block')) continue;\n  \n  // Extract phone from description - multiple patterns from most to least specific\n  let phone = '';\n  const phonePatterns = [\n    /(?:📞\\s*)?(?:тел|phone|tel)[.:\\s]+([+\\d\\s()\\-]{7,})/i,\n    /(?:📱\\s*)([+\\d\\s()\\-]{7,})/,\n    /((?:\\+359|00359)\\d{8,9})/,\n    /(0[89]\\d{7,8})/,\n    /\\b(\\d{9,10})\\b/\n  ];\n  \n  for (const pattern of phonePatterns) {\n    const match = description.match(pattern);\n    if (match) {\n      phone = match[1].replace(/[\\s()\\-]/g, '').trim();\n      break;\n    }\n  }\n  \n  if (!phone || phone.length < 7) continue;\n  \n  // Store in international format\n  const intlPhone = toInternational(phone);\n  const key = phoneKey(phone);\n  \n  // Keep first occurrence of each patient\n  if (!patients.has(key)) {\n    patients.set(key, {\n      name: summary,\n      phone: intlPhone\n    });\n  }\n}\n\nconst patientList = Array.from(patients.values());\n\nreturn [{\n  json: {\n    extractedCount: patientList.length,\n    totalEvents: events.length,\n    patients: patientList\n  }\n}];"
+      },
+      "id": "extract-patients",
+      "name": "Extract Patients from Events",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Patients"
+        },
+        "options": {
+          "returnAllMatches": true
+        }
+      },
+      "id": "read-existing-patients",
+      "name": "Read Existing Patients",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [660, 200],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch",
+        "output": "wait"
+      },
+      "id": "wait-for-both",
+      "name": "Wait for Both",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [880, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Compare extracted patients with existing and find new ones\nconst extracted = $('Extract Patients from Events').first().json;\nconst existingRows = $('Read Existing Patients').all().map(item => item.json);\n\n// Core 9-digit number for comparison\nfunction phoneKey(p) {\n  return String(p || '').replace(/[\\s()\\-.+]/g, '').replace(/^359/, '').replace(/^0/, '');\n}\n\n// Build sets for lookup\nconst existingPhoneKeys = new Set();\nconst existingNames = new Set();\n\nexistingRows.forEach(p => {\n  if (p.phone) existingPhoneKeys.add(phoneKey(p.phone));\n  if (p.name) existingNames.add(p.name.toLowerCase().trim());\n});\n\n// Filter out already existing patients (by phone OR by name)\nconst newPatients = extracted.patients.filter(p => {\n  const key = phoneKey(p.phone);\n  const normName = p.name.toLowerCase().trim();\n  return !existingPhoneKeys.has(key) && !existingNames.has(normName);\n});\n\nif (newPatients.length === 0) {\n  return [{\n    json: {\n      noNewPatients: true,\n      summary: `Общо събития: ${extracted.totalEvents}, Извлечени пациенти: ${extracted.extractedCount}, Вече в таблицата: ${existingRows.length}, Нови: 0`\n    }\n  }];\n}\n\nreturn newPatients.map(p => ({\n  json: {\n    noNewPatients: false,\n    name: p.name,\n    phone: p.phone,\n    createdAt: new Date().toISOString().split('T')[0]\n  }\n}));"
+      },
+      "id": "find-new-patients",
+      "name": "Find New Patients",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.noNewPatients }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "has-new-patients",
+      "name": "Has New Patients?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1320, 100]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Patients"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "name": "={{ $json.name }}",
+            "phone": "={{ \"'\" + $json.phone }}",
+            "createdAt": "={{ $json.createdAt }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "append-patients",
+      "name": "Append New Patients",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1540, 200],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Final summary\nconst items = $input.all();\nreturn [{\n  json: {\n    success: true,\n    message: `✅ Добавени ${items.length} нови пациенти в Patients sheet`,\n    addedCount: items.length,\n    patients: items.map(i => ({ name: i.json.name, phone: i.json.phone }))\n  }\n}];"
+      },
+      "id": "summary",
+      "name": "Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 200]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Date Range",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Date Range": {
+      "main": [
+        [
+          {
+            "node": "Get All Calendar Events",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Existing Patients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Calendar Events": {
+      "main": [
+        [
+          {
+            "node": "Extract Patients from Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Patients from Events": {
+      "main": [
+        [
+          {
+            "node": "Wait for Both",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Existing Patients": {
+      "main": [
+        [
+          {
+            "node": "Wait for Both",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Wait for Both": {
+      "main": [
+        [
+          {
+            "node": "Find New Patients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find New Patients": {
+      "main": [
+        [
+          {
+            "node": "Has New Patients?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has New Patients?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Append New Patients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append New Patients": {
+      "main": [
+        [
+          {
+            "node": "Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "Rodopi Dent"
+    }
+  ]
+}

@@ -19,7 +19,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Validate input\nconst body = $input.first().json.body;\n\nif (!body.name || !body.phone) {\n  return [{\n    json: {\n      valid: false,\n      error: 'Липсва име или телефон'\n    }\n  }];\n}\n\n// Normalize phone (remove spaces, ensure consistent format)\nlet phone = body.phone.replace(/\\s/g, '').replace(/^\\+359/, '0');\n\nreturn [{\n  json: {\n    valid: true,\n    name: body.name.trim(),\n    phone: phone\n  }\n}];"
+        "jsCode": "// Validate input\nconst body = $input.first().json.body;\n\nif (!body.name || !body.phone) {\n  return [{\n    json: {\n      valid: false,\n      error: 'Липсва име или телефон'\n    }\n  }];\n}\n\n// Normalize phone to international +359 format\n// This prevents Google Sheets from stripping the leading 0\nlet phone = String(body.phone).replace(/[\\s()\\-.]/g, '');\nif (phone.startsWith('00359')) phone = '+359' + phone.slice(5);\nelse if (phone.startsWith('0') && phone.length >= 10) phone = '+359' + phone.slice(1);\nelse if (/^[89]\\d{8}$/.test(phone)) phone = '+359' + phone;\nelse if (!phone.startsWith('+') && phone.length >= 9) phone = '+359' + phone;\n\nreturn [{\n  json: {\n    valid: true,\n    name: body.name.trim(),\n    phone: phone\n  }\n}];"
       },
       "id": "validate",
       "name": "Validate Input",
@@ -96,7 +96,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Check if patient with this phone already exists\nconst inputData = $('Validate Input').first().json;\nconst existingPatients = $('Read Patients').all().map(item => item.json);\n\n// Normalize phone for comparison\nconst normalizePhone = (p) => (p || '').replace(/\\s/g, '').replace(/^\\+359/, '0');\n\nconst exists = existingPatients.some(patient => \n  normalizePhone(patient.phone) === normalizePhone(inputData.phone)\n);\n\nreturn [{\n  json: {\n    exists: exists,\n    name: inputData.name,\n    phone: inputData.phone\n  }\n}];"
+        "jsCode": "// Check if patient with this phone already exists\nconst inputData = $('Validate Input').first().json;\nconst existingPatients = $('Read Patients').all().map(item => item.json);\n\n// Extract core 9-digit number for robust comparison across formats\n// +359887493315 / 0887493315 / 887493315 all map to 887493315\nconst phoneKey = (p) => String(p || '').replace(/[\\s()\\-.+]/g, '').replace(/^359/, '').replace(/^0/, '');\n\nconst inputKey = phoneKey(inputData.phone);\nconst phoneExists = existingPatients.some(patient => phoneKey(patient.phone) === inputKey);\n\n// Also check by name (case-insensitive)\nconst nameExists = existingPatients.some(patient =>\n  (patient.name || '').toLowerCase().trim() === (inputData.name || '').toLowerCase().trim()\n);\n\nreturn [{\n  json: {\n    exists: phoneExists || nameExists,\n    name: inputData.name,\n    phone: inputData.phone\n  }\n}];"
       },
       "id": "check-exists",
       "name": "Check If Exists",
@@ -159,7 +159,7 @@
           "mappingMode": "defineBelow",
           "value": {
             "name": "={{ $json.name }}",
-            "phone": "={{ $json.phone }}",
+            "phone": "={{ \"'\" + $json.phone }}",
             "createdAt": "={{ new Date().toISOString().split('T')[0] }}"
           }
         },

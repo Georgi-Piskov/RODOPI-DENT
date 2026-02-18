@@ -540,12 +540,10 @@ const App = {
           r.patientName && r.patientName.toLowerCase().includes(queryLower)
         );
         
-        // Find patient phone from Patients sheet (even if no finance records)
-        const matchedPatient = allPatients.find(p => 
+        // Find ALL matching patients from Patients sheet (not just the first one)
+        const matchedPatients = allPatients.filter(p => 
           p.name && p.name.toLowerCase().includes(queryLower)
         );
-        const patientPhone = matchedPatient?.phone || 
-          (patientRecords.length > 0 ? patientRecords[0].patientPhone : '') || '';
         
         Utils.hideLoading();
         
@@ -553,11 +551,19 @@ const App = {
         this.isPatientSearch = true;
         clearBtn.hidden = false;
         
-        // Update title with phone number
+        // Build patient info display with full names and phones
         const titleEl = document.getElementById('records-title');
         if (titleEl) {
-          const phoneDisplay = patientPhone ? ` 📞 ${patientPhone}` : '';
-          titleEl.textContent = `🔍 Резултати за "${query}"${phoneDisplay} (${patientRecords.length} записа)`;
+          if (matchedPatients.length > 0) {
+            const patientLines = matchedPatients.map(p => {
+              const phone = p.phone ? ` 📞 ${p.phone}` : '';
+              return `${p.name}${phone}`;
+            });
+            titleEl.innerHTML = `🔍 Резултати за "${query}" (${patientRecords.length} записа)<br>` +
+              patientLines.map(line => `<span style="display:block;font-size:0.9em;margin-top:4px;">👤 ${line}</span>`).join('');
+          } else {
+            titleEl.textContent = `🔍 Резултати за "${query}" (${patientRecords.length} записа)`;
+          }
         }
         
         // Calculate patient totals
@@ -572,13 +578,15 @@ const App = {
         document.getElementById('stat-income').textContent = `${totalPaid.toFixed(2)} €`;
         document.getElementById('stat-expense').textContent = '-';
         document.getElementById('stat-balance').textContent = '-';
-        document.getElementById('stat-patients').textContent = patientRecords.length > 0 ? '1' : '0';
+        document.getElementById('stat-patients').textContent = matchedPatients.length || (patientRecords.length > 0 ? '1' : '0');
         
         // Render patient records
         this.allDashboardRecords = patientRecords;
         this.renderRecentRecords(patientRecords);
         
-        if (patientRecords.length === 0) {
+        if (patientRecords.length === 0 && matchedPatients.length > 0) {
+          Utils.showToast('Пациентът е намерен, но няма финансови записи', 'info');
+        } else if (patientRecords.length === 0) {
           Utils.showToast('Няма намерени записи за този пациент', 'info');
         }
         
