@@ -455,6 +455,21 @@ const Calendar = {
         document.querySelector('input[name="colorId"]').value = btn.dataset.color;
       });
     });
+
+    // Auto-switch color when status changes
+    const statusSelect = document.querySelector('#event-form select[name="status"]');
+    if (statusSelect) {
+      statusSelect.addEventListener('change', () => {
+        const statusColorMap = { pending: 'yellow', confirmed: 'green', completed: 'gray' };
+        const newColor = statusColorMap[statusSelect.value] || 'green';
+        document.querySelectorAll('.color-picker__option').forEach(b => b.classList.remove('active'));
+        const colorBtn = document.querySelector(`.color-picker__option--${newColor}`);
+        if (colorBtn) {
+          colorBtn.classList.add('active');
+          document.querySelector('input[name="colorId"]').value = newColor;
+        }
+      });
+    }
   },
 
   /**
