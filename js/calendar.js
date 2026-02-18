@@ -60,6 +60,7 @@ const Calendar = {
         </div>
       </div>
       ${this.renderEventModal()}
+      ${this.renderDayBlockPopup()}
     `;
     
     this.setupEventListeners();
@@ -256,6 +257,95 @@ const Calendar = {
     });
   },
   
+  /**
+   * Render the day-block popup (shown when clicking day number in month view)
+   */
+  renderDayBlockPopup() {
+    return `
+      <div class="day-block-popup" id="day-block-popup" hidden>
+        <div class="day-block-popup__header">
+          <span id="day-block-popup-title">Блокирай</span>
+          <button type="button" class="day-block-popup__close" id="day-block-popup-close">&times;</button>
+        </div>
+        <button class="day-block-popup__option" data-block-type="day">🚫 Цял ден (09:00–18:00)</button>
+        <button class="day-block-popup__option" data-block-type="morning">🌅 Преди обяд (09:00–12:00)</button>
+        <button class="day-block-popup__option" data-block-type="afternoon">🌇 След обяд (13:30–18:00)</button>
+      </div>
+    `;
+  },
+
+  /**
+   * Show day-block popup near clicked day number
+   */
+  showDayBlockPopup(dateStr, anchorEl) {
+    const popup = document.getElementById('day-block-popup');
+    if (!popup) return;
+
+    // Set title
+    const dateParts = dateStr.split('-');
+    document.getElementById('day-block-popup-title').textContent = `Блокирай ${dateParts[2]}.${dateParts[1]}`;
+    popup.dataset.date = dateStr;
+    popup.hidden = false;
+
+    // Position popup near the anchor
+    const rect = anchorEl.getBoundingClientRect();
+    const isMobile = this.isMobile();
+
+    if (isMobile) {
+      // Center on screen for mobile
+      popup.style.position = 'fixed';
+      popup.style.left = '50%';
+      popup.style.top = '50%';
+      popup.style.transform = 'translate(-50%, -50%)';
+    } else {
+      popup.style.position = 'fixed';
+      popup.style.transform = 'none';
+      popup.style.left = Math.min(rect.left, window.innerWidth - 220) + 'px';
+      popup.style.top = (rect.bottom + 4) + 'px';
+    }
+  },
+
+  /**
+   * Hide the day-block popup
+   */
+  hideDayBlockPopup() {
+    const popup = document.getElementById('day-block-popup');
+    if (popup) popup.hidden = true;
+  },
+
+  /**
+   * Quick block for a specific date (from day-number click)
+   */
+  async quickBlockForDate(dateStr, type) {
+    let startTime, endTime, title;
+
+    switch (type) {
+      case 'morning':
+        startTime = '09:00';
+        endTime = '12:00';
+        title = 'Блокиран (сутрин)';
+        break;
+      case 'afternoon':
+        startTime = '13:30';
+        endTime = '18:00';
+        title = 'Блокиран (следобед)';
+        break;
+      case 'day':
+      default:
+        startTime = '09:00';
+        endTime = '18:00';
+        title = 'Блокиран (цял ден)';
+        break;
+    }
+
+    this.hideDayBlockPopup();
+
+    await this.createBlockEvent(dateStr, startTime, endTime, title);
+    Utils.showToast(`${title} – ${dateStr}`, 'success');
+    await this.loadEvents();
+    this.renderView();
+  },
+
   /**
    * Quick block - block morning, afternoon, day, or week
    */
@@ -983,7 +1073,7 @@ const Calendar = {
       
       html += `
         <div class="month-grid__day ${isWeekend ? 'month-grid__day--weekend' : ''} ${isToday ? 'month-grid__day--today' : ''}" data-date="${date}">
-          <span class="month-grid__day-number">${day}</span>
+          <span class="month-grid__day-number" title="Натисни за блокиране">${day}</span>
           <div class="month-grid__events">
             ${dayEvents.slice(0, maxDisplay).map(e => {
               const monthBadge = e.status === 'pending' ? '⏳ ' : e.status === 'completed' ? '✅ ' : '';
@@ -1288,7 +1378,45 @@ const Calendar = {
         this.changeView('day');
       });
     });
-    
+
+    // Click on day NUMBER → show quick-block popup
+    document.querySelectorAll('.month-grid__day-number').forEach(numEl => {
+      numEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const dayCell = numEl.closest('.month-grid__day');
+        if (!dayCell || dayCell.classList.contains('month-grid__day--other-month')) return;
+        const date = dayCell.dataset.date;
+        if (date) this.showDayBlockPopup(date, numEl);
+      });
+    });
+
+    // Day-block popup option buttons
+    document.querySelectorAll('.day-block-popup__option').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const popup = document.getElementById('day-block-popup');
+        const dateStr = popup?.dataset.date;
+        const blockType = btn.dataset.blockType;
+        if (dateStr && blockType) {
+          await this.quickBlockForDate(dateStr, blockType);
+        }
+      });
+    });
+
+    // Close popup button
+    document.getElementById('day-block-popup-close')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.hideDayBlockPopup();
+    });
+
+    // Close popup on outside click
+    document.addEventListener('click', (e) => {
+      const popup = document.getElementById('day-block-popup');
+      if (popup && !popup.hidden && !popup.contains(e.target) && !e.target.classList.contains('month-grid__day-number')) {
+        this.hideDayBlockPopup();
+      }
+    });
+
     // Click on month event
     document.querySelectorAll('.month-event').forEach(event => {
       event.addEventListener('click', (e) => {

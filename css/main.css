@@ -2768,6 +2768,81 @@ button {
   color: var(--color-gray-700);
   border-radius: var(--radius-full);
   margin-bottom: var(--spacing-1);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.month-grid__day-number:hover {
+  background: #fbbf24;
+  color: #92400e;
+  box-shadow: 0 0 0 2px #fbbf2488;
+}
+
+/* Day Block Popup */
+.day-block-popup {
+  position: fixed;
+  z-index: 1100;
+  background: white;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+  padding: 0;
+  min-width: 200px;
+  overflow: hidden;
+  border: 1px solid var(--color-gray-200);
+}
+
+.day-block-popup__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--color-gray-50);
+  border-bottom: 1px solid var(--color-gray-200);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-800);
+}
+
+.day-block-popup__close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: var(--color-gray-500);
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.day-block-popup__close:hover {
+  color: var(--color-gray-900);
+}
+
+.day-block-popup__option {
+  display: block;
+  width: 100%;
+  padding: 12px 14px;
+  text-align: left;
+  background: white;
+  border: none;
+  border-bottom: 1px solid var(--color-gray-100);
+  font-size: var(--font-size-sm);
+  color: var(--color-gray-800);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.day-block-popup__option:last-child {
+  border-bottom: none;
+}
+
+.day-block-popup__option:hover {
+  background: #fff7ed;
+  color: #b45309;
+}
+
+.day-block-popup__option:active {
+  background: #fbbf24;
+  color: #78350f;
 }
 
 .month-grid__day--today .month-grid__day-number {
