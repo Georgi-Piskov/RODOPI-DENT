@@ -539,13 +539,14 @@ const Calendar = {
         
         // Filter only pending events
         this.pendingEvents = response.data.events.filter(e => {
+          // Primary: use parsed status from backend
+          if (e.status === 'pending') return true;
+          // Fallback: detect from title/description
           const title = e.title || '';
           const description = e.description || '';
           return title.startsWith('⏳') || 
-                 title.toLowerCase().includes('pending') ||
                  description.toLowerCase().includes('статус: чакащ') ||
-                 description.toLowerCase().includes('status: pending') ||
-                 description.toLowerCase().includes('pending');
+                 description.toLowerCase().includes('status: pending');
         });
       } else {
         this.pendingEvents = [];
@@ -969,12 +970,15 @@ const Calendar = {
         <div class="month-grid__day ${isWeekend ? 'month-grid__day--weekend' : ''} ${isToday ? 'month-grid__day--today' : ''}" data-date="${date}">
           <span class="month-grid__day-number">${day}</span>
           <div class="month-grid__events">
-            ${dayEvents.slice(0, maxDisplay).map(e => `
+            ${dayEvents.slice(0, maxDisplay).map(e => {
+              const monthBadge = e.status === 'pending' ? '⏳ ' : e.status === 'completed' ? '✅ ' : '';
+              const monthName = (e.patientName || e.title || '').replace(/^⏳\s*/, '').substring(0, 15);
+              return `
               <div class="month-event calendar-event--${e.status || 'confirmed'}" data-event-id="${e.id}" title="${e.patientName || e.title}">
                 <span class="month-event__time">${e.startTime}</span>
-                <span class="month-event__name">${(e.patientName || e.title || '').substring(0, 15)}</span>
+                <span class="month-event__name">${monthBadge}${monthName}</span>
               </div>
-            `).join('')}
+            `}).join('')}
             ${dayEvents.length > maxDisplay ? `
               <div class="month-event month-event--more" title="Кликнете за да видите всички">+${dayEvents.length - maxDisplay} още</div>
             ` : ''}
@@ -1126,9 +1130,13 @@ const Calendar = {
       }
       
       // Build display text
-      const patientName = (event.patientName || event.title || '').substring(0, 25);
+      const patientName = (event.patientName || event.title || '').replace(/^⏳\s*/, '').substring(0, 25);
       const displayTime = event.startTime || '';
       const procedureText = procedure ? procedure.substring(0, 30) : '';
+      
+      // Status badge
+      const statusBadge = event.status === 'pending' ? '⏳ ' : 
+                          event.status === 'completed' ? '✅ ' : '';
       
       // Color class - use colorId (from API) or color as fallback
       const eventColor = event.colorId || event.color || '';
@@ -1154,7 +1162,7 @@ const Calendar = {
              data-event-id="${event.id}"
              style="top: ${top}px; height: ${height}px; left: ${left}%; width: calc(${width}% - 4px);"
              title="${tooltip}">
-          <div class="calendar-event__name">${patientName}</div>
+          <div class="calendar-event__name">${statusBadge}${patientName}</div>
           ${!isCompact && procedureText ? `<div class="calendar-event__procedure">🦷 ${procedureText}</div>` : ''}
           ${!isCompact ? `<div class="calendar-event__time">🕐 ${displayTime}</div>` : ''}
         </div>
@@ -2323,14 +2331,25 @@ const Calendar = {
       title.textContent = 'Редактирай час';
       deleteBtn.hidden = false;
       
-      form.patientName.value = event.patientName || event.title || '';
+      // Strip ⏳ prefix from patient name (added for pending status)
+      const cleanName = (event.patientName || event.title || '').replace(/^⏳\s*/, '');
+      form.patientName.value = cleanName;
       form.patientPhone.value = event.patientPhone || '';
       form.date.value = event.date || '';
       form.startTime.value = event.startTime || '';
       form.duration.value = event.duration || 30;
       form.status.value = event.status || 'confirmed';
       form.procedure.value = event.procedure || '';
-      form.notes.value = event.notes || event.description || '';
+      
+      // Extract only the notes part from description (strip structured lines)
+      let notesText = event.notes || event.description || '';
+      notesText = notesText
+        .replace(/📞\s*Тел:.*\n?/gi, '')
+        .replace(/🦷\s*Процедура:.*\n?/gi, '')
+        .replace(/📋\s*Статус:.*\n?/gi, '')
+        .replace(/📝\s*Бележки:\s*/gi, '')
+        .trim();
+      form.notes.value = notesText;
       form.eventId.value = event.id || event.googleEventId || '';
       
       // Set color if exists (use colorId from API)
