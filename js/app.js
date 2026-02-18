@@ -606,7 +606,97 @@ const App = {
       searchInput.value = '';
       clearBtn.hidden = true;
       this.isPatientSearch = false;
+      this.isExpenseFilter = false;
       await this.loadDashboardData(this.dashboardPeriod);
+    });
+    
+    // Expenses-only filter button
+    const expensesBtn = document.getElementById('show-expenses-btn');
+    expensesBtn?.addEventListener('click', async () => {
+      try {
+        Utils.showLoading();
+        
+        // Determine date range from current period or custom dates
+        const today = Utils.today();
+        let startDate, endDate;
+        const period = this.dashboardPeriod || 'today';
+        
+        switch (period) {
+          case 'today':
+            startDate = endDate = today;
+            break;
+          case 'week':
+            const d = new Date(today);
+            const dow = d.getDay();
+            const diff = d.getDate() - dow + (dow === 0 ? -6 : 1);
+            startDate = new Date(d.setDate(diff)).toISOString().split('T')[0];
+            endDate = today;
+            break;
+          case 'month':
+            startDate = today.substring(0, 7) + '-01';
+            endDate = today;
+            break;
+          case 'custom':
+            startDate = document.getElementById('date-from')?.value || today;
+            endDate = document.getElementById('date-to')?.value || today;
+            break;
+        }
+        
+        const response = await API.getFinance({ startDate, endDate });
+        const allRecords = response.data?.records || [];
+        
+        // Filter only expenses
+        const expenseRecords = allRecords.filter(r => r.type === 'expense');
+        
+        Utils.hideLoading();
+        
+        // Show results
+        this.isExpenseFilter = true;
+        this.isPatientSearch = false;
+        clearBtn.hidden = false;
+        
+        // Calculate expense totals by category
+        let totalExpense = 0;
+        const expenseByCategory = {};
+        const vendors = new Set();
+        
+        expenseRecords.forEach(r => {
+          const amount = Math.abs(parseFloat(r.amount) || 0);
+          totalExpense += amount;
+          const cat = r.category || 'other';
+          expenseByCategory[cat] = (expenseByCategory[cat] || 0) + amount;
+          if (r.patientName) vendors.add(r.patientName);
+        });
+        
+        // Update title
+        const titleEl = document.getElementById('records-title');
+        if (titleEl) {
+          titleEl.innerHTML = `💸 Само разходи за периода (${expenseRecords.length} записа) — Общо: <strong style="color:#ef4444">${totalExpense.toFixed(2)} €</strong>`;
+        }
+        
+        // Update stats
+        document.getElementById('stat-income').textContent = '-';
+        document.getElementById('stat-expense').textContent = `-${totalExpense.toFixed(2)} €`;
+        document.getElementById('stat-balance').textContent = '-';
+        document.getElementById('stat-patients').textContent = vendors.size;
+        
+        // Render expense breakdown only
+        this.renderCategoryBreakdown('income-breakdown', {}, 'income');
+        this.renderCategoryBreakdown('expense-breakdown', expenseByCategory, 'expense');
+        
+        // Render expense records
+        this.allDashboardRecords = expenseRecords;
+        this.renderRecentRecords(expenseRecords);
+        
+        if (expenseRecords.length === 0) {
+          Utils.showToast('Няма разходи за избрания период', 'info');
+        }
+        
+      } catch (error) {
+        Utils.hideLoading();
+        console.error('Expense filter error:', error);
+        Utils.showToast('❌ Грешка при зареждане на разходи', 'error');
+      }
     });
   },
 
