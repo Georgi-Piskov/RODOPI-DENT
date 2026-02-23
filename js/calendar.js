@@ -255,6 +255,33 @@ const Calendar = {
     document.addEventListener('click', () => {
       blockDropdown?.classList.remove('open');
     });
+
+    // Day-block popup option buttons (attached ONCE here, not in setupGridListeners)
+    document.querySelectorAll('.day-block-popup__option').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const popup = document.getElementById('day-block-popup');
+        const dateStr = popup?.dataset.date;
+        const blockType = btn.dataset.blockType;
+        if (dateStr && blockType) {
+          await this.quickBlockForDate(dateStr, blockType);
+        }
+      });
+    });
+
+    // Close popup button
+    document.getElementById('day-block-popup-close')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.hideDayBlockPopup();
+    });
+
+    // Close popup on outside click
+    document.addEventListener('click', (e) => {
+      const popup = document.getElementById('day-block-popup');
+      if (popup && !popup.hidden && !popup.contains(e.target) && !e.target.classList.contains('month-grid__day-number')) {
+        this.hideDayBlockPopup();
+      }
+    });
   },
   
   /**
@@ -1388,33 +1415,6 @@ const Calendar = {
         const date = dayCell.dataset.date;
         if (date) this.showDayBlockPopup(date, numEl);
       });
-    });
-
-    // Day-block popup option buttons
-    document.querySelectorAll('.day-block-popup__option').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const popup = document.getElementById('day-block-popup');
-        const dateStr = popup?.dataset.date;
-        const blockType = btn.dataset.blockType;
-        if (dateStr && blockType) {
-          await this.quickBlockForDate(dateStr, blockType);
-        }
-      });
-    });
-
-    // Close popup button
-    document.getElementById('day-block-popup-close')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.hideDayBlockPopup();
-    });
-
-    // Close popup on outside click
-    document.addEventListener('click', (e) => {
-      const popup = document.getElementById('day-block-popup');
-      if (popup && !popup.hidden && !popup.contains(e.target) && !e.target.classList.contains('month-grid__day-number')) {
-        this.hideDayBlockPopup();
-      }
     });
 
     // Click on month event
