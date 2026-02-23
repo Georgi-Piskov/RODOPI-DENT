@@ -501,6 +501,7 @@ const App = {
       const toDate = document.getElementById('date-to').value;
       
       if (fromDate && toDate) {
+        this.dashboardPeriod = 'custom';
         await this.loadDashboardData('custom', fromDate, toDate);
       } else {
         Utils.showToast('Моля въведете и двете дати', 'warning');
