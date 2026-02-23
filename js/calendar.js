@@ -291,7 +291,7 @@ const Calendar = {
     setTimeout(() => {
       const dismissHandler = (evt) => {
         const p = document.getElementById('day-block-popup');
-        if (p && !p.hidden && !p.contains(evt.target) && !evt.target.classList.contains('month-grid__day-number')) {
+        if (p && !p.hidden && !p.contains(evt.target) && !evt.target.classList.contains('month-grid__day-number') && !evt.target.classList.contains('week-view__day-num')) {
           Calendar.hideDayBlockPopup();
         }
         document.removeEventListener('click', dismissHandler);
@@ -1053,7 +1053,7 @@ const Calendar = {
           ${displayDays.map(wd => `
             <div class="week-view__day-header ${wd.isToday ? 'week-view__day-header--today' : ''} ${wd.isWeekend ? 'week-view__day-header--weekend' : ''}">
               <span class="week-view__day-name">${wd.day}</span>
-              <span class="week-view__day-num">${wd.dayNum}</span>
+              <span class="week-view__day-num" data-date="${wd.date}" title="Натисни за блокиране">${wd.dayNum}</span>
             </div>
           `).join('')}
         </div>
@@ -1441,6 +1441,15 @@ const Calendar = {
         const dayCell = numEl.closest('.month-grid__day');
         if (!dayCell || dayCell.classList.contains('month-grid__day--other-month')) return;
         const date = dayCell.dataset.date;
+        if (date) this.showDayBlockPopup(date, numEl);
+      });
+    });
+
+    // Click on day NUMBER in week view → show quick-block popup
+    document.querySelectorAll('.week-view__day-num').forEach(numEl => {
+      numEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const date = numEl.dataset.date;
         if (date) this.showDayBlockPopup(date, numEl);
       });
     });

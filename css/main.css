@@ -2190,11 +2190,30 @@ button {
 }
 
 .week-view__day-num {
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
   font-size: 24px;
   font-weight: 700;
   color: var(--color-gray-800);
   line-height: 1.2;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.week-view__day-num:hover {
+  background: #fbbf24;
+  color: #92400e;
+  box-shadow: 0 0 0 2px #fbbf2488;
+}
+
+.week-view__day-header--today .week-view__day-num:hover {
+  background: rgba(255,255,255,0.3);
+  color: white;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.4);
 }
 
 .week-view__day-header--today .week-view__day-name,
@@ -2427,6 +2446,8 @@ button {
   
   .week-view__day-num {
     font-size: 18px;
+    width: 28px;
+    height: 28px;
   }
   
   /* Hide days beyond visible range on mobile */
@@ -2505,7 +2526,7 @@ button {
 }
 
 .time-label {
-  height: 60px;
+  height: 120px;
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;
@@ -2609,6 +2630,22 @@ button {
 .hour-slot:hover {
   background: rgba(37, 99, 235, 0.05);
   cursor: pointer;
+}
+
+/* Day View - Mobile Responsive */
+@media (max-width: 768px) {
+  .time-label {
+    height: 60px;
+  }
+  .hour-slot {
+    height: 60px;
+  }
+  .time-grid {
+    grid-template-columns: 45px 1fr;
+  }
+  .day-column {
+    min-height: 400px;
+  }
 }
 
 /* Calendar Events - Improved overlap handling */
