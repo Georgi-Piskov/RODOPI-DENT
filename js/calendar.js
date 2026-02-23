@@ -329,15 +329,23 @@ const Calendar = {
    * Handle day-block popup click (called via inline onclick, guaranteed single execution)
    */
   async handleDayBlockClick(type) {
+    // Triple guard: flag + disable buttons + hide popup immediately
     if (this._blockingInProgress) return;
     this._blockingInProgress = true;
+
+    // Immediately hide popup and disable all buttons to prevent any re-triggering
+    const popup = document.getElementById('day-block-popup');
+    const dateStr = popup?.dataset.date;
+    popup.querySelectorAll('.day-block-popup__option').forEach(b => b.disabled = true);
+    popup.hidden = true;
+
     try {
-      const popup = document.getElementById('day-block-popup');
-      const dateStr = popup?.dataset.date;
       if (dateStr) {
         await this.quickBlockForDate(dateStr, type);
       }
     } finally {
+      // Re-enable buttons for future use
+      popup?.querySelectorAll('.day-block-popup__option').forEach(b => b.disabled = false);
       this._blockingInProgress = false;
     }
   },
@@ -368,6 +376,17 @@ const Calendar = {
     }
 
     this.hideDayBlockPopup();
+
+    // Extra guard: check if we already have a block event for this exact time/date
+    const existing = this.events.find(e => 
+      e.date === dateStr && 
+      (e.title || '').includes('Блокиран') && 
+      e.startTime === startTime
+    );
+    if (existing) {
+      Utils.showToast('Вече има блокировка за този период', 'warning');
+      return;
+    }
 
     await this.createBlockEvent(dateStr, startTime, endTime, title);
     Utils.showToast(`${title} – ${dateStr}`, 'success');
@@ -479,13 +498,20 @@ const Calendar = {
    */
   async createBlockEvent(date, startTime, endTime, title = 'Блокиран') {
     try {
+      // Calculate duration in minutes from startTime and endTime
+      const [sh, sm] = startTime.split(':').map(Number);
+      const [eh, em] = endTime.split(':').map(Number);
+      const duration = (eh * 60 + em) - (sh * 60 + sm);
+
       const eventData = {
         title: title,
         date: date,
         startTime: startTime,
         endTime: endTime,
-        patientName: '',
+        duration: duration,
+        patientName: title,
         patientPhone: '',
+        colorId: 'gray',
         notes: 'Автоматично блокиран от системата',
         status: 'confirmed'
       };
