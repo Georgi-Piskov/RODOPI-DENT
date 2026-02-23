@@ -1035,12 +1035,10 @@ const App = {
               <input type="text" class="form-group__input" value="${Utils.formatDateBG(record.date)}" readonly disabled>
             </div>
             
-            ${record.patientName ? `
             <div class="form-group">
               <label class="form-group__label">Пациент</label>
-              <input type="text" class="form-group__input" value="${record.patientName}" readonly disabled>
+              <input type="text" id="edit-patientName" class="form-group__input" value="${record.patientName || ''}">
             </div>
-            ` : ''}
             
             <div class="form-group">
               <label class="form-group__label">Категория</label>
@@ -1106,6 +1104,7 @@ const App = {
     const isIncome = document.getElementById('edit-record-type').value === 'income';
     
     const updates = {
+      patientName: document.getElementById('edit-patientName')?.value || '',
       category: document.getElementById('edit-category').value,
       description: document.getElementById('edit-description').value,
       amount: parseFloat(document.getElementById('edit-amount').value) || 0,
