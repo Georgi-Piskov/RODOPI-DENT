@@ -255,33 +255,6 @@ const Calendar = {
     document.addEventListener('click', () => {
       blockDropdown?.classList.remove('open');
     });
-
-    // Day-block popup option buttons (attached ONCE here, not in setupGridListeners)
-    document.querySelectorAll('.day-block-popup__option').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const popup = document.getElementById('day-block-popup');
-        const dateStr = popup?.dataset.date;
-        const blockType = btn.dataset.blockType;
-        if (dateStr && blockType) {
-          await this.quickBlockForDate(dateStr, blockType);
-        }
-      });
-    });
-
-    // Close popup button
-    document.getElementById('day-block-popup-close')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.hideDayBlockPopup();
-    });
-
-    // Close popup on outside click
-    document.addEventListener('click', (e) => {
-      const popup = document.getElementById('day-block-popup');
-      if (popup && !popup.hidden && !popup.contains(e.target) && !e.target.classList.contains('month-grid__day-number')) {
-        this.hideDayBlockPopup();
-      }
-    });
   },
   
   /**
@@ -292,11 +265,11 @@ const Calendar = {
       <div class="day-block-popup" id="day-block-popup" hidden>
         <div class="day-block-popup__header">
           <span id="day-block-popup-title">Блокирай</span>
-          <button type="button" class="day-block-popup__close" id="day-block-popup-close">&times;</button>
+          <button type="button" class="day-block-popup__close" onclick="event.stopPropagation(); Calendar.hideDayBlockPopup();">&times;</button>
         </div>
-        <button class="day-block-popup__option" data-block-type="day">🚫 Цял ден (09:00–18:00)</button>
-        <button class="day-block-popup__option" data-block-type="morning">🌅 Преди обяд (09:00–12:00)</button>
-        <button class="day-block-popup__option" data-block-type="afternoon">🌇 След обяд (13:30–18:00)</button>
+        <button class="day-block-popup__option" onclick="event.stopPropagation(); Calendar.handleDayBlockClick('day');">🚫 Цял ден (09:00–18:00)</button>
+        <button class="day-block-popup__option" onclick="event.stopPropagation(); Calendar.handleDayBlockClick('morning');">🌅 Преди обяд (09:00–12:00)</button>
+        <button class="day-block-popup__option" onclick="event.stopPropagation(); Calendar.handleDayBlockClick('afternoon');">🌇 След обяд (13:30–18:00)</button>
       </div>
     `;
   },
@@ -313,6 +286,18 @@ const Calendar = {
     document.getElementById('day-block-popup-title').textContent = `Блокирай ${dateParts[2]}.${dateParts[1]}`;
     popup.dataset.date = dateStr;
     popup.hidden = false;
+
+    // One-shot outside-click dismiss (setTimeout to avoid immediate firing)
+    setTimeout(() => {
+      const dismissHandler = (evt) => {
+        const p = document.getElementById('day-block-popup');
+        if (p && !p.hidden && !p.contains(evt.target) && !evt.target.classList.contains('month-grid__day-number')) {
+          Calendar.hideDayBlockPopup();
+        }
+        document.removeEventListener('click', dismissHandler);
+      };
+      document.addEventListener('click', dismissHandler);
+    }, 10);
 
     // Position popup near the anchor
     const rect = anchorEl.getBoundingClientRect();
@@ -338,6 +323,23 @@ const Calendar = {
   hideDayBlockPopup() {
     const popup = document.getElementById('day-block-popup');
     if (popup) popup.hidden = true;
+  },
+
+  /**
+   * Handle day-block popup click (called via inline onclick, guaranteed single execution)
+   */
+  async handleDayBlockClick(type) {
+    if (this._blockingInProgress) return;
+    this._blockingInProgress = true;
+    try {
+      const popup = document.getElementById('day-block-popup');
+      const dateStr = popup?.dataset.date;
+      if (dateStr) {
+        await this.quickBlockForDate(dateStr, type);
+      }
+    } finally {
+      this._blockingInProgress = false;
+    }
   },
 
   /**
