@@ -284,6 +284,19 @@ const API = {
   },
 
   /**
+   * Search all calendar appointments by patient name (past + upcoming).
+   * @param {string} name - Patient name (partial match, case-insensitive)
+   * @returns {Promise<{success, appointments: [], count}>}
+   */
+  async searchPatientAppointments(name) {
+    if (!name || name.trim().length < 2) {
+      return { success: false, appointments: [], count: 0 };
+    }
+    const endpoint = `${CONFIG.ENDPOINTS.PATIENT_APPOINTMENTS}?name=${encodeURIComponent(name.trim())}`;
+    return this.request(endpoint);
+  },
+
+  /**
    * Send SMS to patient
    * @param {Object} smsData - { phone, message, template?, date?, time?, duration?, patientName? }
    * Templates: booking_received, booking_confirmed, booking_rejected, booking_conflict, booking_expired, reminder

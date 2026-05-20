@@ -1,0 +1,141 @@
+{
+  "name": "Rodopi Dent - Patient Appointments Search",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "patient-appointments",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "patient-appointments"
+    },
+    {
+      "parameters": {
+        "jsCode": "const query = $input.first().json.query || {};\nconst name = (query.name || '').trim();\n\nif (!name || name.length < 2) {\n  return [{ json: { skip: true, error: 'Need at least 2 characters', name: name } }];\n}\n\n// Default range: 2 years back, 2 years forward\nconst now = new Date();\nconst pastYears = parseInt(query.pastYears) || 2;\nconst futureYears = parseInt(query.futureYears) || 2;\n\nconst start = new Date(now);\nstart.setFullYear(start.getFullYear() - pastYears);\nstart.setHours(0, 0, 0, 0);\n\nconst end = new Date(now);\nend.setFullYear(end.getFullYear() + futureYears);\nend.setHours(23, 59, 59, 999);\n\nreturn [{\n  json: {\n    name: name,\n    normalizedName: name.toLowerCase().trim(),\n    startDate: start.toISOString(),\n    endDate: end.toISOString(),\n    skip: false\n  }\n}];"
+      },
+      "id": "parse-params",
+      "name": "Parse Parameters",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            { "value1": "={{ $json.skip }}", "value2": false }
+          ]
+        }
+      },
+      "id": "is-valid",
+      "name": "Is Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "rodopi.dent@gmail.com"
+        },
+        "returnAll": true,
+        "options": {
+          "timeMax": "={{ $json.endDate }}",
+          "timeMin": "={{ $json.startDate }}",
+          "singleEvents": true,
+          "orderBy": "startTime",
+          "q": "={{ $json.name }}"
+        }
+      },
+      "id": "get-events",
+      "name": "Get Calendar Events",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.2,
+      "position": [660, -80],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "",
+          "name": "Google Calendar"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const events = $input.all();\nconst params = $('Parse Parameters').first().json;\nconst normalizedName = params.normalizedName;\n\nconst colorIdToName = {\n  '10': 'green', '9': 'blue', '11': 'red', '5': 'yellow',\n  '3': 'purple', '6': 'orange', '4': 'pink', '8': 'gray'\n};\n\nconst statusLabelToValue = {\n  'чакащ': 'pending', 'потвърден': 'confirmed', 'завършен': 'completed'\n};\n\nfunction toSofiaTime(isoString) {\n  if (!isoString) return null;\n  const date = new Date(isoString);\n  const options = {\n    timeZone: 'Europe/Sofia',\n    year: 'numeric', month: '2-digit', day: '2-digit',\n    hour: '2-digit', minute: '2-digit', hour12: false\n  };\n  const formatter = new Intl.DateTimeFormat('en-CA', options);\n  const parts = formatter.formatToParts(date);\n  const getPart = (type) => parts.find(p => p.type === type)?.value || '00';\n  return {\n    date: `${getPart('year')}-${getPart('month')}-${getPart('day')}`,\n    time: `${getPart('hour')}:${getPart('minute')}`\n  };\n}\n\nconst nowIso = new Date().toISOString();\nconst transformed = [];\n\nfor (const item of events) {\n  const event = item.json;\n  const rawTitle = (event.summary || '').replace(/^⏳\\s*/, '');\n  \n  // Match: title must contain the search term (case-insensitive)\n  if (!rawTitle.toLowerCase().includes(normalizedName)) continue;\n  \n  const startDateTime = event.start?.dateTime || event.start?.date;\n  const endDateTime = event.end?.dateTime || event.end?.date;\n  let startDate, startTime, endDate, endTime, isAllDay = false;\n  \n  if (event.start?.date) {\n    isAllDay = true;\n    startDate = event.start.date;\n    endDate = event.end.date;\n    startTime = '00:00';\n    endTime = '23:59';\n  } else {\n    const s = toSofiaTime(startDateTime);\n    const e = toSofiaTime(endDateTime);\n    startDate = s.date; startTime = s.time;\n    endDate = e.date; endTime = e.time;\n  }\n  \n  const duration = Math.round((new Date(endDateTime) - new Date(startDateTime)) / 60000);\n  const description = event.description || '';\n  let phone = '', procedure = '', appointmentStatus = 'confirmed';\n  \n  const phoneMatch = description.match(/(?:тел|phone|📞)[:\\s]*([+\\d\\s-]+)/i);\n  if (phoneMatch) phone = phoneMatch[1].trim();\n  const procMatch = description.match(/(?:процедура|procedure|🦷)[:\\s]*(.+?)(?:\\n|$)/i);\n  if (procMatch) procedure = procMatch[1].trim();\n  const statusMatch = description.match(/(?:📋 Статус|статус)[:\\s]*(.+?)(?:\\n|$)/i);\n  if (statusMatch) {\n    const rawStatus = statusMatch[1].trim().toLowerCase();\n    appointmentStatus = statusLabelToValue[rawStatus] || rawStatus;\n  }\n  if ((event.summary || '').startsWith('⏳')) appointmentStatus = 'pending';\n  \n  const isPast = startDateTime < nowIso;\n  \n  transformed.push({\n    id: event.id,\n    googleEventId: event.id,\n    title: rawTitle || 'Без заглавие',\n    patientName: rawTitle || '',\n    patientPhone: phone,\n    procedure: procedure,\n    description: description,\n    date: startDate,\n    startTime: startTime,\n    endTime: endTime,\n    endDate: endDate,\n    duration: duration,\n    isAllDay: isAllDay,\n    colorId: colorIdToName[event.colorId] || 'green',\n    status: appointmentStatus,\n    isPast: isPast,\n    location: event.location || '',\n    htmlLink: event.htmlLink\n  });\n}\n\n// Sort: upcoming first (asc), then past (desc)\ntransformed.sort((a, b) => {\n  const aDt = `${a.date}T${a.startTime}`;\n  const bDt = `${b.date}T${b.startTime}`;\n  if (a.isPast && !b.isPast) return 1;\n  if (!a.isPast && b.isPast) return -1;\n  if (a.isPast && b.isPast) return bDt.localeCompare(aDt); // past: newest first\n  return aDt.localeCompare(bDt); // upcoming: soonest first\n});\n\nreturn [{\n  json: {\n    success: true,\n    name: params.name,\n    count: transformed.length,\n    appointments: transformed\n  }\n}];"
+      },
+      "id": "filter-transform",
+      "name": "Filter & Transform",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, -80]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { success: false, error: 'Need at least 2 characters', appointments: [], count: 0 } }];"
+      },
+      "id": "empty-result",
+      "name": "Empty Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 80]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              { "name": "Access-Control-Allow-Origin", "value": "*" }
+            ]
+          }
+        }
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1100, 0]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Parse Parameters", "type": "main", "index": 0 }]]
+    },
+    "Parse Parameters": {
+      "main": [[{ "node": "Is Valid?", "type": "main", "index": 0 }]]
+    },
+    "Is Valid?": {
+      "main": [
+        [{ "node": "Get Calendar Events", "type": "main", "index": 0 }],
+        [{ "node": "Empty Result", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Calendar Events": {
+      "main": [[{ "node": "Filter & Transform", "type": "main", "index": 0 }]]
+    },
+    "Filter & Transform": {
+      "main": [[{ "node": "Respond", "type": "main", "index": 0 }]]
+    },
+    "Empty Result": {
+      "main": [[{ "node": "Respond", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": true,
+  "versionId": "patient-appointments-v1",
+  "id": "24"
+}

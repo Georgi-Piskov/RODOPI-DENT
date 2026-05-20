@@ -61,6 +61,7 @@ const Calendar = {
       </div>
       ${this.renderEventModal()}
       ${this.renderDayBlockPopup()}
+      ${this.renderPatientSearchModal()}
     `;
     
     this.setupEventListeners();
@@ -115,6 +116,9 @@ const Calendar = {
             </div>
           </div>
           
+          <button class="btn btn--secondary btn--small" id="patient-search-btn" title="Търси пациент">
+            🔍 Търси
+          </button>
           <button class="btn btn--success" id="cal-add-event">+ Нов час</button>
         </div>
       </div>
@@ -199,6 +203,21 @@ const Calendar = {
     // Add event button
     document.getElementById('cal-add-event')?.addEventListener('click', () => {
       this.openEventModal();
+    });
+
+    // Patient search button
+    document.getElementById('patient-search-btn')?.addEventListener('click', () => {
+      this.openPatientSearch();
+    });
+    document.getElementById('patient-search-close')?.addEventListener('click', () => {
+      this.closePatientSearch();
+    });
+    document.getElementById('patient-search-input')?.addEventListener('input', (e) => {
+      this.runPatientSearch(e.target.value);
+    });
+    // Close patient search on outside click
+    document.getElementById('patient-search-modal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'patient-search-modal') this.closePatientSearch();
     });
     
     // Block mode toggle
@@ -2486,6 +2505,151 @@ const Calendar = {
         </div>
       </div>
     `;
+  },
+
+  /**
+   * Render patient search modal
+   */
+  renderPatientSearchModal() {
+    return `
+      <div id="patient-search-modal" class="modal" hidden>
+        <div class="modal__content patient-search">
+          <div class="event-modal__header">
+            <h2 class="event-modal__title">🔍 Търси пациент</h2>
+            <button class="event-modal__close" id="patient-search-close">&times;</button>
+          </div>
+          <div class="patient-search__body">
+            <input
+              type="text"
+              id="patient-search-input"
+              class="patient-search__input"
+              placeholder="Въведи име на пациент (поне 2 букви)..."
+              autocomplete="off"
+            >
+            <div id="patient-search-results" class="patient-search__results">
+              <p class="patient-search__hint">Започни да пишеш име, за да видиш всички часове на пациента.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  },
+
+  /**
+   * Open patient search modal
+   */
+  openPatientSearch() {
+    const modal = document.getElementById('patient-search-modal');
+    const input = document.getElementById('patient-search-input');
+    if (!modal || !input) return;
+    modal.hidden = false;
+    input.value = '';
+    document.getElementById('patient-search-results').innerHTML =
+      '<p class="patient-search__hint">Започни да пишеш име, за да видиш всички часове на пациента.</p>';
+    setTimeout(() => input.focus(), 50);
+  },
+
+  /**
+   * Close patient search modal
+   */
+  closePatientSearch() {
+    const modal = document.getElementById('patient-search-modal');
+    if (modal) modal.hidden = true;
+    if (this._patientSearchTimer) {
+      clearTimeout(this._patientSearchTimer);
+      this._patientSearchTimer = null;
+    }
+  },
+
+  /**
+   * Run patient appointments search (debounced)
+   */
+  runPatientSearch(query) {
+    const resultsEl = document.getElementById('patient-search-results');
+    if (!resultsEl) return;
+    const q = (query || '').trim();
+    if (q.length < 2) {
+      resultsEl.innerHTML = '<p class="patient-search__hint">Започни да пишеш име (поне 2 букви)...</p>';
+      return;
+    }
+    resultsEl.innerHTML = '<p class="patient-search__hint">⏳ Търсене...</p>';
+    if (this._patientSearchTimer) clearTimeout(this._patientSearchTimer);
+    this._patientSearchTimer = setTimeout(async () => {
+      const res = await API.searchPatientAppointments(q);
+      const payload = res?.data || res || {};
+      const appointments = payload.appointments || [];
+      this.renderPatientSearchResults(appointments, q);
+    }, 350);
+  },
+
+  /**
+   * Render patient search results list
+   */
+  renderPatientSearchResults(appointments, query) {
+    const resultsEl = document.getElementById('patient-search-results');
+    if (!resultsEl) return;
+
+    if (!appointments.length) {
+      resultsEl.innerHTML = `<p class="patient-search__hint">❌ Няма намерени часове за "${query}".</p>`;
+      return;
+    }
+
+    const upcoming = appointments.filter(a => !a.isPast);
+    const past = appointments.filter(a => a.isPast);
+
+    const statusLabel = {
+      pending: '<span class="patient-search__badge patient-search__badge--pending">Чакащ</span>',
+      confirmed: '<span class="patient-search__badge patient-search__badge--confirmed">Потвърден</span>',
+      completed: '<span class="patient-search__badge patient-search__badge--completed">Завършен</span>'
+    };
+
+    const formatRow = (a) => {
+      const [y, m, d] = (a.date || '').split('-');
+      const dateStr = (y && m && d) ? `${d}.${m}.${y}` : a.date || '';
+      const proc = a.procedure ? `<div class="patient-search__row-proc">🦷 ${a.procedure}</div>` : '';
+      return `
+        <button class="patient-search__row" data-event-id="${a.id}" data-date="${a.date}">
+          <div class="patient-search__row-main">
+            <strong>${a.patientName || a.title}</strong>
+            ${statusLabel[a.status] || ''}
+          </div>
+          <div class="patient-search__row-meta">📅 ${dateStr} &nbsp;·&nbsp; ⏰ ${a.startTime} (${a.duration} мин)</div>
+          ${proc}
+        </button>
+      `;
+    };
+
+    let html = `<p class="patient-search__count">Намерени: ${appointments.length} (${upcoming.length} предстоящи, ${past.length} минали)</p>`;
+    if (upcoming.length) {
+      html += `<h3 class="patient-search__section-title">Предстоящи</h3>`;
+      html += upcoming.map(formatRow).join('');
+    }
+    if (past.length) {
+      html += `<h3 class="patient-search__section-title">Минали</h3>`;
+      html += past.map(formatRow).join('');
+    }
+    resultsEl.innerHTML = html;
+
+    // Wire up click → navigate to that date and open edit modal
+    resultsEl.querySelectorAll('.patient-search__row').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.eventId;
+        const date = btn.dataset.date;
+        const appt = appointments.find(a => a.id === id);
+        if (!appt) return;
+        this.closePatientSearch();
+        // Navigate calendar to that date and reload, then open the edit modal
+        if (date) {
+          const [yy, mm, dd] = date.split('-').map(Number);
+          this.currentDate = new Date(yy, mm - 1, dd);
+          this.currentView = 'day';
+          await this.renderView();
+          await this.loadEvents();
+        }
+        // Open edit modal with the appointment
+        this.openEventModal(appt);
+      });
+    });
   },
 
   /**

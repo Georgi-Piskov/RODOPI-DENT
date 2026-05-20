@@ -4794,3 +4794,108 @@ button {
     padding: var(--spacing-4);
   }
 }
+
+
+/* ============================================
+   PATIENT SEARCH MODAL
+   ============================================ */
+.patient-search {
+  max-width: 640px;
+  width: 95%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+.patient-search__body {
+  padding: var(--spacing-4);
+  overflow-y: auto;
+  flex: 1;
+}
+.patient-search__input {
+  width: 100%;
+  padding: var(--spacing-3);
+  font-size: 1rem;
+  border: 2px solid var(--color-border, #e0e0e0);
+  border-radius: var(--radius-md, 8px);
+  margin-bottom: var(--spacing-3);
+  box-sizing: border-box;
+}
+.patient-search__input:focus {
+  outline: none;
+  border-color: var(--color-primary, #2563eb);
+}
+.patient-search__results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+.patient-search__hint {
+  text-align: center;
+  color: var(--color-text-secondary, #6b7280);
+  padding: var(--spacing-4);
+  margin: 0;
+}
+.patient-search__count {
+  margin: 0 0 var(--spacing-2) 0;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #6b7280);
+}
+.patient-search__section-title {
+  margin: var(--spacing-3) 0 var(--spacing-2) 0;
+  font-size: 0.95rem;
+  color: var(--color-primary, #2563eb);
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  padding-bottom: var(--spacing-1);
+}
+.patient-search__row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--color-bg-secondary, #f9fafb);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: var(--radius-md, 8px);
+  padding: var(--spacing-3);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+.patient-search__row:hover {
+  background: var(--color-primary-light, #dbeafe);
+  border-color: var(--color-primary, #2563eb);
+  transform: translateY(-1px);
+}
+.patient-search__row-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-1);
+  font-size: 1rem;
+}
+.patient-search__row-meta {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary, #6b7280);
+}
+.patient-search__row-proc {
+  font-size: 0.85rem;
+  color: var(--color-text, #374151);
+  margin-top: 4px;
+}
+.patient-search__badge {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.patient-search__badge--pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+.patient-search__badge--confirmed {
+  background: #d1fae5;
+  color: #065f46;
+}
+.patient-search__badge--completed {
+  background: #dbeafe;
+  color: #1e40af;
+}
