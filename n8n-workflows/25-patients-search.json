@@ -1,0 +1,139 @@
+{
+  "name": "Rodopi Dent - Patients Search (Autocomplete)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "patients-search",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "patients-search"
+    },
+    {
+      "parameters": {
+        "jsCode": "const query = $input.first().json.query || {};\nconst q = (query.q || query.name || '').trim();\n\nif (!q || q.length < 1) {\n  return [{ json: { skip: true, q: q } }];\n}\n\nreturn [{ json: { q: q, normalized: q.toLowerCase().trim(), skip: false } }];"
+      },
+      "id": "validate",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            { "value1": "={{ $json.skip }}", "value2": false }
+          ]
+        }
+      },
+      "id": "is-valid",
+      "name": "Is Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Patients"
+        },
+        "options": {}
+      },
+      "id": "read-patients",
+      "name": "Read Patients",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [660, -80],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst q = $('Validate Input').first().json.normalized;\nconst LIMIT = 15;\n\nfunction normalize(s) {\n  return String(s || '').toLowerCase().trim();\n}\n\n// Score: 0 = starts with, 1 = word starts with, 2 = contains\nconst matches = [];\nfor (const item of items) {\n  const row = item.json || {};\n  const name = row.name || '';\n  if (!name) continue;\n  const norm = normalize(name);\n  let score = -1;\n  if (norm.startsWith(q)) score = 0;\n  else if (norm.split(/\\s+/).some(w => w.startsWith(q))) score = 1;\n  else if (norm.includes(q)) score = 2;\n  if (score === -1) continue;\n  matches.push({\n    name: String(name).trim(),\n    phone: String(row.phone || '').trim(),\n    score: score\n  });\n}\n\nmatches.sort((a, b) => {\n  if (a.score !== b.score) return a.score - b.score;\n  return a.name.localeCompare(b.name, 'bg');\n});\n\nconst limited = matches.slice(0, LIMIT).map(m => ({ name: m.name, phone: m.phone }));\n\nreturn [{\n  json: {\n    success: true,\n    q: $('Validate Input').first().json.q,\n    count: limited.length,\n    total: matches.length,\n    patients: limited\n  }\n}];"
+      },
+      "id": "filter-rank",
+      "name": "Filter & Rank",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, -80]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { success: false, q: '', count: 0, patients: [] } }];"
+      },
+      "id": "empty-result",
+      "name": "Empty Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 80]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              { "name": "Access-Control-Allow-Origin", "value": "*" }
+            ]
+          }
+        }
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1100, 0]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Validate Input", "type": "main", "index": 0 }]]
+    },
+    "Validate Input": {
+      "main": [[{ "node": "Is Valid?", "type": "main", "index": 0 }]]
+    },
+    "Is Valid?": {
+      "main": [
+        [{ "node": "Read Patients", "type": "main", "index": 0 }],
+        [{ "node": "Empty Result", "type": "main", "index": 0 }]
+      ]
+    },
+    "Read Patients": {
+      "main": [[{ "node": "Filter & Rank", "type": "main", "index": 0 }]]
+    },
+    "Filter & Rank": {
+      "main": [[{ "node": "Respond", "type": "main", "index": 0 }]]
+    },
+    "Empty Result": {
+      "main": [[{ "node": "Respond", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": true,
+  "versionId": "patients-search-v1",
+  "id": "25"
+}

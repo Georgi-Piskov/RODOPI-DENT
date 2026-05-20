@@ -297,6 +297,19 @@ const API = {
   },
 
   /**
+   * Autocomplete patient names from Patients sheet.
+   * @param {string} q - Query string (min 1 char)
+   * @returns {Promise<{success, patients: [{name, phone}], count}>}
+   */
+  async searchPatients(q) {
+    if (!q || q.trim().length < 1) {
+      return { success: false, patients: [], count: 0 };
+    }
+    const endpoint = `${CONFIG.ENDPOINTS.PATIENTS_SEARCH}?q=${encodeURIComponent(q.trim())}`;
+    return this.request(endpoint);
+  },
+
+  /**
    * Send SMS to patient
    * @param {Object} smsData - { phone, message, template?, date?, time?, duration?, patientName? }
    * Templates: booking_received, booking_confirmed, booking_rejected, booking_conflict, booking_expired, reminder

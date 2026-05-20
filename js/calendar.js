@@ -212,6 +212,18 @@ const Calendar = {
     document.getElementById('patient-search-close')?.addEventListener('click', () => {
       this.closePatientSearch();
     });
+    document.getElementById('patient-search-back')?.addEventListener('click', () => {
+      const input = document.getElementById('patient-search-input');
+      this._selectedPatient = null;
+      document.getElementById('patient-search-back').hidden = true;
+      document.getElementById('patient-search-title').textContent = '🔍 Търси пациент';
+      document.getElementById('patient-search-results').innerHTML = '';
+      if (input) {
+        input.value = '';
+        input.focus();
+      }
+      document.getElementById('patient-search-suggestions').innerHTML = '';
+    });
     document.getElementById('patient-search-input')?.addEventListener('input', (e) => {
       this.runPatientSearch(e.target.value);
     });
@@ -2515,19 +2527,23 @@ const Calendar = {
       <div id="patient-search-modal" class="modal" hidden>
         <div class="modal__content patient-search">
           <div class="event-modal__header">
-            <h2 class="event-modal__title">🔍 Търси пациент</h2>
+            <h2 class="event-modal__title" id="patient-search-title">🔍 Търси пациент</h2>
             <button class="event-modal__close" id="patient-search-close">&times;</button>
           </div>
           <div class="patient-search__body">
-            <input
-              type="text"
-              id="patient-search-input"
-              class="patient-search__input"
-              placeholder="Въведи име на пациент (поне 2 букви)..."
-              autocomplete="off"
-            >
+            <div class="patient-search__input-wrap">
+              <input
+                type="text"
+                id="patient-search-input"
+                class="patient-search__input"
+                placeholder="Започни да пишеш име..."
+                autocomplete="off"
+              >
+              <button type="button" id="patient-search-back" class="btn btn--secondary btn--small" hidden>← Назад</button>
+            </div>
+            <div id="patient-search-suggestions" class="patient-search__suggestions"></div>
             <div id="patient-search-results" class="patient-search__results">
-              <p class="patient-search__hint">Започни да пишеш име, за да видиш всички часове на пациента.</p>
+              <p class="patient-search__hint">Започни да пишеш име, за да видиш предложения с пациенти.</p>
             </div>
           </div>
         </div>
@@ -2544,8 +2560,12 @@ const Calendar = {
     if (!modal || !input) return;
     modal.hidden = false;
     input.value = '';
+    this._selectedPatient = null;
+    document.getElementById('patient-search-back').hidden = true;
+    document.getElementById('patient-search-title').textContent = '🔍 Търси пациент';
+    document.getElementById('patient-search-suggestions').innerHTML = '';
     document.getElementById('patient-search-results').innerHTML =
-      '<p class="patient-search__hint">Започни да пишеш име, за да видиш всички часове на пациента.</p>';
+      '<p class="patient-search__hint">Започни да пишеш име, за да видиш предложения с пациенти.</p>';
     setTimeout(() => input.focus(), 50);
   },
 
@@ -2559,27 +2579,107 @@ const Calendar = {
       clearTimeout(this._patientSearchTimer);
       this._patientSearchTimer = null;
     }
+    this._selectedPatient = null;
   },
 
   /**
-   * Run patient appointments search (debounced)
+   * Run patient name autocomplete (debounced)
    */
   runPatientSearch(query) {
+    const suggestionsEl = document.getElementById('patient-search-suggestions');
     const resultsEl = document.getElementById('patient-search-results');
-    if (!resultsEl) return;
+    if (!suggestionsEl || !resultsEl) return;
+
+    // If user is in "selected patient" mode, reset on new typing
+    if (this._selectedPatient) {
+      this._selectedPatient = null;
+      document.getElementById('patient-search-back').hidden = true;
+      document.getElementById('patient-search-title').textContent = '🔍 Търси пациент';
+      resultsEl.innerHTML = '';
+    }
+
     const q = (query || '').trim();
-    if (q.length < 2) {
-      resultsEl.innerHTML = '<p class="patient-search__hint">Започни да пишеш име (поне 2 букви)...</p>';
+    if (q.length < 1) {
+      suggestionsEl.innerHTML = '';
+      resultsEl.innerHTML = '<p class="patient-search__hint">Започни да пишеш име, за да видиш предложения.</p>';
       return;
     }
-    resultsEl.innerHTML = '<p class="patient-search__hint">⏳ Търсене...</p>';
+
     if (this._patientSearchTimer) clearTimeout(this._patientSearchTimer);
     this._patientSearchTimer = setTimeout(async () => {
-      const res = await API.searchPatientAppointments(q);
+      const res = await API.searchPatients(q);
       const payload = res?.data || res || {};
-      const appointments = payload.appointments || [];
-      this.renderPatientSearchResults(appointments, q);
-    }, 350);
+      const patients = payload.patients || [];
+      this.renderPatientSuggestions(patients, q);
+    }, 250);
+  },
+
+  /**
+   * Render autocomplete suggestions
+   */
+  renderPatientSuggestions(patients, query) {
+    const suggestionsEl = document.getElementById('patient-search-suggestions');
+    if (!suggestionsEl) return;
+
+    if (!patients.length) {
+      suggestionsEl.innerHTML = `
+        <div class="patient-search__no-match">
+          <p>❌ Няма пациент с име "${query}" в базата.</p>
+          <button class="btn btn--secondary btn--small" id="patient-search-force">
+            🔍 Все пак търси в календара
+          </button>
+        </div>
+      `;
+      document.getElementById('patient-search-force')?.addEventListener('click', () => {
+        this.selectPatient({ name: query, phone: '' });
+      });
+      return;
+    }
+
+    const highlight = (name) => {
+      const idx = name.toLowerCase().indexOf(query.toLowerCase());
+      if (idx === -1) return name;
+      const before = name.slice(0, idx);
+      const match = name.slice(idx, idx + query.length);
+      const after = name.slice(idx + query.length);
+      return `${before}<mark>${match}</mark>${after}`;
+    };
+
+    suggestionsEl.innerHTML = patients.map(p => `
+      <button class="patient-search__suggestion" data-name="${p.name.replace(/"/g, '&quot;')}" data-phone="${(p.phone || '').replace(/"/g, '&quot;')}">
+        <span class="patient-search__suggestion-name">${highlight(p.name)}</span>
+        ${p.phone ? `<span class="patient-search__suggestion-phone">📞 ${p.phone}</span>` : ''}
+      </button>
+    `).join('');
+
+    suggestionsEl.querySelectorAll('.patient-search__suggestion').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.selectPatient({ name: btn.dataset.name, phone: btn.dataset.phone });
+      });
+    });
+  },
+
+  /**
+   * Select a patient → load all their appointments
+   */
+  async selectPatient(patient) {
+    this._selectedPatient = patient;
+    const suggestionsEl = document.getElementById('patient-search-suggestions');
+    const resultsEl = document.getElementById('patient-search-results');
+    const input = document.getElementById('patient-search-input');
+    const backBtn = document.getElementById('patient-search-back');
+    const titleEl = document.getElementById('patient-search-title');
+
+    if (suggestionsEl) suggestionsEl.innerHTML = '';
+    if (input) input.value = patient.name;
+    if (backBtn) backBtn.hidden = false;
+    if (titleEl) titleEl.textContent = `📋 ${patient.name}`;
+    if (resultsEl) resultsEl.innerHTML = '<p class="patient-search__hint">⏳ Зареждане на часовете...</p>';
+
+    const res = await API.searchPatientAppointments(patient.name);
+    const payload = res?.data || res || {};
+    const appointments = payload.appointments || [];
+    this.renderPatientSearchResults(appointments, patient.name);
   },
 
   /**
@@ -2638,7 +2738,6 @@ const Calendar = {
         const appt = appointments.find(a => a.id === id);
         if (!appt) return;
         this.closePatientSearch();
-        // Navigate calendar to that date and reload, then open the edit modal
         if (date) {
           const [yy, mm, dd] = date.split('-').map(Number);
           this.currentDate = new Date(yy, mm - 1, dd);
@@ -2646,7 +2745,6 @@ const Calendar = {
           await this.renderView();
           await this.loadEvents();
         }
-        // Open edit modal with the appointment
         this.openEventModal(appt);
       });
     });
