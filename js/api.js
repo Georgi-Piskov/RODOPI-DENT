@@ -273,6 +273,17 @@ const API = {
   },
 
   /**
+   * Lookup a patient phone by name (single record from Patients sheet)
+   * @param {string} name - Patient full name
+   * @returns {Promise<{success, phone, found, matchedName}>}
+   */
+  async getPatientPhone(name) {
+    if (!name) return { success: false, phone: '', found: false };
+    const endpoint = `${CONFIG.ENDPOINTS.PATIENT_PHONE}?name=${encodeURIComponent(name)}`;
+    return this.request(endpoint);
+  },
+
+  /**
    * Send SMS to patient
    * @param {Object} smsData - { phone, message, template?, date?, time?, duration?, patientName? }
    * Templates: booking_received, booking_confirmed, booking_rejected, booking_conflict, booking_expired, reminder

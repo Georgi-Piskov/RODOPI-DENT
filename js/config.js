@@ -36,6 +36,7 @@ const CONFIG = {
     CALENDAR_CREATE: '/calendar-create',
     CALENDAR_UPDATE: '/calendar-update',
     CALENDAR_DELETE: '/calendar-delete',
+    PATIENT_PHONE: '/patient-phone',
     
     // Public Calendar endpoints (patient booking)
     PUBLIC_SLOTS: '/public-slots',

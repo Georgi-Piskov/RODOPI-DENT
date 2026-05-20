@@ -1,0 +1,136 @@
+{
+  "name": "Rodopi Dent - Patient Phone Lookup",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "patient-phone",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "patient-phone"
+    },
+    {
+      "parameters": {
+        "jsCode": "const query = $input.first().json.query || {};\nconst name = (query.name || '').trim();\n\nif (!name) {\n  return [{ json: { success: false, error: 'Missing name parameter', phone: '' } }];\n}\n\nreturn [{ json: { name: name, normalizedName: name.toLowerCase().trim() } }];"
+      },
+      "id": "validate",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Patients"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "name",
+              "lookupValue": "={{ $json.name }}"
+            }
+          ]
+        },
+        "options": {
+          "returnAllMatches": false
+        }
+      },
+      "id": "find-patient",
+      "name": "Find Patient",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [440, 0],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst requestedName = $('Validate Input').first().json.name || '';\nconst normalized = (requestedName || '').toLowerCase().trim();\n\nlet phone = '';\nlet matchedName = '';\n\n// Try exact match first (case-insensitive)\nfor (const item of items) {\n  const row = item.json || {};\n  if (!row.name) continue;\n  if (String(row.name).toLowerCase().trim() === normalized) {\n    phone = row.phone || '';\n    matchedName = row.name;\n    break;\n  }\n}\n\nreturn [{\n  json: {\n    success: true,\n    name: requestedName,\n    matchedName: matchedName,\n    phone: String(phone || '').trim(),\n    found: !!phone\n  }\n}];"
+      },
+      "id": "extract-phone",
+      "name": "Extract Phone",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [880, 0]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          { "node": "Validate Input", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          { "node": "Find Patient", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Find Patient": {
+      "main": [
+        [
+          { "node": "Extract Phone", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Extract Phone": {
+      "main": [
+        [
+          { "node": "Respond", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": true,
+  "versionId": "patient-phone-v1",
+  "id": "23"
+}

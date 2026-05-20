@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "Rodopi Dent - Calendar Get Events",
   "nodes": [
     {
@@ -29,35 +29,6 @@
     },
     {
       "parameters": {
-        "operation": "read",
-        "documentId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
-        },
-        "sheetName": {
-          "__rl": true,
-          "mode": "name",
-          "value": "Patients"
-        },
-        "options": {
-          "returnAllMatches": true
-        }
-      },
-      "id": "read-patients",
-      "name": "Read Patients",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.5,
-      "position": [440, 0],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "",
-          "name": "Google Sheets"
-        }
-      }
-    },
-    {
-      "parameters": {
         "operation": "getAll",
         "calendar": {
           "__rl": true,
@@ -66,8 +37,8 @@
         },
         "returnAll": true,
         "options": {
-          "timeMax": "={{ $('Parse Parameters').first().json.endDate }}",
-          "timeMin": "={{ $('Parse Parameters').first().json.startDate }}",
+          "timeMax": "={{ $json.endDate }}",
+          "timeMin": "={{ $json.startDate }}",
           "singleEvents": true,
           "orderBy": "startTime"
         }
@@ -76,7 +47,7 @@
       "name": "Get Calendar Events",
       "type": "n8n-nodes-base.googleCalendar",
       "typeVersion": 1.2,
-      "position": [660, 0],
+      "position": [440, 0],
       "credentials": {
         "googleCalendarOAuth2Api": {
           "id": "",
@@ -86,13 +57,13 @@
     },
     {
       "parameters": {
-        "jsCode": "// Transform calendar events to our format\nconst events = $input.all();\nconst patients = $('Read Patients').all().map(item => item.json);\n\n// Build patient name -> phone map for fallback lookup\nconst patientPhoneMap = {};\npatients.forEach(p => {\n  if (p.name) {\n    const normalizedName = p.name.toLowerCase().trim();\n    patientPhoneMap[normalizedName] = p.phone || '';\n  }\n});\n\n// Map Google Calendar colorId (1-11) back to our color names\nconst colorIdToName = {\n  '10': 'green',    // Basil\n  '9': 'blue',      // Blueberry\n  '11': 'red',      // Tomato\n  '5': 'yellow',    // Banana\n  '3': 'purple',    // Grape\n  '6': 'orange',    // Tangerine\n  '4': 'pink',      // Flamingo\n  '8': 'gray'       // Graphite\n};\n\n// Map Bulgarian status labels back to internal values\nconst statusLabelToValue = {\n  'чакащ': 'pending',\n  'потвърден': 'confirmed',\n  'завършен': 'completed'\n};\n\n// Helper function to convert UTC/any timezone to Europe/Sofia\nfunction toSofiaTime(isoString) {\n  if (!isoString) return null;\n  const date = new Date(isoString);\n  const options = {\n    timeZone: 'Europe/Sofia',\n    year: 'numeric',\n    month: '2-digit',\n    day: '2-digit',\n    hour: '2-digit',\n    minute: '2-digit',\n    hour12: false\n  };\n  const formatter = new Intl.DateTimeFormat('en-CA', options);\n  const parts = formatter.formatToParts(date);\n  const getPart = (type) => parts.find(p => p.type === type)?.value || '00';\n  return {\n    date: `${getPart('year')}-${getPart('month')}-${getPart('day')}`,\n    time: `${getPart('hour')}:${getPart('minute')}`\n  };\n}\n\nconst transformed = events.map(item => {\n  const event = item.json;\n  \n  // Parse start/end times\n  const startDateTime = event.start?.dateTime || event.start?.date;\n  const endDateTime = event.end?.dateTime || event.end?.date;\n  \n  let startDate, startTime, endDate, endTime, isAllDay = false;\n  \n  if (event.start?.date) {\n    isAllDay = true;\n    startDate = event.start.date;\n    endDate = event.end.date;\n    startTime = '00:00';\n    endTime = '23:59';\n  } else {\n    const startSofia = toSofiaTime(startDateTime);\n    const endSofia = toSofiaTime(endDateTime);\n    startDate = startSofia.date;\n    startTime = startSofia.time;\n    endDate = endSofia.date;\n    endTime = endSofia.time;\n  }\n  \n  // Calculate duration in minutes\n  const durationMs = new Date(endDateTime) - new Date(startDateTime);\n  const duration = Math.round(durationMs / (1000 * 60));\n  \n  // Parse description for structured data\n  const description = event.description || '';\n  let phone = '';\n  let procedure = '';\n  let appointmentStatus = 'confirmed';\n  \n  // Try to extract phone from description\n  const phoneMatch = description.match(/(?:тел|phone|📞)[:\\s]*([+\\d\\s-]+)/i);\n  if (phoneMatch) phone = phoneMatch[1].trim();\n  \n  // Try to extract procedure\n  const procMatch = description.match(/(?:процедура|procedure|🦷)[:\\s]*(.+?)(?:\\n|$)/i);\n  if (procMatch) procedure = procMatch[1].trim();\n  \n  // Try to extract status from description\n  const statusMatch = description.match(/(?:📋 Статус|статус)[:\\s]*(.+?)(?:\\n|$)/i);\n  if (statusMatch) {\n    const rawStatus = statusMatch[1].trim().toLowerCase();\n    appointmentStatus = statusLabelToValue[rawStatus] || rawStatus;\n  }\n  \n  // Also detect pending from ⏳ prefix in title\n  const rawTitle = event.summary || '';\n  if (rawTitle.startsWith('⏳')) {\n    appointmentStatus = 'pending';\n  }\n  \n  // Clean title - strip ⏳ prefix for display\n  const cleanTitle = rawTitle.replace(/^⏳\\s*/, '');\n  \n  // FALLBACK: if no phone in description, look up by patient name in Patients sheet\n  if (!phone && cleanTitle) {\n    const normalizedName = cleanTitle.toLowerCase().trim();\n    phone = patientPhoneMap[normalizedName] || '';\n  }\n  \n  // Map Google colorId to our color name - DEFAULT IS GREEN\n  const colorId = colorIdToName[event.colorId] || 'green';\n  \n  return {\n    json: {\n      id: event.id,\n      googleEventId: event.id,\n      title: cleanTitle || 'Без заглавие',\n      patientName: cleanTitle || '',\n      patientPhone: phone,\n      procedure: procedure,\n      description: description,\n      date: startDate,\n      startTime: startTime,\n      endTime: endTime,\n      endDate: endDate,\n      duration: duration,\n      isAllDay: isAllDay,\n      colorId: colorId,\n      status: appointmentStatus,\n      location: event.location || '',\n      htmlLink: event.htmlLink\n    }\n  };\n});\n\nreturn transformed;"
+        "jsCode": "// Transform calendar events to our format\nconst events = $input.all();\n\n// Map Google Calendar colorId (1-11) back to our color names\nconst colorIdToName = {\n  '10': 'green',    // Basil\n  '9': 'blue',      // Blueberry\n  '11': 'red',      // Tomato\n  '5': 'yellow',    // Banana\n  '3': 'purple',    // Grape\n  '6': 'orange',    // Tangerine\n  '4': 'pink',      // Flamingo\n  '8': 'gray'       // Graphite\n};\n\n// Map Bulgarian status labels back to internal values\nconst statusLabelToValue = {\n  '╤З╨░╨║╨░╤Й': 'pending',\n  '╨┐╨╛╤В╨▓╤К╤А╨┤╨╡╨╜': 'confirmed',\n  '╨╖╨░╨▓╤К╤А╤И╨╡╨╜': 'completed'\n};\n\n// Helper function to convert UTC/any timezone to Europe/Sofia\nfunction toSofiaTime(isoString) {\n  if (!isoString) return null;\n  const date = new Date(isoString);\n  // Format in Europe/Sofia timezone\n  const options = {\n    timeZone: 'Europe/Sofia',\n    year: 'numeric',\n    month: '2-digit',\n    day: '2-digit',\n    hour: '2-digit',\n    minute: '2-digit',\n    hour12: false\n  };\n  const formatter = new Intl.DateTimeFormat('en-CA', options);\n  const parts = formatter.formatToParts(date);\n  const getPart = (type) => parts.find(p => p.type === type)?.value || '00';\n  return {\n    date: `${getPart('year')}-${getPart('month')}-${getPart('day')}`,\n    time: `${getPart('hour')}:${getPart('minute')}`\n  };\n}\n\nconst transformed = events.map(item => {\n  const event = item.json;\n  \n  // Parse start/end times\n  const startDateTime = event.start?.dateTime || event.start?.date;\n  const endDateTime = event.end?.dateTime || event.end?.date;\n  \n  let startDate, startTime, endDate, endTime, isAllDay = false;\n  \n  if (event.start?.date) {\n    // All-day event\n    isAllDay = true;\n    startDate = event.start.date;\n    endDate = event.end.date;\n    startTime = '00:00';\n    endTime = '23:59';\n  } else {\n    // Timed event - CONVERT TO SOFIA TIMEZONE\n    const startSofia = toSofiaTime(startDateTime);\n    const endSofia = toSofiaTime(endDateTime);\n    startDate = startSofia.date;\n    startTime = startSofia.time;\n    endDate = endSofia.date;\n    endTime = endSofia.time;\n  }\n  \n  // Calculate duration in minutes\n  const durationMs = new Date(endDateTime) - new Date(startDateTime);\n  const duration = Math.round(durationMs / (1000 * 60));\n  \n  // Parse description for structured data\n  const description = event.description || '';\n  let phone = '';\n  let procedure = '';\n  let appointmentStatus = 'confirmed'; // default\n  \n  // Try to extract phone from description\n  const phoneMatch = description.match(/(?:╤В╨╡╨╗|phone|ЁЯУЮ)[:\\s]*([+\\d\\s-]+)/i);\n  if (phoneMatch) phone = phoneMatch[1].trim();\n  \n  // Try to extract procedure\n  const procMatch = description.match(/(?:╨┐╤А╨╛╤Ж╨╡╨┤╤Г╤А╨░|procedure|ЁЯж╖)[:\\s]*(.+?)(?:\\n|$)/i);\n  if (procMatch) procedure = procMatch[1].trim();\n  \n  // Try to extract status from description\n  const statusMatch = description.match(/(?:ЁЯУЛ ╨б╤В╨░╤В╤Г╤Б|╤Б╤В╨░╤В╤Г╤Б)[:\\s]*(.+?)(?:\\n|$)/i);\n  if (statusMatch) {\n    const rawStatus = statusMatch[1].trim().toLowerCase();\n    appointmentStatus = statusLabelToValue[rawStatus] || rawStatus;\n  }\n  \n  // Also detect pending from тП│ prefix in title\n  const rawTitle = event.summary || '';\n  if (rawTitle.startsWith('тП│')) {\n    appointmentStatus = 'pending';\n  }\n  \n  // Clean title - strip тП│ prefix for display\n  const cleanTitle = rawTitle.replace(/^тП│\\s*/, '');\n  \n  // Map Google colorId to our color name - DEFAULT IS GREEN\n  const colorId = colorIdToName[event.colorId] || 'green';\n  \n  return {\n    json: {\n      id: event.id,\n      googleEventId: event.id,\n      title: cleanTitle || '╨С╨╡╨╖ ╨╖╨░╨│╨╗╨░╨▓╨╕╨╡',\n      patientName: cleanTitle || '',\n      patientPhone: phone,\n      procedure: procedure,\n      description: description,\n      date: startDate,\n      startTime: startTime,\n      endTime: endTime,\n      endDate: endDate,\n      duration: duration,\n      isAllDay: isAllDay,\n      colorId: colorId,\n      status: appointmentStatus,\n      location: event.location || '',\n      htmlLink: event.htmlLink\n    }\n  };\n});\n\nreturn transformed;"
       },
       "id": "transform",
       "name": "Transform Events",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [880, 0]
+      "position": [660, 0]
     },
     {
       "parameters": {
@@ -113,42 +84,51 @@
       "name": "Respond",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1100, 0]
+      "position": [880, 0]
     }
   ],
   "connections": {
     "Webhook": {
       "main": [
         [
-          { "node": "Parse Parameters", "type": "main", "index": 0 }
+          {
+            "node": "Parse Parameters",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Parse Parameters": {
       "main": [
         [
-          { "node": "Read Patients", "type": "main", "index": 0 }
-        ]
-      ]
-    },
-    "Read Patients": {
-      "main": [
-        [
-          { "node": "Get Calendar Events", "type": "main", "index": 0 }
+          {
+            "node": "Get Calendar Events",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Get Calendar Events": {
       "main": [
         [
-          { "node": "Transform Events", "type": "main", "index": 0 }
+          {
+            "node": "Transform Events",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Transform Events": {
       "main": [
         [
-          { "node": "Respond", "type": "main", "index": 0 }
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     }
@@ -156,7 +136,9 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "active": true,
-  "versionId": "calendar-events-v2",
-  "id": "11"
+  "tags": [
+    {
+      "name": "Rodopi Dent"
+    }
+  ]
 }

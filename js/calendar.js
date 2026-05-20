@@ -2516,6 +2516,21 @@ const Calendar = {
       form.patientName.value = cleanName;
       form.patientPhone.value = event.patientPhone || '';
       form.date.value = event.date || '';
+      
+      // If phone is missing, look it up from Patients sheet by name (async)
+      if (!event.patientPhone && cleanName) {
+        const phoneInput = form.patientPhone;
+        const originalPlaceholder = phoneInput.placeholder;
+        phoneInput.placeholder = 'Търсене на телефон...';
+        API.getPatientPhone(cleanName)
+          .then(res => {
+            if (res && res.success && res.phone && !phoneInput.value) {
+              phoneInput.value = res.phone;
+            }
+          })
+          .catch(err => console.warn('Patient phone lookup failed:', err))
+          .finally(() => { phoneInput.placeholder = originalPlaceholder; });
+      }
       form.startTime.value = event.startTime || '';
       form.duration.value = event.duration || 30;
       form.status.value = event.status || 'confirmed';
