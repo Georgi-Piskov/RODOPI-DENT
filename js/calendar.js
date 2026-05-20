@@ -2524,8 +2524,10 @@ const Calendar = {
         phoneInput.placeholder = 'Търсене на телефон...';
         API.getPatientPhone(cleanName)
           .then(res => {
-            if (res && res.success && res.phone && !phoneInput.value) {
-              phoneInput.value = res.phone;
+            // API.request wraps response as { success, data: <n8nResponse> }
+            const payload = res?.data || res;
+            if (payload && payload.phone && !phoneInput.value) {
+              phoneInput.value = payload.phone;
             }
           })
           .catch(err => console.warn('Patient phone lookup failed:', err))
