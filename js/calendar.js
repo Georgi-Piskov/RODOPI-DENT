@@ -1666,8 +1666,8 @@ const Calendar = {
       const dayName = ['Нед', 'Пон', 'Вто', 'Сря', 'Чет', 'Пет', 'Съб'][new Date(event.date).getDay()];
       
       // Extract phone from description
-      const phoneMatch = (event.description || '').match(/📞 Тел: ([^\n]+)/);
-      const phone = phoneMatch ? phoneMatch[1].trim() : '';
+      const phoneMatch = (event.description || '').match(/📞\s*Тел:\s*([0-9+\s]+)/);
+      const phone = phoneMatch ? phoneMatch[1].replace(/\s/g, '') : null;
       
       // Extract reason from description  
       const reasonMatch = (event.description || '').match(/📋 Причина: ([^\n]+)/);
