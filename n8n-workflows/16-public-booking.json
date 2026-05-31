@@ -276,12 +276,12 @@
               {
                 "row": [
                   {
-                    "text": "30 мин",
-                    "callbackData": "PLACEHOLDER_30"
+                    "text": "✅ 30 мин",
+                    "callbackData": "=confirm_30_{{ $('Prepare Event Data').first().json.id }}"
                   },
                   {
-                    "text": "60 мин",
-                    "callbackData": "PLACEHOLDER_60"
+                    "text": "✅ 60 мин",
+                    "callbackData": "=confirm_60_{{ $('Prepare Event Data').first().json.id }}"
                   }
                 ]
               },
@@ -289,7 +289,7 @@
                 "row": [
                   {
                     "text": "❌ Откажи",
-                    "callbackData": "PLACEHOLDER_CANCEL"
+                    "callbackData": "=cancel_{{ $('Prepare Event Data').first().json.id }}"
                   }
                 ]
               }
@@ -325,12 +325,12 @@
               {
                 "row": [
                   {
-                    "text": "30 мин",
-                    "callbackData": "PLACEHOLDER_30"
+                    "text": "✅ 30 мин",
+                    "callbackData": "=confirm_30_{{ $('Prepare Event Data').first().json.id }}"
                   },
                   {
                     "text": "📞 За обаждане",
-                    "callbackData": "PLACEHOLDER_CALLBACK"
+                    "callbackData": "=callback_{{ $('Prepare Event Data').first().json.id }}"
                   }
                 ]
               },
@@ -338,7 +338,7 @@
                 "row": [
                   {
                     "text": "❌ Откажи",
-                    "callbackData": "PLACEHOLDER_CANCEL"
+                    "callbackData": "=cancel_{{ $('Prepare Event Data').first().json.id }}"
                   }
                 ]
               }
