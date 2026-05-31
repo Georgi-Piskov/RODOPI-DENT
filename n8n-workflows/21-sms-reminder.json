@@ -64,10 +64,10 @@
     },
     {
       "parameters": {
-        "jsCode": "// Get events and filter only confirmed ones\nconst items = $input.all();\nconst tomorrowDisplay = $('Calculate Tomorrow').first().json.tomorrowDisplay;\n\nconst confirmedEvents = [];\n\nfor (const item of items) {\n  const event = item.json;\n  \n  // Check if confirmed (colorId 10 = green = confirmed)\n  // Also check description for status\n  const isConfirmed = \n    event.colorId === '10' || \n    event.colorId === 10 ||\n    (event.description && event.description.toLowerCase().includes('confirmed')) ||\n    (event.extendedProperties?.private?.status === 'confirmed');\n  \n  if (!isConfirmed) continue;\n  \n  // Extract phone from description\n  // Format: \"📱 0888123456\" or \"Phone: 0888123456\"\n  let phone = '';\n  if (event.description) {\n    const phoneMatch = event.description.match(/(?:📱|Phone:|Телефон:)?\\s*([+]?[0-9\\s-]{8,15})/i);\n    if (phoneMatch) {\n      phone = phoneMatch[1].replace(/[\\s-]/g, '');\n    }\n  }\n  \n  if (!phone) continue; // Skip if no phone\n  \n  // Extract time from event\n  const startTime = event.start?.dateTime || event.start?.date;\n  let time = '';\n  if (startTime) {\n    const eventDate = new Date(startTime);\n    time = new Intl.DateTimeFormat('bg-BG', {\n      timeZone: 'Europe/Sofia',\n      hour: '2-digit',\n      minute: '2-digit',\n      hour12: false\n    }).format(eventDate);\n  }\n  \n  // Extract patient name from summary\n  const patientName = event.summary?.replace(/[✅🟢⏳🟡]/g, '').trim() || 'Пациент';\n  \n  confirmedEvents.push({\n    eventId: event.id,\n    patientName: patientName,\n    phone: phone,\n    date: tomorrowDisplay,\n    time: time,\n    summary: event.summary\n  });\n}\n\nif (confirmedEvents.length === 0) {\n  return [{ json: { noEvents: true, message: 'Няма потвърдени часове за утре' } }];\n}\n\nreturn confirmedEvents.map(e => ({ json: e }));"
+        "jsCode": "// Get events and filter by reminder flag (🔔 Напомняне: ДА)\nconst items = $input.all();\nconst tomorrowDisplay = $('Calculate Tomorrow').first().json.tomorrowDisplay;\n\nconst eventsToRemind = [];\n\nfor (const item of items) {\n  const event = item.json;\n  const desc = event.description || '';\n\n  // Skip cancelled events\n  if (event.status === 'cancelled') continue;\n\n  // Source of truth: 🔔 Напомняне: ДА tag in description.\n  // Events without the tag (legacy / admin-created without opt-in) are SKIPPED.\n  const reminderMatch = desc.match(/🔔\\s*Напомняне:\\s*(ДА|НЕ|YES|NO)/i);\n  if (!reminderMatch) continue;\n  const flagVal = reminderMatch[1].toUpperCase();\n  if (flagVal !== 'ДА' && flagVal !== 'YES') continue;\n\n  // Skip if appointment status is completed\n  if (/Статус:\\s*Завършен/i.test(desc)) continue;\n\n  // Extract phone — supports several formats used in our descriptions\n  let phone = '';\n  const phoneMatch = desc.match(/(?:📞\\s*Тел:|📱|Phone:|Телефон:)\\s*([+]?[0-9\\s\\-]{8,16})/i);\n  if (phoneMatch) {\n    phone = phoneMatch[1].replace(/[\\s\\-]/g, '');\n  }\n  if (!phone) continue;\n\n  // Extract email if present (for future email reminder dispatch)\n  let email = '';\n  const emailMatch = desc.match(/✉️\\s*Имейл:\\s*([^\\s\\n]+)/i);\n  if (emailMatch) email = emailMatch[1].trim();\n\n  // Extract notify channels if present (e.g. \"📬 Известия: SMS, Имейл\")\n  let channels = ['sms'];\n  const notifyMatch = desc.match(/📬\\s*Известия:\\s*([^\\n]+)/i);\n  if (notifyMatch) {\n    const raw = notifyMatch[1].toLowerCase();\n    channels = [];\n    if (raw.includes('sms')) channels.push('sms');\n    if (raw.includes('имейл') || raw.includes('email')) channels.push('email');\n    if (channels.length === 0) channels = ['sms'];\n  }\n\n  // Extract event time\n  const startTime = event.start?.dateTime || event.start?.date;\n  let time = '';\n  if (startTime) {\n    const eventDate = new Date(startTime);\n    time = new Intl.DateTimeFormat('bg-BG', {\n      timeZone: 'Europe/Sofia',\n      hour: '2-digit',\n      minute: '2-digit',\n      hour12: false\n    }).format(eventDate);\n  }\n\n  // Extract patient name from summary (strip status emojis)\n  const patientName = (event.summary || '').replace(/[✅🟢⏳🟡🔔]/g, '').trim() || 'Пациент';\n\n  eventsToRemind.push({\n    eventId: event.id,\n    patientName,\n    phone,\n    email,\n    channels,\n    date: tomorrowDisplay,\n    time,\n    summary: event.summary\n  });\n}\n\nif (eventsToRemind.length === 0) {\n  return [{ json: { noEvents: true, message: 'Няма часове за напомняне утре' } }];\n}\n\nreturn eventsToRemind.map(e => ({ json: e }));"
       },
       "id": "filter-confirmed-001",
-      "name": "Filter Confirmed & Extract Data",
+      "name": "Filter Events Needing Reminder",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
@@ -202,18 +202,7 @@
       "main": [
         [
           {
-            "node": "Filter Confirmed & Extract Data",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Filter Confirmed & Extract Data": {
-      "main": [
-        [
-          {
-            "node": "Has Events?",
+            "node": "Filter Events Needing Reminder",
             "type": "main",
             "index": 0
           }
@@ -243,6 +232,17 @@
         [
           {
             "node": "Send FCM to Android",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Events Needing Reminder": {
+      "main": [
+        [
+          {
+            "node": "Has Events?",
             "type": "main",
             "index": 0
           }

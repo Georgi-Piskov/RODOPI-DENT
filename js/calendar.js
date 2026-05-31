@@ -2507,6 +2507,13 @@ const Calendar = {
               <label>Бележки</label>
               <textarea name="notes" rows="2" placeholder="Допълнителна информация..."></textarea>
             </div>
+            <div class="form-group event-form__row--full reminder-toggle">
+              <label class="reminder-toggle__label">
+                <input type="checkbox" name="sendReminder" id="event-send-reminder">
+                <span>🔔 <strong>Изпрати напомняне</strong> на пациента ден преди прегледа</span>
+              </label>
+              <p class="reminder-toggle__hint">Автоматично ВКЛЮЧЕНО за нов пациент. За редовни пациенти включете ръчно при нужда.</p>
+            </div>
             <input type="hidden" name="eventId" value="">
             <div class="event-form__actions">
               <button type="button" class="btn btn--danger event-form__delete" id="event-delete-btn" hidden>🗑️ Изтрий</button>
@@ -2817,6 +2824,20 @@ const Calendar = {
         .trim();
       form.notes.value = notesText;
       form.eventId.value = event.id || event.googleEventId || '';
+
+      // Parse reminder flag from description: "🔔 Напомняне: ДА" / "НЕ"
+      const reminderInput = form.sendReminder;
+      if (reminderInput) {
+        const desc = event.description || event.notes || '';
+        const reminderMatch = desc.match(/🔔\s*Напомняне:\s*(ДА|НЕ|YES|NO)/i);
+        if (reminderMatch) {
+          const v = reminderMatch[1].toUpperCase();
+          reminderInput.checked = (v === 'ДА' || v === 'YES');
+        } else {
+          // Legacy event without tag — default OFF on edit
+          reminderInput.checked = false;
+        }
+      }
       
       // Set color if exists (use colorId from API)
       const eventColor = event.colorId || event.color;
@@ -2836,6 +2857,11 @@ const Calendar = {
       form.date.value = date || this.formatDate(this.currentDate);
       form.startTime.value = hour ? `${String(hour).padStart(2, '0')}:00` : '09:00';
       form.eventId.value = '';
+
+      // Default reminder OFF for admin-created events (doctor opts in per case)
+      if (form.sendReminder) {
+        form.sendReminder.checked = false;
+      }
     }
     
     modal.hidden = false;
@@ -2868,7 +2894,8 @@ const Calendar = {
       status: formData.get('status'),
       procedure: formData.get('procedure'),
       notes: formData.get('notes'),
-      colorId: formData.get('colorId') || 'green'
+      colorId: formData.get('colorId') || 'green',
+      sendReminder: formData.get('sendReminder') === 'on'
     };
     
     // DEBUG: Log what we're sending

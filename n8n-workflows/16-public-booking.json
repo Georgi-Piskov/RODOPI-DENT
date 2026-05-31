@@ -22,7 +22,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Validate incoming booking data\nconst body = $input.first().json.body;\n\nconst required = ['patientName', 'patientPhone', 'date', 'startTime'];\nconst missing = required.filter(field => !body[field]);\n\nif (missing.length > 0) {\n  return [{\n    json: {\n      valid: false,\n      error: `Липсващи полета: ${missing.join(', ')}`\n    }\n  }];\n}\n\n// Validate phone number (Bulgarian format)\nconst phone = body.patientPhone.replace(/\\s/g, '');\nconst phoneRegex = /^(\\+359|0)[0-9]{9}$/;\nif (!phoneRegex.test(phone)) {\n  return [{\n    json: {\n      valid: false,\n      error: 'Невалиден телефонен номер. Моля, използвайте формат: 0888123456 или +359888123456'\n    }\n  }];\n}\n\n// Validate notification channels (sms | email | viber | telegram)\nconst allowedChannels = ['sms', 'email', 'viber', 'telegram'];\nlet notify = Array.isArray(body.notify) ? body.notify : [];\nnotify = notify.filter(c => allowedChannels.includes(c));\nif (notify.length === 0) {\n  // Backward compat: default to SMS if nothing was sent\n  notify = ['sms'];\n}\n\n// If email channel selected, email must be a valid address\nconst patientEmail = (body.patientEmail || '').trim();\nconst emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\nif (notify.includes('email')) {\n  if (!patientEmail || !emailRegex.test(patientEmail)) {\n    return [{\n      json: {\n        valid: false,\n        error: 'За имейл известия е нужен валиден имейл адрес'\n      }\n    }];\n  }\n}\n\n// Validate date is in the future\nconst bookingDate = new Date(body.date + 'T' + body.startTime);\nconst now = new Date();\nif (bookingDate < now) {\n  return [{\n    json: {\n      valid: false,\n      error: 'Не може да запазите час в миналото'\n    }\n  }];\n}\n\n// Check if it's a working day\nconst dayOfWeek = new Date(body.date).getDay();\nif (dayOfWeek === 0 || dayOfWeek === 6) {\n  return [{\n    json: {\n      valid: false,\n      error: 'Събота и неделя са почивни дни'\n    }\n  }];\n}\n\n// Default duration is 30 minutes for new bookings (doctor will confirm actual duration)\nconst duration = 30;\n\nreturn [{\n  json: {\n    valid: true,\n    patientName: body.patientName.trim(),\n    patientPhone: phone,\n    patientEmail: patientEmail,\n    notify: notify,\n    date: body.date,\n    startTime: body.startTime,\n    duration: duration,\n    reason: (body.reason || '').trim(),\n    notes: (body.notes || '').trim()\n  }\n}];"
+        "jsCode": "// Validate incoming booking data\nconst body = $input.first().json.body;\n\nconst required = ['patientName', 'patientPhone', 'date', 'startTime'];\nconst missing = required.filter(field => !body[field]);\n\nif (missing.length > 0) {\n  return [{\n    json: {\n      valid: false,\n      error: `Липсващи полета: ${missing.join(', ')}`\n    }\n  }];\n}\n\n// Validate phone number (Bulgarian format)\nconst phone = body.patientPhone.replace(/\\s/g, '');\nconst phoneRegex = /^(\\+359|0)[0-9]{9}$/;\nif (!phoneRegex.test(phone)) {\n  return [{\n    json: {\n      valid: false,\n      error: 'Невалиден телефонен номер. Моля, използвайте формат: 0888123456 или +359888123456'\n    }\n  }];\n}\n\n// Validate notification channels — only sms + email supported now\nconst allowedChannels = ['sms', 'email'];\nlet notify = Array.isArray(body.notify) ? body.notify : [];\nnotify = notify.filter(c => allowedChannels.includes(c));\nif (notify.length === 0) {\n  // Backward compat: default to SMS if nothing was sent\n  notify = ['sms'];\n}\n\n// If email channel selected, email must be a valid address\nconst patientEmail = (body.patientEmail || '').trim();\nconst emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\nif (notify.includes('email')) {\n  if (!patientEmail || !emailRegex.test(patientEmail)) {\n    return [{\n      json: {\n        valid: false,\n        error: 'За имейл известия е нужен валиден имейл адрес'\n      }\n    }];\n  }\n}\n\n// Validate date is in the future\nconst bookingDate = new Date(body.date + 'T' + body.startTime);\nconst now = new Date();\nif (bookingDate < now) {\n  return [{\n    json: {\n      valid: false,\n      error: 'Не може да запазите час в миналото'\n    }\n  }];\n}\n\n// Check if it's a working day\nconst dayOfWeek = new Date(body.date).getDay();\nif (dayOfWeek === 0 || dayOfWeek === 6) {\n  return [{\n    json: {\n      valid: false,\n      error: 'Събота и неделя са почивни дни'\n    }\n  }];\n}\n\n// Default duration is 30 minutes for new bookings\nconst duration = 30;\n\nreturn [{\n  json: {\n    valid: true,\n    patientName: body.patientName.trim(),\n    patientPhone: phone,\n    patientEmail: patientEmail,\n    notify: notify,\n    date: body.date,\n    startTime: body.startTime,\n    duration: duration,\n    reason: (body.reason || '').trim(),\n    notes: (body.notes || '').trim()\n  }\n}];"
       },
       "id": "validate",
       "name": "Validate Input",
@@ -166,7 +166,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Prepare calendar event data\nconst booking = $json;\n\n// Calculate end time\nconst [hours, minutes] = booking.startTime.split(':').map(Number);\nconst startMinutes = hours * 60 + minutes;\nconst endMinutes = startMinutes + booking.duration;\nconst endHours = Math.floor(endMinutes / 60);\nconst endMins = endMinutes % 60;\nconst endTime = `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;\n\nconst notifyList = Array.isArray(booking.notify) ? booking.notify : ['sms'];\nconst notifyLabel = notifyList.map(n => ({\n  sms: 'SMS', email: 'Имейл', viber: 'Viber/WhatsApp', telegram: 'Telegram'\n}[n] || n)).join(', ');\n\n// Build description with structured data\nlet description = `📞 Тел: ${booking.patientPhone}\\n`;\nif (booking.patientEmail) {\n  description += `✉️ Имейл: ${booking.patientEmail}\\n`;\n}\ndescription += `📬 Известия: ${notifyLabel}\\n`;\nif (booking.reason) {\n  description += `📋 Причина: ${booking.reason}\\n`;\n}\nif (booking.notes) {\n  description += `📝 Бележки: ${booking.notes}\\n`;\n}\ndescription += `\\n⏳ Статус: ЧАКАЩ (pending)\\n`;\ndescription += `🆔 ID: ${booking.id}\\n`;\ndescription += `📅 Създаден: ${new Date().toLocaleString('bg-BG')}`;\n\nreturn [{\n  json: {\n    summary: `⏳ ${booking.patientName}`,\n    description: description,\n    startDateTime: `${booking.date}T${booking.startTime}:00`,\n    endDateTime: `${booking.date}T${endTime}:00`,\n    colorId: '5',  // Yellow for pending\n    id: booking.id,\n    patientName: booking.patientName,\n    patientPhone: booking.patientPhone,\n    patientEmail: booking.patientEmail || '',\n    notify: notifyList\n  }\n}];"
+        "jsCode": "// Prepare calendar event data\n// IMPORTANT: This node now runs AFTER \"Save Patient to Sheet\" so we know if the patient is new.\nconst booking = $('Check Conflict').first().json;\n\n// Determine if this is a new patient based on patients-upsert response.\n// The upstream \"Save Patient to Sheet\" returns { success, action: 'created' | 'skipped', ... }.\n// `$input.first().json` is that response.\nconst upsertResp = $input.first().json || {};\nconst isNewPatient = upsertResp.action === 'created';\n\n// For PUBLIC bookings: new patient -> auto reminder ON, returning patient -> OFF (doctor can flip from admin)\nconst sendReminder = isNewPatient;\n\n// Calculate end time\nconst [hours, minutes] = booking.startTime.split(':').map(Number);\nconst startMinutes = hours * 60 + minutes;\nconst endMinutes = startMinutes + booking.duration;\nconst endHours = Math.floor(endMinutes / 60);\nconst endMins = endMinutes % 60;\nconst endTime = `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;\n\nconst notifyList = Array.isArray(booking.notify) ? booking.notify : ['sms'];\nconst notifyLabel = notifyList.map(n => ({\n  sms: 'SMS', email: 'Имейл'\n}[n] || n)).join(', ');\n\n// Build description with structured data\nlet description = `📞 Тел: ${booking.patientPhone}\\n`;\nif (booking.patientEmail) {\n  description += `✉️ Имейл: ${booking.patientEmail}\\n`;\n}\ndescription += `📬 Известия: ${notifyLabel}\\n`;\ndescription += `🔔 Напомняне: ${sendReminder ? 'ДА' : 'НЕ'}\\n`;\ndescription += `👤 Тип: ${isNewPatient ? 'НОВ пациент' : 'Редовен пациент'}\\n`;\nif (booking.reason) {\n  description += `📋 Причина: ${booking.reason}\\n`;\n}\nif (booking.notes) {\n  description += `📝 Бележки: ${booking.notes}\\n`;\n}\ndescription += `\\n⏳ Статус: ЧАКАЩ (pending)\\n`;\ndescription += `🆔 ID: ${booking.id}\\n`;\ndescription += `📅 Създаден: ${new Date().toLocaleString('bg-BG')}`;\n\nreturn [{\n  json: {\n    summary: `⏳ ${booking.patientName}`,\n    description: description,\n    startDateTime: `${booking.date}T${booking.startTime}:00`,\n    endDateTime: `${booking.date}T${endTime}:00`,\n    colorId: '5',  // Yellow for pending\n    id: booking.id,\n    patientName: booking.patientName,\n    patientPhone: booking.patientPhone,\n    patientEmail: booking.patientEmail || '',\n    notify: notifyList,\n    isNewPatient: isNewPatient,\n    sendReminder: sendReminder\n  }\n}];"
       },
       "id": "prepare-event",
       "name": "Prepare Event Data",
@@ -174,7 +174,7 @@
       "typeVersion": 2,
       "position": [
         1320,
-        200
+        250
       ]
     },
     {
@@ -405,7 +405,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"name\": \"{{ $('Prepare Event Data').first().json.patientName }}\",\n  \"phone\": \"{{ $('Prepare Event Data').first().json.patientPhone }}\",\n  \"email\": \"{{ $('Prepare Event Data').first().json.patientEmail }}\",\n  \"notify\": {{ JSON.stringify($('Prepare Event Data').first().json.notify) }}\n}",
+        "jsonBody": "={\n  \"name\": \"{{ $('Check Conflict').first().json.patientName }}\",\n  \"phone\": \"{{ $('Check Conflict').first().json.patientPhone }}\",\n  \"email\": \"{{ $('Check Conflict').first().json.patientEmail }}\",\n  \"notify\": {{ JSON.stringify($('Check Conflict').first().json.notify) }}\n}",
         "options": {}
       },
       "id": "save-patient",
@@ -413,8 +413,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1760,
-        650
+        1100,
+        250
       ],
       "continueOnFail": true
     },
@@ -513,7 +513,7 @@
         ],
         [
           {
-            "node": "Prepare Event Data",
+            "node": "Save Patient to Sheet",
             "type": "main",
             "index": 0
           }
@@ -541,11 +541,6 @@
           },
           {
             "node": "Can 60 min?",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Save Patient to Sheet",
             "type": "main",
             "index": 0
           },
@@ -596,6 +591,17 @@
           }
         ],
         []
+      ]
+    },
+    "Save Patient to Sheet": {
+      "main": [
+        [
+          {
+            "node": "Prepare Event Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },

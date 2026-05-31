@@ -14,18 +14,24 @@
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "webhookId": "calendar-create"
     },
     {
       "parameters": {
-        "jsCode": "// Parse and validate input\nconst body = $input.first().json.body;\n\n// Support both patientName and title for blocking\nconst eventTitle = body.title || body.patientName;\n\n// Required fields\nif (!eventTitle) {\n  throw new Error('Име на пациент или заглавие е задължително');\n}\nif (!body.date) {\n  throw new Error('Дата е задължителна');\n}\nif (!body.startTime) {\n  throw new Error('Начален час е задължителен');\n}\n\n// Calculate end time based on duration or endTime\nlet endTime;\nif (body.endTime) {\n  endTime = body.endTime;\n} else {\n  const duration = body.duration || 30; // Default 30 minutes\n  const [hours, minutes] = body.startTime.split(':').map(Number);\n  const startDate = new Date(`${body.date}T${body.startTime}:00`);\n  const endDate = new Date(startDate.getTime() + duration * 60 * 1000);\n  endTime = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;\n}\n\n// Appointment status handling\nconst statusVal = body.status || 'confirmed';\nconst statusLabels = { 'pending': 'Чакащ', 'confirmed': 'Потвърден', 'completed': 'Завършен' };\nconst statusLabel = statusLabels[statusVal] || 'Потвърден';\n\n// Build summary - add ⏳ prefix for pending\nlet summary = eventTitle;\nif (statusVal === 'pending') {\n  summary = '⏳ ' + eventTitle;\n}\n\n// Build description with structured data\nlet description = '';\nif (body.patientPhone) {\n  description += `📞 Тел: ${body.patientPhone}\\n`;\n}\nif (body.procedure) {\n  description += `🦷 Процедура: ${body.procedure}\\n`;\n}\ndescription += `📋 Статус: ${statusLabel}\\n`;\nif (body.notes) {\n  description += `📝 Бележки: ${body.notes}\\n`;\n}\n\n// Map color names to Google Calendar colorId (1-11)\nconst colorMap = {\n  'green': '10',    // Basil (green)\n  'blue': '9',      // Blueberry (blue)\n  'red': '11',      // Tomato (red)\n  'yellow': '5',    // Banana (yellow)\n  'purple': '3',    // Grape (purple)\n  'orange': '6',    // Tangerine (orange)\n  'pink': '4',      // Flamingo (pink)\n  'gray': '8'       // Graphite (gray)\n};\n// Status-based default colors: pending=yellow, completed=gray, confirmed=green\nconst statusColorDefaults = { 'pending': 'yellow', 'completed': 'gray', 'confirmed': 'green' };\nconst effectiveColor = body.colorId || statusColorDefaults[statusVal] || 'green';\nconst googleColorId = colorMap[effectiveColor] || colorMap['green'];\n\nreturn [{\n  json: {\n    summary: summary,\n    description: description.trim(),\n    startDateTime: `${body.date}T${body.startTime}:00`,\n    endDateTime: `${body.date}T${endTime}:00`,\n    date: body.date,\n    duration: body.duration || 30,\n    patientName: body.patientName || eventTitle,\n    patientPhone: body.patientPhone || '',\n    procedure: body.procedure || '',\n    status: statusVal,\n    colorId: googleColorId\n  }\n}];"
+        "jsCode": "// Parse and validate input\nconst body = $input.first().json.body;\n\n// Support both patientName and title for blocking\nconst eventTitle = body.title || body.patientName;\n\n// Required fields\nif (!eventTitle) {\n  throw new Error('Име на пациент или заглавие е задължително');\n}\nif (!body.date) {\n  throw new Error('Дата е задължителна');\n}\nif (!body.startTime) {\n  throw new Error('Начален час е задължителен');\n}\n\n// Calculate end time based on duration or endTime\nlet endTime;\nif (body.endTime) {\n  endTime = body.endTime;\n} else {\n  const duration = body.duration || 30;\n  const startDate = new Date(`${body.date}T${body.startTime}:00`);\n  const endDate = new Date(startDate.getTime() + duration * 60 * 1000);\n  endTime = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;\n}\n\n// Appointment status handling\nconst statusVal = body.status || 'confirmed';\nconst statusLabels = { 'pending': 'Чакащ', 'confirmed': 'Потвърден', 'completed': 'Завършен' };\nconst statusLabel = statusLabels[statusVal] || 'Потвърден';\n\n// Reminder flag (admin-controlled). Default: off.\nconst sendReminder = body.sendReminder === true || body.sendReminder === 'true';\n\n// Build summary - add ⏳ prefix for pending\nlet summary = eventTitle;\nif (statusVal === 'pending') {\n  summary = '⏳ ' + eventTitle;\n}\n\n// Build description with structured data\nlet description = '';\nif (body.patientPhone) {\n  description += `📞 Тел: ${body.patientPhone}\\n`;\n}\nif (body.patientEmail) {\n  description += `✉️ Имейл: ${body.patientEmail}\\n`;\n}\nif (body.procedure) {\n  description += `🦷 Процедура: ${body.procedure}\\n`;\n}\ndescription += `📋 Статус: ${statusLabel}\\n`;\ndescription += `🔔 Напомняне: ${sendReminder ? 'ДА' : 'НЕ'}\\n`;\nif (body.notes) {\n  description += `📝 Бележки: ${body.notes}\\n`;\n}\n\n// Map color names to Google Calendar colorId (1-11)\nconst colorMap = {\n  'green': '10', 'blue': '9', 'red': '11', 'yellow': '5',\n  'purple': '3', 'orange': '6', 'pink': '4', 'gray': '8'\n};\nconst statusColorDefaults = { 'pending': 'yellow', 'completed': 'gray', 'confirmed': 'green' };\nconst effectiveColor = body.colorId || statusColorDefaults[statusVal] || 'green';\nconst googleColorId = colorMap[effectiveColor] || colorMap['green'];\n\nreturn [{\n  json: {\n    summary: summary,\n    description: description.trim(),\n    startDateTime: `${body.date}T${body.startTime}:00`,\n    endDateTime: `${body.date}T${endTime}:00`,\n    date: body.date,\n    duration: body.duration || 30,\n    patientName: body.patientName || eventTitle,\n    patientPhone: body.patientPhone || '',\n    procedure: body.procedure || '',\n    status: statusVal,\n    sendReminder: sendReminder,\n    colorId: googleColorId\n  }\n}];"
       },
       "id": "prepare",
       "name": "Prepare Event Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
@@ -48,7 +54,10 @@
       "name": "Create Calendar Event",
       "type": "n8n-nodes-base.googleCalendar",
       "typeVersion": 1.2,
-      "position": [440, 0],
+      "position": [
+        440,
+        0
+      ],
       "credentials": {
         "googleCalendarOAuth2Api": {
           "id": "",
@@ -64,7 +73,10 @@
       "name": "Format Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [660, 0]
+      "position": [
+        660,
+        0
+      ]
     },
     {
       "parameters": {
@@ -85,7 +97,10 @@
       "name": "Respond Success",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [880, 0]
+      "position": [
+        880,
+        0
+      ]
     },
     {
       "parameters": {
@@ -109,7 +124,10 @@
       "name": "Save Patient to Sheet",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, 150],
+      "position": [
+        660,
+        150
+      ],
       "continueOnFail": true
     }
   ],

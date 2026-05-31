@@ -667,6 +667,38 @@ button {
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
 }
 
+/* Reminder toggle in admin event modal */
+.reminder-toggle {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 2px solid #fbbf24;
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-3) var(--spacing-4);
+}
+
+.reminder-toggle__label {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  cursor: pointer;
+  font-size: 0.95rem;
+  color: var(--color-gray-800, #1f2937);
+}
+
+.reminder-toggle__label input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: #f59e0b;
+  flex-shrink: 0;
+}
+
+.reminder-toggle__hint {
+  margin: 6px 0 0 32px;
+  font-size: 0.8rem;
+  color: #92400e;
+  line-height: 1.3;
+}
+
 /* Booking Confirmation */
 .booking-confirmation {
   text-align: center;
