@@ -134,6 +134,7 @@ const App = {
 
   /**
    * Render calendar month
+   * Public booking is limited to a 1-month window from today.
    */
   renderCalendarMonth(container, year, month) {
     const firstDay = new Date(year, month, 1);
@@ -146,12 +147,23 @@ const App = {
       'Юли', 'Август', 'Септември', 'Октомври', 'Ноември', 'Декември'
     ];
 
+    // Compute booking window: today .. today + 1 calendar month (inclusive)
+    const todayDate = new Date();
+    todayDate.setHours(0, 0, 0, 0);
+    const maxDate = new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, todayDate.getDate());
+    const todayStr = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
+    const maxStr = `${maxDate.getFullYear()}-${String(maxDate.getMonth() + 1).padStart(2, '0')}-${String(maxDate.getDate()).padStart(2, '0')}`;
+
+    // Disable nav arrows that would leave the booking window
+    const isCurrentMonth = (year === todayDate.getFullYear() && month === todayDate.getMonth());
+    const isMaxMonth = (year === maxDate.getFullYear() && month === maxDate.getMonth());
+
     let html = `
       <div class="calendar">
         <div class="calendar__header">
-          <button class="calendar__nav" data-action="prev">&lt;</button>
+          <button class="calendar__nav" data-action="prev"${isCurrentMonth ? ' disabled' : ''}>&lt;</button>
           <span class="calendar__title">${monthNames[month]} ${year}</span>
-          <button class="calendar__nav" data-action="next">&gt;</button>
+          <button class="calendar__nav" data-action="next"${isMaxMonth ? ' disabled' : ''}>&gt;</button>
         </div>
         <div class="calendar__weekdays">
           <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Нд</span>
@@ -165,18 +177,19 @@ const App = {
     }
 
     // Days of month
-    const today = Utils.today();
     for (let day = 1; day <= daysInMonth; day++) {
       const date = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const isToday = date === today;
-      const isPast = date < today;
+      const isToday = date === todayStr;
+      const isPast = date < todayStr;
+      const isBeyondLimit = date > maxStr;
       const isWorkingDay = Utils.isWorkingDay(date);
-      
+
       let classes = 'calendar__day';
       if (isToday) classes += ' calendar__day--today';
       if (isPast) classes += ' calendar__day--past';
+      if (isBeyondLimit) classes += ' calendar__day--past'; // visually treated like unavailable
       if (!isWorkingDay) classes += ' calendar__day--disabled';
-      
+
       html += `<span class="${classes}" data-date="${date}">${day}</span>`;
     }
 
@@ -193,24 +206,29 @@ const App = {
 
     container.querySelectorAll('.calendar__nav').forEach(btn => {
       btn.addEventListener('click', (e) => {
+        if (btn.disabled) return;
         const action = e.target.dataset.action;
         let newMonth = month;
         let newYear = year;
-        
+
         if (action === 'prev') {
+          // Don't navigate before today's month
+          if (isCurrentMonth) return;
           newMonth--;
           if (newMonth < 0) {
             newMonth = 11;
             newYear--;
           }
         } else {
+          // Don't navigate past the max booking month
+          if (isMaxMonth) return;
           newMonth++;
           if (newMonth > 11) {
             newMonth = 0;
             newYear++;
           }
         }
-        
+
         this.renderCalendarMonth(container, newYear, newMonth);
       });
     });
