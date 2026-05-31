@@ -277,11 +277,11 @@
                 "row": [
                   {
                     "text": "✅ 30 мин",
-                    "callbackData": "=confirm_30_{{ $('Prepare Event Data').first().json.id }}"
+                    "callbackData": "=confirm_30_{{ $('Create Calendar Event').first().json.id }}"
                   },
                   {
                     "text": "✅ 60 мин",
-                    "callbackData": "=confirm_60_{{ $('Prepare Event Data').first().json.id }}"
+                    "callbackData": "=confirm_60_{{ $('Create Calendar Event').first().json.id }}"
                   }
                 ]
               },
@@ -289,7 +289,7 @@
                 "row": [
                   {
                     "text": "❌ Откажи",
-                    "callbackData": "=cancel_{{ $('Prepare Event Data').first().json.id }}"
+                    "callbackData": "=cancel_{{ $('Create Calendar Event').first().json.id }}"
                   }
                 ]
               }
@@ -311,7 +311,7 @@
           "name": "Telegram Bot"
         }
       },
-      "notes": "CALLBACK DATA:\n30 мин: confirm_30_{{ $('Prepare Event Data').first().json.id }}\n60 мин: confirm_60_{{ $('Prepare Event Data').first().json.id }}\nОткажи: cancel_{{ $('Prepare Event Data').first().json.id }}"
+      "notes": "CALLBACK DATA (uses Google Calendar event id, not internal apt_xxx):\n30 мин: confirm_30_{{ $('Create Calendar Event').first().json.id }}\n60 мин: confirm_60_{{ $('Create Calendar Event').first().json.id }}\nОткажи: cancel_{{ $('Create Calendar Event').first().json.id }}"
     },
     {
       "parameters": {
@@ -326,11 +326,11 @@
                 "row": [
                   {
                     "text": "✅ 30 мин",
-                    "callbackData": "=confirm_30_{{ $('Prepare Event Data').first().json.id }}"
+                    "callbackData": "=confirm_30_{{ $('Create Calendar Event').first().json.id }}"
                   },
                   {
                     "text": "📞 За обаждане",
-                    "callbackData": "=callback_{{ $('Prepare Event Data').first().json.id }}"
+                    "callbackData": "=callback_{{ $('Create Calendar Event').first().json.id }}"
                   }
                 ]
               },
@@ -338,7 +338,7 @@
                 "row": [
                   {
                     "text": "❌ Откажи",
-                    "callbackData": "=cancel_{{ $('Prepare Event Data').first().json.id }}"
+                    "callbackData": "=cancel_{{ $('Create Calendar Event').first().json.id }}"
                   }
                 ]
               }
@@ -360,7 +360,7 @@
           "name": "Telegram Bot"
         }
       },
-      "notes": "CALLBACK DATA:\n30 мин: confirm_30_{{ $('Prepare Event Data').first().json.id }}\nЗа обаждане: callback_{{ $('Prepare Event Data').first().json.id }}\nОткажи: cancel_{{ $('Prepare Event Data').first().json.id }}"
+      "notes": "CALLBACK DATA (uses Google Calendar event id, not internal apt_xxx):\n30 мин: confirm_30_{{ $('Create Calendar Event').first().json.id }}\nЗа обаждане: callback_{{ $('Create Calendar Event').first().json.id }}\nОткажи: cancel_{{ $('Create Calendar Event').first().json.id }}"
     },
     {
       "parameters": {
