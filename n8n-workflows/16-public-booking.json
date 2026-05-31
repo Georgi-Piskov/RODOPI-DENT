@@ -10,13 +10,13 @@
           "allowedOrigins": "*"
         }
       },
-      "id": "webhook",
+      "id": "d95b992b-a5f7-4944-a6fa-06e97db838f4",
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        0,
-        0
+        -2736,
+        896
       ],
       "webhookId": "public-booking"
     },
@@ -24,33 +24,47 @@
       "parameters": {
         "jsCode": "// Validate incoming booking data\nconst body = $input.first().json.body;\n\nconst required = ['patientName', 'patientPhone', 'date', 'startTime'];\nconst missing = required.filter(field => !body[field]);\n\nif (missing.length > 0) {\n  return [{\n    json: {\n      valid: false,\n      error: `Липсващи полета: ${missing.join(', ')}`\n    }\n  }];\n}\n\n// Validate phone number (Bulgarian format)\nconst phone = body.patientPhone.replace(/\\s/g, '');\nconst phoneRegex = /^(\\+359|0)[0-9]{9}$/;\nif (!phoneRegex.test(phone)) {\n  return [{\n    json: {\n      valid: false,\n      error: 'Невалиден телефонен номер. Моля, използвайте формат: 0888123456 или +359888123456'\n    }\n  }];\n}\n\n// Validate notification channels — only sms + email supported now\nconst allowedChannels = ['sms', 'email'];\nlet notify = Array.isArray(body.notify) ? body.notify : [];\nnotify = notify.filter(c => allowedChannels.includes(c));\nif (notify.length === 0) {\n  // Backward compat: default to SMS if nothing was sent\n  notify = ['sms'];\n}\n\n// If email channel selected, email must be a valid address\nconst patientEmail = (body.patientEmail || '').trim();\nconst emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\nif (notify.includes('email')) {\n  if (!patientEmail || !emailRegex.test(patientEmail)) {\n    return [{\n      json: {\n        valid: false,\n        error: 'За имейл известия е нужен валиден имейл адрес'\n      }\n    }];\n  }\n}\n\n// Validate date is in the future\nconst bookingDate = new Date(body.date + 'T' + body.startTime);\nconst now = new Date();\nif (bookingDate < now) {\n  return [{\n    json: {\n      valid: false,\n      error: 'Не може да запазите час в миналото'\n    }\n  }];\n}\n\n// Limit public booking window: maximum 1 calendar month ahead\nconst today = new Date();\ntoday.setHours(0, 0, 0, 0);\nconst maxBookingDate = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate(), 23, 59, 59);\nif (bookingDate > maxBookingDate) {\n  return [{\n    json: {\n      valid: false,\n      error: 'Часове могат да се запазват максимум 1 месец напред'\n    }\n  }];\n}\n\n// Check if it's a working day\nconst dayOfWeek = new Date(body.date).getDay();\nif (dayOfWeek === 0 || dayOfWeek === 6) {\n  return [{\n    json: {\n      valid: false,\n      error: 'Събота и неделя са почивни дни'\n    }\n  }];\n}\n\n// Default duration is 30 minutes for new bookings\nconst duration = 30;\n\nreturn [{\n  json: {\n    valid: true,\n    patientName: body.patientName.trim(),\n    patientPhone: phone,\n    patientEmail: patientEmail,\n    notify: notify,\n    date: body.date,\n    startTime: body.startTime,\n    duration: duration,\n    reason: (body.reason || '').trim(),\n    notes: (body.notes || '').trim()\n  }\n}];"
       },
-      "id": "validate",
+      "id": "b44b3db5-9329-42d6-a4ce-a9595c2e31f3",
       "name": "Validate Input",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        220,
-        0
+        -2528,
+        896
       ]
     },
     {
       "parameters": {
         "conditions": {
-          "boolean": [
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
             {
-              "value1": "={{ $json.valid }}",
-              "value2": true
+              "id": "638a633a-9e5b-48e8-87a7-845576718d69",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
             }
-          ]
-        }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       },
-      "id": "is-valid",
+      "id": "dcbb4136-e6b9-45cc-a795-abe442f967ab",
       "name": "Is Valid?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        440,
-        0
+        -2304,
+        896
       ]
     },
     {
@@ -68,13 +82,13 @@
           }
         }
       },
-      "id": "respond-invalid",
+      "id": "33202891-3fa1-40e3-bccd-763703127519",
       "name": "Respond Invalid",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        660,
-        -100
+        -2080,
+        800
       ]
     },
     {
@@ -87,23 +101,23 @@
         },
         "returnAll": true,
         "options": {
-          "timeMax": "={{ $json.date }}T23:59:59+02:00",
           "timeMin": "={{ $json.date }}T00:00:00+02:00",
+          "timeMax": "={{ $json.date }}T23:59:59+02:00",
           "singleEvents": true
         }
       },
-      "id": "get-calendar",
+      "id": "4deb1ca6-87be-443f-883b-f9a79038a4fe",
       "name": "Get Calendar Events",
       "type": "n8n-nodes-base.googleCalendar",
       "typeVersion": 1.2,
       "position": [
-        660,
-        100
+        -2080,
+        1008
       ],
       "credentials": {
         "googleCalendarOAuth2Api": {
-          "id": "",
-          "name": "Google Calendar"
+          "id": "5pwZjn7dCINLfgpU",
+          "name": "RODOPI DENT-4"
         }
       }
     },
@@ -111,33 +125,47 @@
       "parameters": {
         "jsCode": "// Get the booking request\nconst booking = $('Validate Input').first().json;\nconst bookingDate = booking.date;\nconst bookingTime = booking.startTime;\n\n// Helper function to convert to Europe/Sofia timezone and get minutes\nfunction toSofiaMinutes(isoString) {\n  if (!isoString) return null;\n  const d = new Date(isoString);\n  const options = {\n    timeZone: 'Europe/Sofia',\n    hour: '2-digit',\n    minute: '2-digit',\n    hour12: false\n  };\n  const formatter = new Intl.DateTimeFormat('en-CA', options);\n  const parts = formatter.formatToParts(d);\n  const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');\n  const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0');\n  return hour * 60 + minute;\n}\n\nfunction timeToMinutes(time) {\n  const [hours, minutes] = time.split(':').map(Number);\n  return hours * 60 + minutes;\n}\n\nconst bookingStart = timeToMinutes(bookingTime);\n\n// Get existing calendar events from Get Calendar Events node\nconst calendarEvents = $('Get Calendar Events').all();\n\n// Check for exact same start time AND calculate max available minutes\nlet hasExactConflict = false;\nlet conflictWith = null;\nlet nextEventStart = 18 * 60; // Default: end of working day (18:00)\n\nfor (const item of calendarEvents) {\n  const event = item.json;\n  \n  // Skip cancelled events\n  if (event.status === 'cancelled') continue;\n  \n  let existingStart = null;\n  \n  if (event.start?.dateTime) {\n    // CONVERT TO SOFIA TIMEZONE\n    existingStart = toSofiaMinutes(event.start.dateTime);\n  } else if (event.start?.date) {\n    // All-day event blocks entire day\n    hasExactConflict = true;\n    conflictWith = 'целодневно събитие';\n    break;\n  }\n  \n  if (existingStart === null) continue;\n  \n  // Check for exact same start time\n  if (bookingStart === existingStart) {\n    hasExactConflict = true;\n    const startHour = Math.floor(existingStart / 60);\n    const startMin = existingStart % 60;\n    conflictWith = `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')}`;\n    break;\n  }\n  \n  // Find the earliest event that starts AFTER our booking start time\n  if (existingStart > bookingStart && existingStart < nextEventStart) {\n    nextEventStart = existingStart;\n  }\n}\n\nif (hasExactConflict) {\n  return [{\n    json: {\n      conflict: true,\n      error: `Този час (${bookingTime}) вече е зает. Моля изберете друг час.`\n    }\n  }];\n}\n\n// Calculate max available minutes until next event\nconst maxAvailableMinutes = nextEventStart - bookingStart;\n\n// Determine which buttons to show\nconst can30 = maxAvailableMinutes >= 30;\nconst can60 = maxAvailableMinutes >= 60;\n\nconst id = 'apt_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 8);\n\nreturn [{\n  json: {\n    conflict: false,\n    id: id,\n    patientName: booking.patientName,\n    patientPhone: booking.patientPhone,\n    patientEmail: booking.patientEmail,\n    notify: booking.notify,\n    date: booking.date,\n    startTime: booking.startTime,\n    duration: booking.duration,\n    reason: booking.reason,\n    notes: booking.notes,\n    maxAvailableMinutes: maxAvailableMinutes,\n    can30: can30,\n    can60: can60\n  }\n}];"
       },
-      "id": "check-conflict",
+      "id": "5376f46d-28ba-4dba-a22b-fe80e845239d",
       "name": "Check Conflict",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        880,
-        100
+        -1856,
+        1008
       ]
     },
     {
       "parameters": {
         "conditions": {
-          "boolean": [
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
             {
-              "value1": "={{ $json.conflict }}",
-              "value2": true
+              "id": "f9dad783-75fe-4d57-841e-610cd5f54c64",
+              "leftValue": "={{ $json.conflict }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
             }
-          ]
-        }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       },
-      "id": "has-conflict",
+      "id": "771d62bc-c8bc-480f-92fd-96e5fb881c87",
       "name": "Has Conflict?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1100,
-        100
+        -1648,
+        1008
       ]
     },
     {
@@ -155,26 +183,26 @@
           }
         }
       },
-      "id": "respond-conflict",
+      "id": "10494a7f-9900-4545-a30e-3d9ad419224a",
       "name": "Respond Conflict",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        1320,
-        0
+        -1424,
+        896
       ]
     },
     {
       "parameters": {
         "jsCode": "// Prepare calendar event data\n// IMPORTANT: This node now runs AFTER \"Save Patient to Sheet\" so we know if the patient is new.\nconst booking = $('Check Conflict').first().json;\n\n// Determine if this is a new patient based on patients-upsert response.\n// The upstream \"Save Patient to Sheet\" returns { success, action: 'created' | 'skipped', ... }.\n// `$input.first().json` is that response.\nconst upsertResp = $input.first().json || {};\nconst isNewPatient = upsertResp.action === 'created';\n\n// For PUBLIC bookings: new patient -> auto reminder ON, returning patient -> OFF (doctor can flip from admin)\nconst sendReminder = isNewPatient;\n\n// Calculate end time\nconst [hours, minutes] = booking.startTime.split(':').map(Number);\nconst startMinutes = hours * 60 + minutes;\nconst endMinutes = startMinutes + booking.duration;\nconst endHours = Math.floor(endMinutes / 60);\nconst endMins = endMinutes % 60;\nconst endTime = `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;\n\nconst notifyList = Array.isArray(booking.notify) ? booking.notify : ['sms'];\nconst notifyLabel = notifyList.map(n => ({\n  sms: 'SMS', email: 'Имейл'\n}[n] || n)).join(', ');\n\n// Build description with structured data\nlet description = `📞 Тел: ${booking.patientPhone}\\n`;\nif (booking.patientEmail) {\n  description += `✉️ Имейл: ${booking.patientEmail}\\n`;\n}\ndescription += `📬 Известия: ${notifyLabel}\\n`;\ndescription += `🔔 Напомняне: ${sendReminder ? 'ДА' : 'НЕ'}\\n`;\ndescription += `👤 Тип: ${isNewPatient ? 'НОВ пациент' : 'Редовен пациент'}\\n`;\nif (booking.reason) {\n  description += `📋 Причина: ${booking.reason}\\n`;\n}\nif (booking.notes) {\n  description += `📝 Бележки: ${booking.notes}\\n`;\n}\ndescription += `\\n⏳ Статус: ЧАКАЩ (pending)\\n`;\ndescription += `🆔 ID: ${booking.id}\\n`;\ndescription += `📅 Създаден: ${new Date().toLocaleString('bg-BG')}`;\n\nreturn [{\n  json: {\n    summary: `⏳ ${booking.patientName}`,\n    description: description,\n    startDateTime: `${booking.date}T${booking.startTime}:00`,\n    endDateTime: `${booking.date}T${endTime}:00`,\n    colorId: '5',  // Yellow for pending\n    id: booking.id,\n    patientName: booking.patientName,\n    patientPhone: booking.patientPhone,\n    patientEmail: booking.patientEmail || '',\n    notify: notifyList,\n    isNewPatient: isNewPatient,\n    sendReminder: sendReminder\n  }\n}];"
       },
-      "id": "prepare-event",
+      "id": "7b80881b-c506-41ac-bc1e-c5aa97765784",
       "name": "Prepare Event Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1320,
-        250
+        -1424,
+        1152
       ]
     },
     {
@@ -187,23 +215,22 @@
         "start": "={{ $json.startDateTime }}",
         "end": "={{ $json.endDateTime }}",
         "additionalFields": {
-          "summary": "={{ $json.summary }}",
           "description": "={{ $json.description }}",
-          "colorId": "={{ $json.colorId }}"
+          "summary": "={{ $json.summary }}"
         }
       },
-      "id": "create-calendar-event",
+      "id": "a5ab89b3-e7a3-479f-b01d-5d027c573d90",
       "name": "Create Calendar Event",
       "type": "n8n-nodes-base.googleCalendar",
       "typeVersion": 1.2,
       "position": [
-        1540,
-        200
+        -1200,
+        1104
       ],
       "credentials": {
         "googleCalendarOAuth2Api": {
-          "id": "",
-          "name": "Google Calendar"
+          "id": "5pwZjn7dCINLfgpU",
+          "name": "RODOPI DENT-4"
         }
       }
     },
@@ -211,13 +238,13 @@
       "parameters": {
         "jsCode": "// Prepare success response\nconst calendarEvent = $input.first().json;\nconst preparedData = $('Prepare Event Data').first().json;\n\nreturn [{\n  json: {\n    success: true,\n    message: 'Часът е запазен успешно! Очаквайте потвърждение.',\n    booking: {\n      id: preparedData.id,\n      googleEventId: calendarEvent.id,\n      patientName: preparedData.patientName,\n      patientPhone: preparedData.patientPhone,\n      date: preparedData.startDateTime.split('T')[0],\n      startTime: preparedData.startDateTime.split('T')[1].slice(0, 5),\n      status: 'pending'\n    }\n  }\n}];"
       },
-      "id": "prepare-response",
+      "id": "7b11b0b6-ce12-4747-a253-a9e6e983b051",
       "name": "Prepare Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1760,
-        200
+        -976,
+        1104
       ]
     },
     {
@@ -235,160 +262,162 @@
           }
         }
       },
-      "id": "respond-success",
+      "id": "ccd91273-6aca-410c-ab38-ae76cd2ed631",
       "name": "Respond Success",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        1980,
-        200
+        -768,
+        1104
       ]
     },
     {
       "parameters": {
         "conditions": {
-          "boolean": [
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
             {
-              "value1": "={{ $('Check Conflict').first().json.can60 }}",
-              "value2": true
+              "id": "62631258-7944-48ed-a7cf-3075d79efbdf",
+              "leftValue": "={{ $('Has Conflict?').item.json.can60 }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
             }
-          ]
-        }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       },
-      "id": "can-60-check",
+      "id": "2c517b37-e8fa-493c-844e-a8c36b59212a",
       "name": "Can 60 min?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1760,
-        400
+        -976,
+        1296
       ]
     },
     {
       "parameters": {
-        "chatId": "2146283697",
+        "chatId": "7746454038",
         "text": "=🦷 *Нова заявка за час!*\n\n👤 Пациент: {{ $('Prepare Event Data').first().json.patientName }}\n📞 Телефон: {{ $('Prepare Event Data').first().json.patientPhone }}\n📅 Дата: {{ $('Prepare Event Data').first().json.startDateTime.split('T')[0] }}\n🕐 Час: {{ $('Prepare Event Data').first().json.startDateTime.split('T')[1].slice(0, 5) }}\n📋 Причина: {{ $('Validate Input').first().json.reason || 'Не е посочена' }}\n⏱️ Свободно време: {{ $('Check Conflict').first().json.maxAvailableMinutes }} мин.\n\n⏳ *Изберете продължителност:*",
-        "additionalFields": {
-          "parse_mode": "Markdown",
-          "replyMarkup": "inlineKeyboard",
-          "inlineKeyboard": {
-            "rows": [
-              {
-                "row": [
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
                   {
-                    "text": "✅ 30 мин",
-                    "callbackData": "=confirm_30_{{ $('Create Calendar Event').first().json.id }}"
+                    "text": "30 мин",
+                    "additionalFields": {
+                      "callback_data": "=confirm_30_{{ $('Create Calendar Event').first().json.id }}"
+                    }
                   },
                   {
-                    "text": "✅ 60 мин",
-                    "callbackData": "=confirm_60_{{ $('Create Calendar Event').first().json.id }}"
-                  }
-                ]
-              },
-              {
-                "row": [
+                    "text": "60 мин",
+                    "additionalFields": {
+                      "callback_data": "=confirm_60_{{ $('Create Calendar Event').first().json.id }}"
+                    }
+                  },
                   {
-                    "text": "❌ Откажи",
-                    "callbackData": "=cancel_{{ $('Create Calendar Event').first().json.id }}"
+                    "text": "за обаждане",
+                    "additionalFields": {
+                      "callback_data": "=callback_{{ $('Create Calendar Event').first().json.id }}"
+                    }
+                  },
+                  {
+                    "text": "откажи",
+                    "additionalFields": {
+                      "callback_data": "=cancel_{{ $('Create Calendar Event').first().json.id }}"
+                    }
                   }
                 ]
               }
-            ]
-          }
+            }
+          ]
+        },
+        "additionalFields": {
+          "parse_mode": "Markdown"
         }
       },
-      "id": "telegram-full",
+      "id": "22a3b842-d9b3-4422-bf3e-0804c946373a",
       "name": "Telegram Full Options",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        1980,
-        350
+        -720,
+        1280
       ],
+      "webhookId": "065e4adb-aa4a-438d-8946-cfe84a79c8e6",
       "credentials": {
         "telegramApi": {
-          "id": "",
-          "name": "Telegram Bot"
+          "id": "Wlmv35AlA14kMzkM",
+          "name": "RodopiDentBot"
         }
       },
-      "notes": "CALLBACK DATA (uses Google Calendar event id, not internal apt_xxx):\n30 мин: confirm_30_{{ $('Create Calendar Event').first().json.id }}\n60 мин: confirm_60_{{ $('Create Calendar Event').first().json.id }}\nОткажи: cancel_{{ $('Create Calendar Event').first().json.id }}"
+      "notes": "CALLBACK DATA:\n30 мин: confirm_30_{{ $('Prepare Event Data').first().json.id }}\n60 мин: confirm_60_{{ $('Prepare Event Data').first().json.id }}\nОткажи: cancel_{{ $('Prepare Event Data').first().json.id }}"
     },
     {
       "parameters": {
-        "chatId": "2146283697",
+        "chatId": "7746454038",
         "text": "=🦷 *Нова заявка за час!*\n\n👤 Пациент: {{ $('Prepare Event Data').first().json.patientName }}\n📞 Телефон: {{ $('Prepare Event Data').first().json.patientPhone }}\n📅 Дата: {{ $('Prepare Event Data').first().json.startDateTime.split('T')[0] }}\n🕐 Час: {{ $('Prepare Event Data').first().json.startDateTime.split('T')[1].slice(0, 5) }}\n📋 Причина: {{ $('Validate Input').first().json.reason || 'Не е посочена' }}\n⚠️ *Свободно време: само {{ $('Check Conflict').first().json.maxAvailableMinutes }} мин!*\n\n⏳ *Изберете действие:*",
-        "additionalFields": {
-          "parse_mode": "Markdown",
-          "replyMarkup": "inlineKeyboard",
-          "inlineKeyboard": {
-            "rows": [
-              {
-                "row": [
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
                   {
-                    "text": "✅ 30 мин",
-                    "callbackData": "=confirm_30_{{ $('Create Calendar Event').first().json.id }}"
+                    "text": "30 мин",
+                    "additionalFields": {
+                      "callback_data": "=confirm_30_{{ $('Create Calendar Event').first().json.id }}"
+                    }
                   },
                   {
-                    "text": "📞 За обаждане",
-                    "callbackData": "=callback_{{ $('Create Calendar Event').first().json.id }}"
-                  }
-                ]
-              },
-              {
-                "row": [
+                    "text": "за обаждане",
+                    "additionalFields": {
+                      "callback_data": "=callback_{{ $('Create Calendar Event').first().json.id }}"
+                    }
+                  },
                   {
-                    "text": "❌ Откажи",
-                    "callbackData": "=cancel_{{ $('Create Calendar Event').first().json.id }}"
+                    "text": "откажи",
+                    "additionalFields": {
+                      "callback_data": "=cancel_{{ $('Create Calendar Event').first().json.id }}"
+                    }
                   }
                 ]
               }
-            ]
-          }
+            }
+          ]
+        },
+        "additionalFields": {
+          "parse_mode": "Markdown"
         }
       },
-      "id": "telegram-limited",
+      "id": "773691b8-3057-4835-8203-b17e118b764e",
       "name": "Telegram Limited (30 only)",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        1980,
-        500
+        -720,
+        1680
       ],
+      "webhookId": "0ac8e388-53bd-4b11-8353-8d813e98ce7b",
       "credentials": {
         "telegramApi": {
-          "id": "",
-          "name": "Telegram Bot"
+          "id": "Wlmv35AlA14kMzkM",
+          "name": "RodopiDentBot"
         }
       },
-      "notes": "CALLBACK DATA (uses Google Calendar event id, not internal apt_xxx):\n30 мин: confirm_30_{{ $('Create Calendar Event').first().json.id }}\nЗа обаждане: callback_{{ $('Create Calendar Event').first().json.id }}\nОткажи: cancel_{{ $('Create Calendar Event').first().json.id }}"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://n8n.simeontsvetanovn8nworkflows.site/webhook/send-sms",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"phone\": \"{{ $('Prepare Event Data').first().json.patientPhone }}\",\n  \"template\": \"booking_received\",\n  \"date\": \"{{ $('Prepare Event Data').first().json.startDateTime.split('T')[0] }}\",\n  \"time\": \"{{ $('Prepare Event Data').first().json.startDateTime.split('T')[1].slice(0, 5) }}\",\n  \"patientName\": \"{{ $('Prepare Event Data').first().json.patientName }}\"\n}",
-        "options": {}
-      },
-      "id": "send-sms-received",
-      "name": "Send SMS to Patient",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1980,
-        470
-      ],
-      "continueOnFail": true
+      "notes": "CALLBACK DATA:\n30 мин: confirm_30_{{ $('Prepare Event Data').first().json.id }}\nЗа обаждане: callback_{{ $('Prepare Event Data').first().json.id }}\nОткажи: cancel_{{ $('Prepare Event Data').first().json.id }}"
     },
     {
       "parameters": {
@@ -408,35 +437,15 @@
         "jsonBody": "={\n  \"name\": \"{{ $('Check Conflict').first().json.patientName }}\",\n  \"phone\": \"{{ $('Check Conflict').first().json.patientPhone }}\",\n  \"email\": \"{{ $('Check Conflict').first().json.patientEmail }}\",\n  \"notify\": {{ JSON.stringify($('Check Conflict').first().json.notify) }}\n}",
         "options": {}
       },
-      "id": "save-patient",
+      "id": "ff086029-d360-423c-8efb-dfa145d9a1ea",
       "name": "Save Patient to Sheet",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1100,
-        250
+        -1648,
+        1152
       ],
       "continueOnFail": true
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "boolean": [
-            {
-              "value1": "={{ ($('Prepare Event Data').first().json.notify || []).includes('sms') }}",
-              "value2": true
-            }
-          ]
-        }
-      },
-      "id": "wants-sms",
-      "name": "Wants SMS?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [
-        1760,
-        500
-      ]
     }
   ],
   "connections": {
@@ -543,11 +552,6 @@
             "node": "Can 60 min?",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Wants SMS?",
-            "type": "main",
-            "index": 0
           }
         ]
       ]
@@ -581,18 +585,6 @@
         ]
       ]
     },
-    "Wants SMS?": {
-      "main": [
-        [
-          {
-            "node": "Send SMS to Patient",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        []
-      ]
-    },
     "Save Patient to Sheet": {
       "main": [
         [
@@ -605,7 +597,15 @@
       ]
     }
   },
+  "active": true,
   "settings": {
     "executionOrder": "v1"
-  }
+  },
+  "versionId": "a8fe8dd6-b824-497e-82a6-fd2d9e839926",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a7204f8cf331ce45a25a617a4d887233056efe67a0537cd171194c6ba0ab4002"
+  },
+  "id": "lu2chuTcWPbjqM5m",
+  "tags": []
 }
