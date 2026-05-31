@@ -2798,7 +2798,14 @@ const Calendar = {
       form.startTime.value = event.startTime || '';
       form.duration.value = event.duration || 30;
       form.status.value = event.status || 'confirmed';
-      form.procedure.value = event.procedure || '';
+
+      // Extract procedure - fallback to parsing description if not on event
+      let procedureValue = event.procedure || '';
+      if (!procedureValue && event.description) {
+        const procMatch = event.description.match(/(?:🦷|процедура|procedure)[:\s]*([^\n\r]+)/i);
+        if (procMatch) procedureValue = procMatch[1].trim();
+      }
+      form.procedure.value = procedureValue;
       
       // Extract only the notes part from description (strip structured lines)
       let notesText = event.notes || event.description || '';
