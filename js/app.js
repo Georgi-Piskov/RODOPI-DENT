@@ -335,19 +335,41 @@ const App = {
     const form = e.target;
     const formData = new FormData(form);
     
+    // Collect selected notification channels (sms / email / viber / telegram)
+    const notify = formData.getAll('notify');
+    const email = (formData.get('patientEmail') || '').trim();
+
     const bookingData = {
       patientName: formData.get('patientName'),
       patientPhone: formData.get('patientPhone'),
+      patientEmail: email,
       reason: formData.get('reason') || '',
       date: form.dataset.date,
       startTime: form.dataset.time,
-      duration: parseInt(formData.get('duration')) || CONFIG.DEFAULT_DURATION
+      duration: parseInt(formData.get('duration')) || CONFIG.DEFAULT_DURATION,
+      notify: notify
     };
 
     // Validate phone
     if (!Utils.validatePhone(bookingData.patientPhone)) {
       Utils.showToast('Невалиден телефонен номер', 'error');
       return;
+    }
+
+    // Require at least one notification channel
+    if (notify.length === 0) {
+      Utils.showToast('Изберете поне един начин за известяване (SMS, имейл и т.н.)', 'error');
+      return;
+    }
+
+    // If Email channel is selected, email must be provided & valid
+    if (notify.includes('email')) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!email || !emailRegex.test(email)) {
+        Utils.showToast('За имейл известия моля въведете валиден имейл адрес', 'error');
+        document.getElementById('patient-email')?.focus();
+        return;
+      }
     }
 
     // Submit booking

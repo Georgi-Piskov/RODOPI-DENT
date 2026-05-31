@@ -14,18 +14,24 @@
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "webhookId": "public-booking"
     },
     {
       "parameters": {
-        "jsCode": "// Validate incoming booking data\nconst body = $input.first().json.body;\n\nconst required = ['patientName', 'patientPhone', 'date', 'startTime'];\nconst missing = required.filter(field => !body[field]);\n\nif (missing.length > 0) {\n  return [{\n    json: {\n      valid: false,\n      error: `Липсващи полета: ${missing.join(', ')}`\n    }\n  }];\n}\n\n// Validate phone number (Bulgarian format)\nconst phone = body.patientPhone.replace(/\\s/g, '');\nconst phoneRegex = /^(\\+359|0)[0-9]{9}$/;\nif (!phoneRegex.test(phone)) {\n  return [{\n    json: {\n      valid: false,\n      error: 'Невалиден телефонен номер. Моля, използвайте формат: 0888123456 или +359888123456'\n    }\n  }];\n}\n\n// Validate date is in the future\nconst bookingDate = new Date(body.date + 'T' + body.startTime);\nconst now = new Date();\nif (bookingDate < now) {\n  return [{\n    json: {\n      valid: false,\n      error: 'Не може да запазите час в миналото'\n    }\n  }];\n}\n\n// Check if it's a working day\nconst dayOfWeek = new Date(body.date).getDay();\nif (dayOfWeek === 0 || dayOfWeek === 6) {\n  return [{\n    json: {\n      valid: false,\n      error: 'Събота и неделя са почивни дни'\n    }\n  }];\n}\n\n// Default duration is 30 minutes for new bookings (doctor will confirm actual duration)\nconst duration = 30;\n\nreturn [{\n  json: {\n    valid: true,\n    patientName: body.patientName.trim(),\n    patientPhone: phone,\n    date: body.date,\n    startTime: body.startTime,\n    duration: duration,\n    reason: (body.reason || '').trim(),\n    notes: (body.notes || '').trim()\n  }\n}];"
+        "jsCode": "// Validate incoming booking data\nconst body = $input.first().json.body;\n\nconst required = ['patientName', 'patientPhone', 'date', 'startTime'];\nconst missing = required.filter(field => !body[field]);\n\nif (missing.length > 0) {\n  return [{\n    json: {\n      valid: false,\n      error: `Липсващи полета: ${missing.join(', ')}`\n    }\n  }];\n}\n\n// Validate phone number (Bulgarian format)\nconst phone = body.patientPhone.replace(/\\s/g, '');\nconst phoneRegex = /^(\\+359|0)[0-9]{9}$/;\nif (!phoneRegex.test(phone)) {\n  return [{\n    json: {\n      valid: false,\n      error: 'Невалиден телефонен номер. Моля, използвайте формат: 0888123456 или +359888123456'\n    }\n  }];\n}\n\n// Validate notification channels (sms | email | viber | telegram)\nconst allowedChannels = ['sms', 'email', 'viber', 'telegram'];\nlet notify = Array.isArray(body.notify) ? body.notify : [];\nnotify = notify.filter(c => allowedChannels.includes(c));\nif (notify.length === 0) {\n  // Backward compat: default to SMS if nothing was sent\n  notify = ['sms'];\n}\n\n// If email channel selected, email must be a valid address\nconst patientEmail = (body.patientEmail || '').trim();\nconst emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\nif (notify.includes('email')) {\n  if (!patientEmail || !emailRegex.test(patientEmail)) {\n    return [{\n      json: {\n        valid: false,\n        error: 'За имейл известия е нужен валиден имейл адрес'\n      }\n    }];\n  }\n}\n\n// Validate date is in the future\nconst bookingDate = new Date(body.date + 'T' + body.startTime);\nconst now = new Date();\nif (bookingDate < now) {\n  return [{\n    json: {\n      valid: false,\n      error: 'Не може да запазите час в миналото'\n    }\n  }];\n}\n\n// Check if it's a working day\nconst dayOfWeek = new Date(body.date).getDay();\nif (dayOfWeek === 0 || dayOfWeek === 6) {\n  return [{\n    json: {\n      valid: false,\n      error: 'Събота и неделя са почивни дни'\n    }\n  }];\n}\n\n// Default duration is 30 minutes for new bookings (doctor will confirm actual duration)\nconst duration = 30;\n\nreturn [{\n  json: {\n    valid: true,\n    patientName: body.patientName.trim(),\n    patientPhone: phone,\n    patientEmail: patientEmail,\n    notify: notify,\n    date: body.date,\n    startTime: body.startTime,\n    duration: duration,\n    reason: (body.reason || '').trim(),\n    notes: (body.notes || '').trim()\n  }\n}];"
       },
       "id": "validate",
       "name": "Validate Input",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
@@ -42,7 +48,10 @@
       "name": "Is Valid?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
@@ -63,7 +72,10 @@
       "name": "Respond Invalid",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [660, -100]
+      "position": [
+        660,
+        -100
+      ]
     },
     {
       "parameters": {
@@ -84,7 +96,10 @@
       "name": "Get Calendar Events",
       "type": "n8n-nodes-base.googleCalendar",
       "typeVersion": 1.2,
-      "position": [660, 100],
+      "position": [
+        660,
+        100
+      ],
       "credentials": {
         "googleCalendarOAuth2Api": {
           "id": "",
@@ -94,13 +109,16 @@
     },
     {
       "parameters": {
-        "jsCode": "// Get the booking request\nconst booking = $('Validate Input').first().json;\nconst bookingDate = booking.date;\nconst bookingTime = booking.startTime;\n\n// Helper function to convert to Europe/Sofia timezone and get minutes\nfunction toSofiaMinutes(isoString) {\n  if (!isoString) return null;\n  const d = new Date(isoString);\n  const options = {\n    timeZone: 'Europe/Sofia',\n    hour: '2-digit',\n    minute: '2-digit',\n    hour12: false\n  };\n  const formatter = new Intl.DateTimeFormat('en-CA', options);\n  const parts = formatter.formatToParts(d);\n  const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');\n  const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0');\n  return hour * 60 + minute;\n}\n\nfunction timeToMinutes(time) {\n  const [hours, minutes] = time.split(':').map(Number);\n  return hours * 60 + minutes;\n}\n\nconst bookingStart = timeToMinutes(bookingTime);\n\n// Get existing calendar events from Get Calendar Events node\nconst calendarEvents = $('Get Calendar Events').all();\n\n// Check for exact same start time AND calculate max available minutes\nlet hasExactConflict = false;\nlet conflictWith = null;\nlet nextEventStart = 18 * 60; // Default: end of working day (18:00)\n\nfor (const item of calendarEvents) {\n  const event = item.json;\n  \n  // Skip cancelled events\n  if (event.status === 'cancelled') continue;\n  \n  let existingStart = null;\n  \n  if (event.start?.dateTime) {\n    // CONVERT TO SOFIA TIMEZONE\n    existingStart = toSofiaMinutes(event.start.dateTime);\n  } else if (event.start?.date) {\n    // All-day event blocks entire day\n    hasExactConflict = true;\n    conflictWith = 'целодневно събитие';\n    break;\n  }\n  \n  if (existingStart === null) continue;\n  \n  // Check for exact same start time\n  if (bookingStart === existingStart) {\n    hasExactConflict = true;\n    const startHour = Math.floor(existingStart / 60);\n    const startMin = existingStart % 60;\n    conflictWith = `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')}`;\n    break;\n  }\n  \n  // Find the earliest event that starts AFTER our booking start time\n  if (existingStart > bookingStart && existingStart < nextEventStart) {\n    nextEventStart = existingStart;\n  }\n}\n\nif (hasExactConflict) {\n  return [{\n    json: {\n      conflict: true,\n      error: `Този час (${bookingTime}) вече е зает. Моля изберете друг час.`\n    }\n  }];\n}\n\n// Calculate max available minutes until next event\nconst maxAvailableMinutes = nextEventStart - bookingStart;\n\n// Determine which buttons to show\nconst can30 = maxAvailableMinutes >= 30;\nconst can60 = maxAvailableMinutes >= 60;\n\nconst id = 'apt_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 8);\n\nreturn [{\n  json: {\n    conflict: false,\n    id: id,\n    patientName: booking.patientName,\n    patientPhone: booking.patientPhone,\n    date: booking.date,\n    startTime: booking.startTime,\n    duration: booking.duration,\n    reason: booking.reason,\n    notes: booking.notes,\n    maxAvailableMinutes: maxAvailableMinutes,\n    can30: can30,\n    can60: can60\n  }\n}];"
+        "jsCode": "// Get the booking request\nconst booking = $('Validate Input').first().json;\nconst bookingDate = booking.date;\nconst bookingTime = booking.startTime;\n\n// Helper function to convert to Europe/Sofia timezone and get minutes\nfunction toSofiaMinutes(isoString) {\n  if (!isoString) return null;\n  const d = new Date(isoString);\n  const options = {\n    timeZone: 'Europe/Sofia',\n    hour: '2-digit',\n    minute: '2-digit',\n    hour12: false\n  };\n  const formatter = new Intl.DateTimeFormat('en-CA', options);\n  const parts = formatter.formatToParts(d);\n  const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');\n  const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0');\n  return hour * 60 + minute;\n}\n\nfunction timeToMinutes(time) {\n  const [hours, minutes] = time.split(':').map(Number);\n  return hours * 60 + minutes;\n}\n\nconst bookingStart = timeToMinutes(bookingTime);\n\n// Get existing calendar events from Get Calendar Events node\nconst calendarEvents = $('Get Calendar Events').all();\n\n// Check for exact same start time AND calculate max available minutes\nlet hasExactConflict = false;\nlet conflictWith = null;\nlet nextEventStart = 18 * 60; // Default: end of working day (18:00)\n\nfor (const item of calendarEvents) {\n  const event = item.json;\n  \n  // Skip cancelled events\n  if (event.status === 'cancelled') continue;\n  \n  let existingStart = null;\n  \n  if (event.start?.dateTime) {\n    // CONVERT TO SOFIA TIMEZONE\n    existingStart = toSofiaMinutes(event.start.dateTime);\n  } else if (event.start?.date) {\n    // All-day event blocks entire day\n    hasExactConflict = true;\n    conflictWith = 'целодневно събитие';\n    break;\n  }\n  \n  if (existingStart === null) continue;\n  \n  // Check for exact same start time\n  if (bookingStart === existingStart) {\n    hasExactConflict = true;\n    const startHour = Math.floor(existingStart / 60);\n    const startMin = existingStart % 60;\n    conflictWith = `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')}`;\n    break;\n  }\n  \n  // Find the earliest event that starts AFTER our booking start time\n  if (existingStart > bookingStart && existingStart < nextEventStart) {\n    nextEventStart = existingStart;\n  }\n}\n\nif (hasExactConflict) {\n  return [{\n    json: {\n      conflict: true,\n      error: `Този час (${bookingTime}) вече е зает. Моля изберете друг час.`\n    }\n  }];\n}\n\n// Calculate max available minutes until next event\nconst maxAvailableMinutes = nextEventStart - bookingStart;\n\n// Determine which buttons to show\nconst can30 = maxAvailableMinutes >= 30;\nconst can60 = maxAvailableMinutes >= 60;\n\nconst id = 'apt_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 8);\n\nreturn [{\n  json: {\n    conflict: false,\n    id: id,\n    patientName: booking.patientName,\n    patientPhone: booking.patientPhone,\n    patientEmail: booking.patientEmail,\n    notify: booking.notify,\n    date: booking.date,\n    startTime: booking.startTime,\n    duration: booking.duration,\n    reason: booking.reason,\n    notes: booking.notes,\n    maxAvailableMinutes: maxAvailableMinutes,\n    can30: can30,\n    can60: can60\n  }\n}];"
       },
       "id": "check-conflict",
       "name": "Check Conflict",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [880, 100]
+      "position": [
+        880,
+        100
+      ]
     },
     {
       "parameters": {
@@ -117,7 +135,10 @@
       "name": "Has Conflict?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1100, 100]
+      "position": [
+        1100,
+        100
+      ]
     },
     {
       "parameters": {
@@ -138,17 +159,23 @@
       "name": "Respond Conflict",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1320, 0]
+      "position": [
+        1320,
+        0
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Prepare calendar event data\nconst booking = $json;\n\n// Calculate end time\nconst [hours, minutes] = booking.startTime.split(':').map(Number);\nconst startMinutes = hours * 60 + minutes;\nconst endMinutes = startMinutes + booking.duration;\nconst endHours = Math.floor(endMinutes / 60);\nconst endMins = endMinutes % 60;\nconst endTime = `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;\n\n// Build description with structured data\nlet description = `📞 Тел: ${booking.patientPhone}\\n`;\nif (booking.reason) {\n  description += `📋 Причина: ${booking.reason}\\n`;\n}\nif (booking.notes) {\n  description += `📝 Бележки: ${booking.notes}\\n`;\n}\ndescription += `\\n⏳ Статус: ЧАКАЩ (pending)\\n`;\ndescription += `🆔 ID: ${booking.id}\\n`;\ndescription += `📅 Създаден: ${new Date().toLocaleString('bg-BG')}`;\n\nreturn [{\n  json: {\n    summary: `⏳ ${booking.patientName}`,\n    description: description,\n    startDateTime: `${booking.date}T${booking.startTime}:00`,\n    endDateTime: `${booking.date}T${endTime}:00`,\n    colorId: '5',  // Yellow for pending\n    id: booking.id,\n    patientName: booking.patientName,\n    patientPhone: booking.patientPhone\n  }\n}];"
+        "jsCode": "// Prepare calendar event data\nconst booking = $json;\n\n// Calculate end time\nconst [hours, minutes] = booking.startTime.split(':').map(Number);\nconst startMinutes = hours * 60 + minutes;\nconst endMinutes = startMinutes + booking.duration;\nconst endHours = Math.floor(endMinutes / 60);\nconst endMins = endMinutes % 60;\nconst endTime = `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;\n\nconst notifyList = Array.isArray(booking.notify) ? booking.notify : ['sms'];\nconst notifyLabel = notifyList.map(n => ({\n  sms: 'SMS', email: 'Имейл', viber: 'Viber/WhatsApp', telegram: 'Telegram'\n}[n] || n)).join(', ');\n\n// Build description with structured data\nlet description = `📞 Тел: ${booking.patientPhone}\\n`;\nif (booking.patientEmail) {\n  description += `✉️ Имейл: ${booking.patientEmail}\\n`;\n}\ndescription += `📬 Известия: ${notifyLabel}\\n`;\nif (booking.reason) {\n  description += `📋 Причина: ${booking.reason}\\n`;\n}\nif (booking.notes) {\n  description += `📝 Бележки: ${booking.notes}\\n`;\n}\ndescription += `\\n⏳ Статус: ЧАКАЩ (pending)\\n`;\ndescription += `🆔 ID: ${booking.id}\\n`;\ndescription += `📅 Създаден: ${new Date().toLocaleString('bg-BG')}`;\n\nreturn [{\n  json: {\n    summary: `⏳ ${booking.patientName}`,\n    description: description,\n    startDateTime: `${booking.date}T${booking.startTime}:00`,\n    endDateTime: `${booking.date}T${endTime}:00`,\n    colorId: '5',  // Yellow for pending\n    id: booking.id,\n    patientName: booking.patientName,\n    patientPhone: booking.patientPhone,\n    patientEmail: booking.patientEmail || '',\n    notify: notifyList\n  }\n}];"
       },
       "id": "prepare-event",
       "name": "Prepare Event Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1320, 200]
+      "position": [
+        1320,
+        200
+      ]
     },
     {
       "parameters": {
@@ -169,7 +196,10 @@
       "name": "Create Calendar Event",
       "type": "n8n-nodes-base.googleCalendar",
       "typeVersion": 1.2,
-      "position": [1540, 200],
+      "position": [
+        1540,
+        200
+      ],
       "credentials": {
         "googleCalendarOAuth2Api": {
           "id": "",
@@ -185,7 +215,10 @@
       "name": "Prepare Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1760, 200]
+      "position": [
+        1760,
+        200
+      ]
     },
     {
       "parameters": {
@@ -206,7 +239,10 @@
       "name": "Respond Success",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1980, 200]
+      "position": [
+        1980,
+        200
+      ]
     },
     {
       "parameters": {
@@ -223,7 +259,10 @@
       "name": "Can 60 min?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1760, 400]
+      "position": [
+        1760,
+        400
+      ]
     },
     {
       "parameters": {
@@ -262,7 +301,10 @@
       "name": "Telegram Full Options",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1980, 350],
+      "position": [
+        1980,
+        350
+      ],
       "credentials": {
         "telegramApi": {
           "id": "",
@@ -308,7 +350,10 @@
       "name": "Telegram Limited (30 only)",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1980, 500],
+      "position": [
+        1980,
+        500
+      ],
       "credentials": {
         "telegramApi": {
           "id": "",
@@ -339,7 +384,10 @@
       "name": "Send SMS to Patient",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1760, 500],
+      "position": [
+        1980,
+        470
+      ],
       "continueOnFail": true
     },
     {
@@ -357,15 +405,38 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"name\": \"{{ $('Prepare Event Data').first().json.patientName }}\",\n  \"phone\": \"{{ $('Prepare Event Data').first().json.patientPhone }}\"\n}",
+        "jsonBody": "={\n  \"name\": \"{{ $('Prepare Event Data').first().json.patientName }}\",\n  \"phone\": \"{{ $('Prepare Event Data').first().json.patientPhone }}\",\n  \"email\": \"{{ $('Prepare Event Data').first().json.patientEmail }}\",\n  \"notify\": {{ JSON.stringify($('Prepare Event Data').first().json.notify) }}\n}",
         "options": {}
       },
       "id": "save-patient",
       "name": "Save Patient to Sheet",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1760, 650],
+      "position": [
+        1760,
+        650
+      ],
       "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ ($('Prepare Event Data').first().json.notify || []).includes('sms') }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "wants-sms",
+      "name": "Wants SMS?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        500
+      ]
     }
   ],
   "connections": {
@@ -474,12 +545,12 @@
             "index": 0
           },
           {
-            "node": "Send SMS to Patient",
+            "node": "Save Patient to Sheet",
             "type": "main",
             "index": 0
           },
           {
-            "node": "Save Patient to Sheet",
+            "node": "Wants SMS?",
             "type": "main",
             "index": 0
           }
@@ -513,6 +584,18 @@
             "index": 0
           }
         ]
+      ]
+    },
+    "Wants SMS?": {
+      "main": [
+        [
+          {
+            "node": "Send SMS to Patient",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
       ]
     }
   },
