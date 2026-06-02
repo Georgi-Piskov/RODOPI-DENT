@@ -42,7 +42,18 @@ const API = {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       
-      const data = await response.json();
+      // Read body as text first so we can handle empty responses gracefully
+      // (e.g. an n8n workflow that finished without reaching the Respond node).
+      const text = await response.text();
+      let data = {};
+      if (text && text.trim().length > 0) {
+        try {
+          data = JSON.parse(text);
+        } catch (parseErr) {
+          console.warn('API: non-JSON response from', endpoint, '— body:', text.slice(0, 200));
+          return { success: false, error: 'BAD_JSON', message: 'Невалиден отговор от сървъра' };
+        }
+      }
       return { success: true, data };
       
     } catch (error) {
