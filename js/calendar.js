@@ -1316,9 +1316,11 @@ const Calendar = {
         // Try to extract from description: "🦷 Процедура: Преглед"
         const match = event.description.match(/(?:процедура|procedure|🦷)[:\s]*([^\n]+)/i);
         if (match) {
-          procedure = match[1].trim();
+          procedure = match[1].replace(/^(?:(?:процедура|procedure)[:\s]+)+/i, '').trim();
         }
       }
+      // Strip duplicated label prefixes from already-corrupted data
+      procedure = procedure.replace(/^(?:(?:процедура|procedure)[:\s]+)+/i, '');
       
       // Build display text
       const patientName = (event.patientName || event.title || '').replace(/^⏳\s*/, '').substring(0, 25);
@@ -2812,14 +2814,18 @@ const Calendar = {
         const procMatch = event.description.match(/(?:🦷|процедура|procedure)[:\s]*([^\n\r]+)/i);
         if (procMatch) procedureValue = procMatch[1].trim();
       }
+      // Strip duplicated label prefixes from already-corrupted data ("Процедура: Процедура: ...")
+      procedureValue = procedureValue.replace(/^(?:(?:процедура|procedure)[:\s]+)+/i, '');
       form.procedure.value = procedureValue;
       
       // Extract only the notes part from description (strip structured lines)
       let notesText = event.notes || event.description || '';
       notesText = notesText
         .replace(/📞\s*Тел:.*\n?/gi, '')
+        .replace(/✉️?\s*Имейл:.*\n?/gi, '')
         .replace(/🦷\s*Процедура:.*\n?/gi, '')
         .replace(/📋\s*Статус:.*\n?/gi, '')
+        .replace(/🔔\s*Напомняне:.*\n?/gi, '')
         .replace(/📝\s*Бележки:\s*/gi, '')
         .trim();
       form.notes.value = notesText;
