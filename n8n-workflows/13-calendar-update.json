@@ -47,7 +47,7 @@
           "end": "={{ $json.updateFields.endDateTime }}",
           "summary": "={{ $json.updateFields.summary }}",
           "description": "={{ $json.updateFields.description }}",
-          "colorId": "={{ $json.updateFields.colorId || '' }}"
+          "color": "={{ $json.updateFields.colorId || '' }}"
         }
       },
       "id": "update-event",

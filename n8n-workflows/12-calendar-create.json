@@ -47,7 +47,7 @@
           "summary": "={{ $json.summary }}",
           "description": "={{ $json.description }}",
           "sendUpdates": "all",
-          "colorId": "={{ $json.colorId || '' }}"
+          "color": "={{ $json.colorId || '' }}"
         }
       },
       "id": "create-event",
