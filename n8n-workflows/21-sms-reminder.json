@@ -24,7 +24,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Calculate tomorrow's date in Sofia timezone\nconst now = new Date();\nconst sofia = new Intl.DateTimeFormat('en-CA', {\n  timeZone: 'Europe/Sofia',\n  year: 'numeric',\n  month: '2-digit',\n  day: '2-digit'\n});\n\n// Get tomorrow\nconst tomorrow = new Date(now);\ntomorrow.setDate(tomorrow.getDate() + 1);\n\nconst tomorrowStr = sofia.format(tomorrow); // YYYY-MM-DD format\n\n// Also format for SMS display (DD.MM.YYYY)\nconst displayDate = new Intl.DateTimeFormat('bg-BG', {\n  timeZone: 'Europe/Sofia',\n  day: '2-digit',\n  month: '2-digit',\n  year: 'numeric'\n}).format(tomorrow);\n\nreturn [{\n  json: {\n    tomorrowISO: tomorrowStr,\n    tomorrowDisplay: displayDate,\n    timeMin: tomorrowStr + 'T00:00:00+02:00',\n    timeMax: tomorrowStr + 'T23:59:59+02:00'\n  }\n}];"
+        "jsCode": "// Calculate tomorrow's date in Sofia timezone\nconst now = new Date();\nconst sofia = new Intl.DateTimeFormat('en-CA', {\n  timeZone: 'Europe/Sofia',\n  year: 'numeric',\n  month: '2-digit',\n  day: '2-digit'\n});\n\n// Get tomorrow\nconst tomorrow = new Date(now);\ntomorrow.setDate(tomorrow.getDate() + 1);\n\nconst tomorrowStr = sofia.format(tomorrow); // YYYY-MM-DD format\n\n// Also format for SMS display (DD.MM.YYYY)\nconst displayDate = new Intl.DateTimeFormat('bg-BG', {\n  timeZone: 'Europe/Sofia',\n  day: '2-digit',\n  month: '2-digit',\n  year: 'numeric'\n}).format(tomorrow);\n\n// Actual UTC offset for Sofia on that date (handles DST: +02:00 winter / +03:00 summer)\nconst offsetPart = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Sofia', timeZoneName: 'longOffset' })\n  .formatToParts(tomorrow).find(p => p.type === 'timeZoneName').value; // e.g. 'GMT+03:00'\nconst sofiaOffset = offsetPart.replace('GMT', '') || '+02:00';\n\nreturn [{\n  json: {\n    tomorrowISO: tomorrowStr,\n    tomorrowDisplay: displayDate,\n    timeMin: tomorrowStr + 'T00:00:00' + sofiaOffset,\n    timeMax: tomorrowStr + 'T23:59:59' + sofiaOffset\n  }\n}];"
       },
       "id": "calc-tomorrow-001",
       "name": "Calculate Tomorrow",
@@ -85,7 +85,7 @@
           },
           "conditions": [
             {
-              "leftValue": "={{ $json.noEvents }}",
+              "leftValue": "={{ $json.noEvents === true }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -108,7 +108,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Prepare SMS for each patient\nconst event = $input.first().json;\n\n// Normalize Bulgarian phone number\nlet phone = event.phone.replace(/\\s+/g, '').replace(/[^0-9+]/g, '');\nif (phone.startsWith('0')) {\n  phone = '+359' + phone.substring(1);\n} else if (!phone.startsWith('+')) {\n  phone = '+359' + phone;\n}\n\n// Create reminder message\nconst message = `Родопи Дент: Напомняне - имате час утре (${event.date}) в ${event.time}. Очакваме ви!`;\n\nreturn [{\n  json: {\n    phone: phone,\n    message: message,\n    patientName: event.patientName,\n    eventId: event.eventId\n  }\n}];"
+        "jsCode": "// Prepare SMS for EVERY patient (not just the first)\nconst items = $input.all();\n\nreturn items.map(item => {\n  const event = item.json;\n\n  // Normalize Bulgarian phone number\n  let phone = event.phone.replace(/\\s+/g, '').replace(/[^0-9+]/g, '');\n  if (phone.startsWith('0')) {\n    phone = '+359' + phone.substring(1);\n  } else if (!phone.startsWith('+')) {\n    phone = '+359' + phone;\n  }\n\n  const message = `Родопи Дент: Напомняне - имате час утре (${event.date}) в ${event.time}. Очакваме ви!`;\n\n  return {\n    json: {\n      phone: phone,\n      message: message,\n      patientName: event.patientName,\n      eventId: event.eventId\n    }\n  };\n});"
       },
       "id": "prepare-sms-001",
       "name": "Prepare Reminder SMS",
