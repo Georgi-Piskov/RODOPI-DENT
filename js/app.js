@@ -261,11 +261,11 @@ const App = {
         slotsEl.innerHTML = `<p class="text-muted">${response.data.message}</p>`;
       } else {
         // API error - show message, don't show all slots (prevents double booking)
-        slotsEl.innerHTML = '<p class="text-error">⚠️ Грешка при зареждане. Моля, опитайте отново.</p>';
+        slotsEl.innerHTML = '<p class="text-error">Грешка при зареждане. Моля, опитайте отново.</p>';
       }
     } catch (error) {
       console.error('Error loading slots:', error);
-      slotsEl.innerHTML = '<p class="text-error">⚠️ Грешка при зареждане. Моля, опитайте отново.</p>';
+      slotsEl.innerHTML = '<p class="text-error">Грешка при зареждане. Моля, опитайте отново.</p>';
     }
   },
 
@@ -321,9 +321,9 @@ const App = {
         const summary = document.getElementById('booking-summary');
         if (summary) {
           summary.innerHTML = `
-            <p><strong>📅 Дата:</strong> ${Utils.formatDateBG(date)}</p>
-            <p><strong>🕐 Час:</strong> ${Utils.formatTime(time)}</p>
-            <p><strong>⏱️ Продължителност:</strong> ${duration} минути</p>
+            <p><strong>Дата:</strong> ${Utils.formatDateBG(date)}</p>
+            <p><strong>Час:</strong> ${Utils.formatTime(time)}</p>
+            <p><strong>Продължителност:</strong> ${duration} минути</p>
           `;
         }
       };
@@ -415,7 +415,7 @@ const App = {
   showBookingConfirmation(bookingData) {
     const container = document.querySelector('.booking-page') || document.querySelector('.page');
     if (!container) {
-      Utils.showToast('✅ Заявката е приета и чака одобрение от доктора!', 'success');
+      Utils.showToast('Заявката е приета и чака одобрение от доктора!', 'success');
       setTimeout(() => Router.navigate('/'), 3000);
       return;
     }
@@ -431,31 +431,31 @@ const App = {
     
     container.innerHTML = `
       <div class="booking-confirmation">
-        <div class="booking-confirmation__icon">✅</div>
+        <div class="booking-confirmation__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="52" height="52"><circle cx="12" cy="12" r="10"/><path d="m8 12.5 2.5 2.5L16 9.5"/></svg></div>
         <h2>Заявката е приета!</h2>
         <p class="booking-confirmation__subtitle">Чака одобрение от доктора</p>
         
         <div class="booking-confirmation__details">
           <div class="booking-confirmation__row">
-            <span class="label">📅 Дата:</span>
+            <span class="label">Дата:</span>
             <span class="value">${formattedDate}</span>
           </div>
           <div class="booking-confirmation__row">
-            <span class="label">🕐 Час:</span>
+            <span class="label">Час:</span>
             <span class="value">${bookingData.startTime}</span>
           </div>
           <div class="booking-confirmation__row">
-            <span class="label">👤 Име:</span>
+            <span class="label">Име:</span>
             <span class="value">${bookingData.patientName}</span>
           </div>
           <div class="booking-confirmation__row">
-            <span class="label">📱 Телефон:</span>
+            <span class="label">Телефон:</span>
             <span class="value">${bookingData.patientPhone}</span>
           </div>
         </div>
         
         <div class="booking-confirmation__note">
-          <p>📱 <strong>Ще получите SMS</strong> когато докторът потвърди вашия час.</p>
+          <p><strong>Ще получите SMS</strong> когато докторът потвърди вашия час.</p>
           <p>Ако не получите отговор до края на деня, ще се свържем с вас по телефона.</p>
         </div>
         
