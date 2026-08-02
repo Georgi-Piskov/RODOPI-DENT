@@ -1537,9 +1537,10 @@ const Calendar = {
     const now = new Date();
     const hours = now.getHours();
     const minutes = now.getMinutes();
-    
+
     if (hours >= this.workingHours.start && hours <= this.workingHours.end) {
-      const top = ((hours - this.workingHours.start) * 60) + minutes;
+      // Same px scale as events (desktop: 120px/h, mobile: 60px/h)
+      const top = this.getEventTop(`${hours}:${String(minutes).padStart(2, '0')}`);
       timeLine.style.top = `${top}px`;
       timeLine.style.display = 'block';
     } else {
