@@ -67,7 +67,7 @@ const CONFIG = {
   DEFAULT_DURATION: 30,
   
   // Available durations for appointments
-  DURATIONS: [30, 45, 60, 90, 120],
+  DURATIONS: [30, 45, 60, 90, 120, 150, 180],
   
   // Appointment statuses
   STATUSES: {

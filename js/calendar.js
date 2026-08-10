@@ -2477,6 +2477,8 @@ const Calendar = {
                   <option value="60">60 минути</option>
                   <option value="90">90 минути</option>
                   <option value="120">2 часа</option>
+                  <option value="150">2 часа и 30 мин</option>
+                  <option value="180">3 часа</option>
                 </select>
               </div>
               <div class="form-group">
