@@ -127,7 +127,7 @@
         "nodeCredentialType": "googleApi",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"message\": {\n    \"token\": \"fOCo7Bd_RUC0XnRagx-8xI:APA91bFQcrkEamhN5PopRJ2FYKpj3IbvH-HmHprbnlEFRGxnNZLEgIoa-_LHm8rAFm4d7jWvo3XkMAUKbhFVcKJkUFLNG6pgZHBLFJFAM8lNCicCanxTNrg\",\n    \"data\": {\n      \"phone\": \"{{ $json.phone }}\",\n      \"message\": \"{{ $json.message }}\"\n    }\n  }\n}",
+        "jsonBody": "={\n  \"message\": {\n    \"token\": \"fOCo7Bd_RUC0XnRagx-8xI:APA91bFQcrkEamhN5PopRJ2FYKpj3IbvH-HmHprbnlEFRGxnNZLEgIoa-_LHm8rAFm4d7jWvo3XkMAUKbhFVcKJkUFLNG6pgZHBLFJFAM8lNCicCanxTNrg\",\n    \"android\": { \"priority\": \"HIGH\" },\n    \"data\": {\n      \"phone\": \"{{ $json.phone }}\",\n      \"message\": \"{{ $json.message }}\"\n    }\n  }\n}",
         "options": {
           "allowUnauthorizedCerts": false
         }
