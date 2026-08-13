@@ -614,6 +614,9 @@ const Calendar = {
       e.preventDefault();
       await this.handleEventSubmit(e.target);
     });
+
+    // Автоматичен телефон при писане на име (подсказки от Patients листа)
+    this.setupNameAutocomplete();
     
     // Delete button
     document.getElementById('event-delete-btn')?.addEventListener('click', async () => {
@@ -646,6 +649,75 @@ const Calendar = {
         }
       });
     }
+  },
+
+  /**
+   * Autocomplete: while typing a patient name in the event form, suggest
+   * known patients (from the Patients sheet) and fill the phone on pick.
+   * Fallback on blur: exact-name phone lookup if the phone field is empty.
+   */
+  setupNameAutocomplete() {
+    const nameInput = document.querySelector('#event-form input[name="patientName"]');
+    const phoneInput = document.querySelector('#event-form input[name="patientPhone"]');
+    const sugBox = document.getElementById('event-name-suggestions');
+    if (!nameInput || !phoneInput || !sugBox) return;
+
+    let timer = null;
+    let seq = 0;
+    const hide = () => { sugBox.hidden = true; sugBox.innerHTML = ''; };
+
+    nameInput.addEventListener('input', () => {
+      clearTimeout(timer);
+      const q = nameInput.value.trim();
+      if (q.length < 2) { hide(); return; }
+      timer = setTimeout(async () => {
+        const mySeq = ++seq;
+        try {
+          const res = await API.searchPatients(q);
+          const payload = res?.data || res;
+          if (mySeq !== seq) return; // остаряла заявка
+          const patients = (payload && payload.patients) || [];
+          if (!patients.length) { hide(); return; }
+          sugBox.innerHTML = '';
+          patients.slice(0, 6).forEach(p => {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'name-autocomplete__item';
+            const nm = document.createElement('span');
+            nm.className = 'name-autocomplete__name';
+            nm.textContent = p.name || '';
+            const ph = document.createElement('span');
+            ph.className = 'name-autocomplete__phone';
+            ph.textContent = p.phone || '';
+            item.append(nm, ph);
+            item.addEventListener('mousedown', (e) => {
+              e.preventDefault(); // преди blur на input-а
+              nameInput.value = p.name || '';
+              if (p.phone) phoneInput.value = p.phone;
+              hide();
+            });
+            sugBox.appendChild(item);
+          });
+          sugBox.hidden = false;
+        } catch (err) {
+          hide();
+        }
+      }, 250);
+    });
+
+    nameInput.addEventListener('blur', () => {
+      setTimeout(hide, 200);
+      // Резервен вариант: точно търсене по цялото име
+      const name = nameInput.value.trim();
+      if (name.length >= 3 && !phoneInput.value.trim()) {
+        API.getPatientPhone(name).then(res => {
+          const payload = res?.data || res;
+          if (payload && payload.found && payload.phone && !phoneInput.value.trim()) {
+            phoneInput.value = payload.phone;
+          }
+        }).catch(() => {});
+      }
+    });
   },
 
   /**
@@ -2409,7 +2481,10 @@ const Calendar = {
           <form id="event-form" class="event-form">
             <div class="form-group event-form__row--full">
               <label>Име на пациент *</label>
-              <input type="text" name="patientName" required placeholder="Въведете име...">
+              <div class="name-autocomplete">
+                <input type="text" name="patientName" required placeholder="Въведете име..." autocomplete="off">
+                <div class="name-autocomplete__list" id="event-name-suggestions" hidden></div>
+              </div>
             </div>
             <div class="form-group event-form__row--full">
               <label>Телефон</label>
