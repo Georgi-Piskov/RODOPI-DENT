@@ -2634,6 +2634,7 @@ button {
     padding: 2px 4px;
     font-size: 10px;
     min-height: 20px;
+    min-width: 30px;
   }
   
   .calendar-event__name {
@@ -2826,6 +2827,9 @@ button {
   position: absolute;
   background: var(--color-confirmed);
   color: white;
+  /* При много застъпени часове JS дели колоната на N; под този минимум
+     картите се застъпват като тесте вместо да станат невидими нишки */
+  min-width: 46px;
   border-radius: 7px;
   padding: 4px 6px;
   font-size: 11px;
