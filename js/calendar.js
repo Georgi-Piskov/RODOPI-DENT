@@ -1237,9 +1237,9 @@ const Calendar = {
               const monthBadge = e.status === 'pending' ? '⏳ ' : e.status === 'completed' ? '✅ ' : '';
               const monthName = (e.patientName || e.title || '').replace(/^⏳\s*/, '').substring(0, 15);
               return `
-              <div class="month-event calendar-event--${e.status || 'confirmed'}" data-event-id="${e.id}" title="${e.patientName || e.title}">
+              <div class="month-event calendar-event--${e.status || 'confirmed'}" data-event-id="${e.id}" title="${this.esc(e.patientName || e.title)}">
                 <span class="month-event__time">${e.startTime}</span>
-                <span class="month-event__name">${monthBadge}${monthName}</span>
+                <span class="month-event__name">${monthBadge}${this.esc(monthName)}</span>
               </div>
             `}).join('')}
             ${dayEvents.length > maxDisplay ? `
@@ -1368,6 +1368,17 @@ const Calendar = {
   },
 
   /**
+   * Екранира потребителски текст за влагане в HTML стрингове.
+   * Без това символ като "<" в име/процедура чупи целия рендер
+   * (инцидентът от 21.08: процедура "...CL <C low" глътна 6 карти).
+   */
+  esc(str) {
+    return String(str ?? '').replace(/[&<>"']/g, c => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+  },
+
+  /**
    * Render events for a specific day with proper overlap handling
    */
   renderEventsForDay(date) {
@@ -1423,12 +1434,12 @@ const Calendar = {
       const isCompact = isMobile ? (duration <= 30) : (duration <= 15);
       
       return `
-        <div class="calendar-event calendar-event--${event.status || 'confirmed'} ${colorClass}${isCompact ? ' calendar-event--compact' : ''}" 
+        <div class="calendar-event calendar-event--${event.status || 'confirmed'} ${colorClass}${isCompact ? ' calendar-event--compact' : ''}"
              data-event-id="${event.id}"
              style="top: ${top}px; height: ${height}px; left: ${left}%; width: calc(${width}% - 4px);"
-             title="${tooltip}">
-          <div class="calendar-event__name">${statusBadge}${patientName}</div>
-          ${!isCompact && procedureText ? `<div class="calendar-event__procedure">🦷 ${procedureText}</div>` : ''}
+             title="${this.esc(tooltip)}">
+          <div class="calendar-event__name">${statusBadge}${this.esc(patientName)}</div>
+          ${!isCompact && procedureText ? `<div class="calendar-event__procedure">🦷 ${this.esc(procedureText)}</div>` : ''}
           ${!isCompact ? `<div class="calendar-event__time">🕐 ${displayTime}</div>` : ''}
         </div>
       `;
@@ -1700,12 +1711,12 @@ const Calendar = {
       return `
         <div class="callback-request-card" data-event-id="${event.id}">
           <div class="callback-request-card__info">
-            <strong>${patientName}</strong>
+            <strong>${this.esc(patientName)}</strong>
             <span class="callback-request-card__datetime">
               📅 ${dayName}, ${dateStr} в ${event.startTime}
             </span>
-            ${phone ? `<a href="tel:${phone}" class="callback-request-card__phone">📞 ${phone}</a>` : ''}
-            ${reason ? `<span class="callback-request-card__reason">📋 ${reason}</span>` : ''}
+            ${phone ? `<a href="tel:${this.esc(phone)}" class="callback-request-card__phone">📞 ${this.esc(phone)}</a>` : ''}
+            ${reason ? `<span class="callback-request-card__reason">📋 ${this.esc(reason)}</span>` : ''}
           </div>
           <div class="callback-request-card__actions">
             <button class="btn btn--success btn--small callback-done" 
@@ -1799,7 +1810,7 @@ const Calendar = {
         if (conflictNames.length > 0) {
           conflictWarning = `
             <div class="pending-request-card__conflict">
-              ⚠️ Следващ час след ${maxAvailableMinutes} мин: ${conflictNames.join(', ')}
+              ⚠️ Следващ час след ${maxAvailableMinutes} мин: ${this.esc(conflictNames.join(', '))}
             </div>
           `;
         }
@@ -1844,12 +1855,12 @@ const Calendar = {
       return `
         <div class="pending-request-card ${!can60 ? 'has-conflict' : ''}" data-event-id="${event.id}">
           <div class="pending-request-card__info">
-            <strong>${patientName}</strong>
+            <strong>${this.esc(patientName)}</strong>
             <span class="pending-request-card__datetime">
               📅 ${dayName}, ${dateStr} в ${event.startTime}
             </span>
-            ${phone ? `<span class="pending-request-card__phone">📞 ${phone}</span>` : ''}
-            ${reason ? `<span class="pending-request-card__reason">📋 ${reason}</span>` : ''}
+            ${phone ? `<span class="pending-request-card__phone">📞 ${this.esc(phone)}</span>` : ''}
+            ${reason ? `<span class="pending-request-card__reason">📋 ${this.esc(reason)}</span>` : ''}
             ${conflictWarning}
           </div>
           <div class="pending-request-card__actions">
