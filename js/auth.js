@@ -134,7 +134,7 @@ const Auth = {
         this.setToken(response.credential);
         
         Utils.showToast(`Добре дошли, ${payload.name}!`, 'success');
-        Router.navigate('/admin/dashboard');
+        Router.navigate('/admin/calendar');
       }
     }
   },

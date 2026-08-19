@@ -471,7 +471,7 @@ const App = {
    */
   renderAdminLogin() {
     if (Auth.isAuthenticated()) {
-      Router.navigate('/admin/dashboard');
+      Router.navigate('/admin/calendar');
       return;
     }
 
@@ -1253,9 +1253,9 @@ const App = {
           </div>
         </div>
         <nav class="admin-nav">
+          <a href="#/admin/calendar" class="admin-nav__link active">Календар</a>
           <a href="#/admin/dashboard" class="admin-nav__link">Табло</a>
           <a href="#/admin/workday" class="admin-nav__link">Работен ден</a>
-          <a href="#/admin/calendar" class="admin-nav__link active">Календар</a>
           <a href="#/admin/settings" class="admin-nav__link">Настройки</a>
         </nav>
         
@@ -1296,9 +1296,9 @@ const App = {
           </div>
         </div>
         <nav class="admin-nav">
+          <a href="#/admin/calendar" class="admin-nav__link">📆 Календар</a>
           <a href="#/admin/dashboard" class="admin-nav__link">Табло</a>
           <a href="#/admin/workday" class="admin-nav__link active">Работен ден</a>
-          <a href="#/admin/calendar" class="admin-nav__link">📆 Календар</a>
           <a href="#/admin/settings" class="admin-nav__link">Настройки</a>
         </nav>
         
