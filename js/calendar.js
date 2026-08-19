@@ -2965,6 +2965,42 @@ const Calendar = {
   /**
    * Handle event form submit
    */
+  /**
+   * Проверка за застъпване срещу СВЕЖИ данни от сървъра (не от изгледа).
+   * Ако сървърът е недостъпен, ползва вече заредените събития.
+   */
+  async findConflictsFresh(date, startTime, duration, excludeEventId) {
+    const [h, m] = String(startTime).split(':').map(Number);
+    const start = h * 60 + m;
+    const end = start + (parseInt(duration) || 30);
+
+    let events = null;
+    try {
+      const startD = new Date(date + 'T00:00:00');
+      const endD = new Date(startD);
+      endD.setDate(endD.getDate() + 1);
+      const res = await API.getCalendarEvents({
+        startDate: startD.toISOString(),
+        endDate: endD.toISOString(),
+        view: 'day'
+      });
+      const payload = res?.data || res;
+      if (payload && Array.isArray(payload.events)) events = payload.events;
+    } catch (e) {
+      console.warn('Conflict check: server unavailable, using loaded events', e);
+    }
+    if (!events) events = this.events || [];
+
+    return events.filter(ev => {
+      if (!ev || ev.date !== date) return false;
+      if (excludeEventId && ev.id === excludeEventId) return false;
+      if (ev.status === 'cancelled') return false;
+      const s = this.timeToMinutes(ev.startTime);
+      const en = ev.endTime ? this.timeToMinutes(ev.endTime) : s + (ev.duration || 30);
+      return start < en && end > s;
+    });
+  },
+
   async handleEventSubmit(form) {
     const formData = new FormData(form);
     const eventId = formData.get('eventId');
@@ -2989,7 +3025,24 @@ const Calendar = {
     const submitBtn = document.getElementById('event-submit-btn');
     submitBtn.disabled = true;
     submitBtn.textContent = 'Запазване...';
-    
+
+    // Защитна мрежа: предупреждение при застъпване с вече записани часове
+    // (проверка срещу свежи данни от сървъра, независимо какво показва изгледът)
+    const conflicts = await this.findConflictsFresh(data.date, data.startTime, data.duration, eventId);
+    if (conflicts.length > 0) {
+      const list = conflicts.map(c =>
+        `• ${c.startTime}-${c.endTime}  ${((c.patientName || c.title || 'Зает') + '').replace(/^⏳\s*/, '')}`
+      ).join('\n');
+      const proceed = confirm(
+        `ВНИМАНИЕ: На ${data.date} в този интервал вече има ${conflicts.length} запис(а):\n\n${list}\n\nЗапази ВЪПРЕКИ застъпването?`
+      );
+      if (!proceed) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Запази';
+        return;
+      }
+    }
+
     try {
       let response;
       

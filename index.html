@@ -627,7 +627,7 @@
   <script src="js/api.js?v=3.16.1"></script>
   <script src="js/router.js?v=3.8"></script>
   <script src="js/auth.js?v=3.8"></script>
-  <script src="js/calendar.js?v=3.18.3"></script>
+  <script src="js/calendar.js?v=3.19.0"></script>
   <script src="js/app.js?v=3.18.0"></script>
   
   <!-- Register Service Worker -->
@@ -635,8 +635,21 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
-          .then(reg => console.log('SW registered'))
+          .then(reg => {
+            console.log('SW registered');
+            // Проверявай за нова версия при всяко отваряне (иначе PWA може
+            // да върти седмици стар кеш и да крие нови събития/поправки)
+            reg.update();
+            setInterval(() => reg.update(), 60 * 60 * 1000);
+          })
           .catch(err => console.log('SW registration failed:', err));
+      });
+      // Когато нов SW поеме контрола — презареди веднъж за свежите файлове
+      let swReloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (swReloaded) return;
+        swReloaded = true;
+        window.location.reload();
       });
     }
   </script>
