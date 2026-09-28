@@ -597,7 +597,8 @@ const App = {
         if (titleEl) {
           if (matchedPatients.length > 0) {
             const patientLines = matchedPatients.map(p => {
-              const phone = p.phone ? ` 📞 ${p.phone}` : '';
+              const date = p.phone && p.createdAt ? ` · от ${Utils.formatPatientDate(p.createdAt)}` : '';
+              const phone = p.phone ? ` 📞 ${p.phone}${date}` : '';
               return `${p.name}${phone}`;
             });
             titleEl.innerHTML = `🔍 Резултати за "${query}" (${patientRecords.length} записа)<br>` +

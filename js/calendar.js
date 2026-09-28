@@ -688,7 +688,8 @@ const Calendar = {
             nm.textContent = p.name || '';
             const ph = document.createElement('span');
             ph.className = 'name-autocomplete__phone';
-            ph.textContent = p.phone || '';
+            // A patient may have several phones (e.g. both parents) - show when each was added
+            ph.textContent = (p.phone || '') + (p.phone && p.createdAt ? ` · от ${Utils.formatPatientDate(p.createdAt)}` : '');
             item.append(nm, ph);
             item.addEventListener('mousedown', (e) => {
               e.preventDefault(); // преди blur на input-а
@@ -2746,7 +2747,7 @@ const Calendar = {
     suggestionsEl.innerHTML = patients.map(p => `
       <button class="patient-search__suggestion" data-name="${p.name.replace(/"/g, '&quot;')}" data-phone="${(p.phone || '').replace(/"/g, '&quot;')}">
         <span class="patient-search__suggestion-name">${highlight(p.name)}</span>
-        ${p.phone ? `<span class="patient-search__suggestion-phone">📞 ${p.phone}</span>` : ''}
+        ${p.phone ? `<span class="patient-search__suggestion-phone">📞 ${p.phone}${p.createdAt ? ` · от ${Utils.formatPatientDate(p.createdAt)}` : ''}</span>` : ''}
       </button>
     `).join('');
 

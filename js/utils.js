@@ -174,6 +174,14 @@ const Utils = {
   },
 
   /**
+   * Format a Patients-sheet date (YYYY-MM-DD) as DD.MM.YYYY
+   */
+  formatPatientDate(value) {
+    const m = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? `${m[3]}.${m[2]}.${m[1]}` : String(value || '');
+  },
+
+  /**
    * Show toast notification
    */
   showToast(message, type = 'info', duration = 3000) {

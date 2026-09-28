@@ -16,7 +16,7 @@
       "parameters": {
         "jsCode": "// 3 years back -> 6 months ahead\nconst from = new Date(); from.setFullYear(from.getFullYear() - 3);\nconst to = new Date(); to.setMonth(to.getMonth() + 6);\nreturn [{ json: { startDate: from.toISOString(), endDate: to.toISOString() } }];"
       },
-      "id": "91db92e5-0711-415e-8f6a-55a26e5bd421",
+      "id": "c6b0b428-e449-4fa3-862c-571daa5101b5",
       "name": "Set Date Range",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -41,7 +41,7 @@
           "orderBy": "startTime"
         }
       },
-      "id": "4d27b044-117f-4792-ba86-aa04ea53e7dd",
+      "id": "cf0a3961-44f5-4134-a851-578467e66b2f",
       "name": "Get All Calendar Events",
       "type": "n8n-nodes-base.googleCalendar",
       "typeVersion": 1.2,
@@ -72,7 +72,7 @@
         },
         "options": {}
       },
-      "id": "3601ba8e-0faa-47ce-8af1-73da81afa448",
+      "id": "e225873a-1a7c-45c7-a87f-f8d1c3b703aa",
       "name": "Read Existing Patients",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
@@ -91,9 +91,9 @@
     },
     {
       "parameters": {
-        "jsCode": "// ============================================================\n// PATIENTS RECOVERY from Google Calendar\n// DRY_RUN = true  -> nothing is written, only a report is shown\n// DRY_RUN = false -> new patients are appended, changed phones are updated\n// ============================================================\nconst DRY_RUN = true;\n\n// --- Patient matching helpers (same logic in upsert + recovery) ---\n// Strip leading status icons (⏳ ✅ 🔔 ...) and stray punctuation from a name\nfunction cleanName(n) {\n  return String(n || '')\n    .replace(/^[^\\p{L}\\p{N}]+/u, '')\n    .replace(/\\s+/g, ' ')\n    .replace(/[\\s.,;:\\-]+$/, '')\n    .trim();\n}\nfunction nameKey(n) {\n  return cleanName(n).toLowerCase();\n}\n// Normalize to +359 international format (text-safe for Google Sheets)\nfunction toInternational(p) {\n  let phone = String(p || '').replace(/[\\s()\\-.\\/]/g, '');\n  if (!phone) return '';\n  if (phone.startsWith('00359')) phone = '+359' + phone.slice(5);\n  else if (phone.startsWith('359')) phone = '+' + phone;\n  else if (phone.startsWith('0') && phone.length >= 10) phone = '+359' + phone.slice(1);\n  else if (/^[89]\\d{8}$/.test(phone)) phone = '+359' + phone;\n  else if (!phone.startsWith('+') && phone.length >= 9) phone = '+359' + phone;\n  return phone;\n}\n// Core digits for comparison: +359887493315 / 0887493315 / 887493315 -> 887493315\nfunction phoneKey(p) {\n  return String(p || '').replace(/\\D/g, '').replace(/^00/, '').replace(/^359/, '').replace(/^0/, '');\n}\nfunction isBlockName(n) {\n  return /блокиран|почивка|отпуск|blocked/i.test(String(n || ''));\n}\n\nfunction extractPhone(description) {\n  const text = String(description || '').replace(/<[^>]*>/g, ' ');\n  const patterns = [\n    /📞\\s*Тел[.:]?\\s*([+\\d\\s()\\-]{7,})/i,\n    /(?:тел|phone|tel)[.:\\s]+([+\\d\\s()\\-]{7,})/i,\n    /((?:\\+359|00359)[\\d\\s]{8,12})/,\n    /\\b(0[2-9][\\d\\s]{7,10})\\b/\n  ];\n  for (const re of patterns) {\n    const m = text.match(re);\n    if (m) {\n      const phone = toInternational(m[1]);\n      if (/^\\+359\\d{8,9}$/.test(phone)) return phone;\n    }\n  }\n  return '';\n}\n\n// 1) Latest known data per patient name from the calendar (oldest -> newest)\nconst events = $('Get All Calendar Events').all()\n  .map(i => i.json)\n  .filter(e => e && e.id && e.start && e.start.dateTime && e.status !== 'cancelled')\n  .sort((a, b) => String(a.start.dateTime).localeCompare(String(b.start.dateTime)));\n\nconst fromCalendar = new Map();\nfor (const ev of events) {\n  const name = cleanName(ev.summary);\n  if (!name || name.length < 2 || isBlockName(name)) continue;\n  const key = nameKey(name);\n  const phone = extractPhone(ev.description);\n  const prev = fromCalendar.get(key) || { name, phone: '', lastDate: '' };\n  prev.name = name;\n  if (phone) prev.phone = phone;            // newest phone wins\n  prev.lastDate = ev.start.dateTime.slice(0, 10);\n  fromCalendar.set(key, prev);\n}\n\n// 2) Existing sheet rows\nconst rows = $('Read Existing Patients').all()\n  .map(i => i.json)\n  .filter(r => r && r.row_number && (r.name || r.phone));\nconst rowsByName = new Map();\nfor (const r of rows) {\n  const k = nameKey(r.name);\n  if (!rowsByName.has(k)) rowsByName.set(k, []);\n  rowsByName.get(k).push(r);\n}\n\n// 3) Plan\nconst today = new Date().toISOString().split('T')[0];\nconst toAdd = [];\nconst toUpdate = [];\nfor (const [key, p] of fromCalendar) {\n  const existing = rowsByName.get(key) || [];\n  if (existing.length === 0) {\n    toAdd.push({ op: 'append', name: p.name, phone: p.phone, createdAt: today, lastVisit: p.lastDate });\n    continue;\n  }\n  if (!p.phone) continue;\n  if (existing.some(r => phoneKey(r.phone) === phoneKey(p.phone))) continue;\n  const noPhoneRow = existing.find(r => !phoneKey(r.phone));\n  const target = noPhoneRow || (existing.length === 1 ? existing[0] : null);\n  if (target) {\n    toUpdate.push({ op: 'update', rowNumber: target.row_number, name: target.name,\n                    oldPhone: String(target.phone || ''), phone: p.phone, lastVisit: p.lastDate });\n  } else {\n    toAdd.push({ op: 'append', name: p.name, phone: p.phone, createdAt: today, lastVisit: p.lastDate });\n  }\n}\n\nconst report = {\n  op: 'report',\n  dryRun: DRY_RUN,\n  summary: `${DRY_RUN ? 'ПРОБА (нищо не е записано)' : 'ЗАПИСАНО'}: ` +\n    `събития ${events.length}, пациенти в календара ${fromCalendar.size}, ` +\n    `редове в таблицата ${rows.length}, нови ${toAdd.length}, обновени телефони ${toUpdate.length}`,\n  toAdd: toAdd.map(p => `${p.name} | ${p.phone || '(без телефон)'} | последен час ${p.lastVisit}`),\n  toUpdate: toUpdate.map(p => `ред ${p.rowNumber}: ${p.name} | ${p.oldPhone || '(празно)'} -> ${p.phone}`)\n};\n\nif (DRY_RUN) return [{ json: report }];\nreturn [{ json: report }, ...toAdd.map(p => ({ json: p })), ...toUpdate.map(p => ({ json: p }))];\n"
+        "jsCode": "// ============================================================\n// PATIENTS RECOVERY from Google Calendar\n// DRY_RUN = true  -> nothing is written, only a report is shown\n// DRY_RUN = false -> new patients are appended, changed phones are updated\n// ============================================================\n// Manual run: change FORCE_APPLY to true to write.\n// Webhook run (temporary): ?apply=1 writes, anything else is a dry run.\nconst FORCE_APPLY = false;\nlet apply = false;\ntry { apply = String($('Recovery Webhook').first().json.query.apply || '') === '1'; } catch (e) {}\nconst DRY_RUN = !(apply || FORCE_APPLY);\n\n// --- Patient matching helpers (same logic in upsert + recovery) ---\n// Strip leading status icons (⏳ ✅ 🔔 ...) and stray punctuation from a name\nfunction cleanName(n) {\n  return String(n || '')\n    .replace(/^[^\\p{L}\\p{N}]+/u, '')\n    .replace(/\\s+/g, ' ')\n    .replace(/[\\s.,;:\\-]+$/, '')\n    .trim();\n}\nfunction nameKey(n) {\n  return cleanName(n).toLowerCase();\n}\n// Normalize to +359 international format (text-safe for Google Sheets)\nfunction toInternational(p) {\n  let phone = String(p || '').replace(/[\\s()\\-.\\/]/g, '');\n  if (!phone) return '';\n  if (phone.startsWith('00359')) phone = '+359' + phone.slice(5);\n  else if (phone.startsWith('359')) phone = '+' + phone;\n  else if (phone.startsWith('0') && phone.length >= 10) phone = '+359' + phone.slice(1);\n  else if (/^[89]\\d{8}$/.test(phone)) phone = '+359' + phone;\n  else if (!phone.startsWith('+') && phone.length >= 9) phone = '+359' + phone;\n  return phone;\n}\n// Core digits for comparison: +359887493315 / 0887493315 / 887493315 -> 887493315\nfunction phoneKey(p) {\n  return String(p || '').replace(/\\D/g, '').replace(/^00/, '').replace(/^359/, '').replace(/^0/, '');\n}\nfunction isBlockName(n) {\n  return /блокиран|почивка|отпуск|blocked/i.test(String(n || ''));\n}\n\nfunction extractPhone(description) {\n  const text = String(description || '').replace(/<[^>]*>/g, ' ');\n  const patterns = [\n    /📞\\s*Тел[.:]?\\s*([+\\d\\s()\\-]{7,})/i,\n    /(?:тел|phone|tel)[.:\\s]+([+\\d\\s()\\-]{7,})/i,\n    /((?:\\+359|00359)[\\d\\s]{8,12})/,\n    /\\b(0[2-9][\\d\\s]{7,10})\\b/\n  ];\n  for (const re of patterns) {\n    const m = text.match(re);\n    if (m) {\n      const phone = toInternational(m[1]);\n      if (/^\\+359\\d{8,9}$/.test(phone)) return phone;\n    }\n  }\n  return '';\n}\n\n// 1) Latest known data per patient name from the calendar (oldest -> newest)\nconst events = $('Get All Calendar Events').all()\n  .map(i => i.json)\n  .filter(e => e && e.id && e.start && e.start.dateTime && e.status !== 'cancelled')\n  .sort((a, b) => String(a.start.dateTime).localeCompare(String(b.start.dateTime)));\n\nconst fromCalendar = new Map();\nfor (const ev of events) {\n  const name = cleanName(ev.summary);\n  if (!name || name.length < 2 || isBlockName(name)) continue;\n  const key = nameKey(name);\n  const phone = extractPhone(ev.description);\n  const date = ev.start.dateTime.slice(0, 10);\n  const prev = fromCalendar.get(key) || { name, phones: new Map(), lastDate: '' };\n  prev.name = name;\n  if (phone && !prev.phones.has(phoneKey(phone))) prev.phones.set(phoneKey(phone), { phone, firstDate: date });\n  prev.lastDate = date;\n  fromCalendar.set(key, prev);\n}\n\n// 2) Existing sheet rows\nconst rows = $('Read Existing Patients').all()\n  .map(i => i.json)\n  .filter(r => r && r.row_number && (r.name || r.phone));\nconst rowsByName = new Map();\nfor (const r of rows) {\n  const k = nameKey(r.name);\n  if (!rowsByName.has(k)) rowsByName.set(k, []);\n  rowsByName.get(k).push(r);\n}\n\n// 3) Plan\nconst today = new Date().toISOString().split('T')[0];\nconst toAdd = [];\nconst skipped = { noPhone: 0, notAName: [], duplicate: [] };\nconst toUpdate = [];\nfor (const [key, p] of fromCalendar) {\n  const existing = rowsByName.get(key) || [];\n  const words = p.name.split(' ');\n  const firstName = words[0].toLowerCase();\n  const phones = [...p.phones.values()];\n  if (existing.length === 0) {\n    // Only real-looking patients: must have a phone, a short name without digits,\n    // and must not be an existing patient (same phone + same first name) with notes in the title\n    if (phones.length === 0) { skipped.noPhone++; continue; }\n    if (/\\d/.test(p.name) || words.length > 4) { skipped.notAName.push(`${p.name} | ${phones.map(x => x.phone).join(', ')}`); continue; }\n  }\n  const knownKeys = new Set(existing.map(r => phoneKey(r.phone)).filter(Boolean));\n  let noPhoneRow = existing.find(r => !phoneKey(r.phone));\n  for (const ph of phones) {\n    if (knownKeys.has(phoneKey(ph.phone))) continue;\n    if (existing.length === 0 && rows.some(r => phoneKey(r.phone) === phoneKey(ph.phone) && nameKey(r.name).split(' ')[0] === firstName)) {\n      skipped.duplicate.push(`${p.name} | ${ph.phone}`); continue;\n    }\n    if (noPhoneRow) {\n      // Fill the existing name-only row instead of adding a new one\n      toUpdate.push({ op: 'update', rowNumber: noPhoneRow.row_number, name: noPhoneRow.name,\n                      oldPhone: '', phone: ph.phone, lastVisit: ph.firstDate });\n      noPhoneRow = null;\n    } else {\n      toAdd.push({ op: 'append', name: existing.length ? existing[0].name : p.name, phone: ph.phone,\n                   createdAt: ph.firstDate, lastVisit: p.lastDate,\n                   extraPhone: existing.length > 0 });\n    }\n    knownKeys.add(phoneKey(ph.phone));\n  }\n}\n\nconst report = {\n  op: 'report',\n  dryRun: DRY_RUN,\n  summary: `${DRY_RUN ? 'ПРОБА (нищо не е записано)' : 'ЗАПИСАНО'}: ` +\n    `събития ${events.length}, пациенти в календара ${fromCalendar.size}, ` +\n    `редове в таблицата ${rows.length}, нови пациенти ${toAdd.filter(p => !p.extraPhone).length}, ` +\n    `допълнителни телефони ${toAdd.filter(p => p.extraPhone).length}, попълнени празни телефони ${toUpdate.length}`,\n  toAdd: toAdd.filter(p => !p.extraPhone).map(p => `${p.name} | ${p.phone} | от ${p.createdAt}`),\n  extraPhones: toAdd.filter(p => p.extraPhone).map(p => `${p.name} | ${p.phone} | от ${p.createdAt}`),\n  toUpdate: toUpdate.map(p => `ред ${p.rowNumber}: ${p.name} | ${p.oldPhone || '(празно)'} -> ${p.phone}`),\n  skippedNoPhone: skipped.noPhone,\n  skippedNotAName: skipped.notAName,\n  skippedDuplicate: skipped.duplicate\n};\n\nif (DRY_RUN) return [{ json: report }];\nreturn [{ json: report }, ...toAdd.map(p => ({ json: p })), ...toUpdate.map(p => ({ json: p }))];\n"
       },
-      "id": "6ab52129-5356-4133-90c4-f728f94f3236",
+      "id": "2d176e6e-0803-4c85-8e32-0674a7a038d4",
       "name": "Plan Changes",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -113,7 +113,7 @@
           },
           "conditions": [
             {
-              "id": "c4e6aa3a-3343-4500-b657-92e0298e131c",
+              "id": "a90b9c20-b8d2-4ea2-86b7-4dcb583e628e",
               "leftValue": "={{ $json.op }}",
               "operator": {
                 "type": "string",
@@ -126,7 +126,7 @@
         },
         "options": {}
       },
-      "id": "38e1cb6f-fc9e-44e4-96bd-68935302f88f",
+      "id": "26c25f04-eaa7-4dd8-8bac-9f7e3d462518",
       "name": "Append?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
@@ -212,7 +212,7 @@
         },
         "options": {}
       },
-      "id": "003824b4-59d6-4929-8d43-f4f3a9ee79d5",
+      "id": "553987e9-06c6-4121-9a2a-8b3d8d86384f",
       "name": "Append Patients",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
@@ -238,7 +238,7 @@
           },
           "conditions": [
             {
-              "id": "fd71cc44-3208-4395-9ed2-9fb26142b202",
+              "id": "4e3f33a5-cbfe-43d9-a1ae-48f3fca4bdf3",
               "leftValue": "={{ $json.op }}",
               "operator": {
                 "type": "string",
@@ -251,7 +251,7 @@
         },
         "options": {}
       },
-      "id": "c3ffc3ca-77dd-4e7b-af38-856296332de0",
+      "id": "a9c4f92d-e44d-4e9e-8e66-35b98b7b7335",
       "name": "Update?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
@@ -349,7 +349,7 @@
         },
         "options": {}
       },
-      "id": "6bce0297-1c70-43a5-aadf-11dfcae3cf27",
+      "id": "98c387d2-7fdf-4fca-a853-43086e82899e",
       "name": "Update Phones",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
@@ -455,7 +455,7 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "active": true,
+  "active": false,
   "id": "gfKVfVgGYz6j3Bel",
   "tags": [
     {

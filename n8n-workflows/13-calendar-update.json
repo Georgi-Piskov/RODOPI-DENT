@@ -89,7 +89,7 @@
           },
           "conditions": [
             {
-              "id": "a7e751ae-96b5-490d-aba9-691980634e4b",
+              "id": "39662d5c-2610-4700-9893-27afc6608baa",
               "leftValue": "={{ $('Prepare Update Data').first().json.savePatient }}",
               "operator": {
                 "type": "boolean",
@@ -103,7 +103,7 @@
         },
         "options": {}
       },
-      "id": "519ce365-b6a5-490e-94d4-ba41ff9104f3",
+      "id": "d0620ef1-2a41-406f-b902-2b4e0244445a",
       "name": "Save Patient?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
@@ -132,7 +132,7 @@
           "timeout": 15000
         }
       },
-      "id": "30c0a1dd-1846-412f-b8fe-ed27e5c8ca4a",
+      "id": "796e16aa-207e-4e08-bf45-da4c8b2af3f1",
       "name": "Save Patient to Sheet",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
