@@ -1,0 +1,252 @@
+{
+  "name": "Rodopi Dent - Patients Delete",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "patients-delete",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "bd8016f7-b791-426b-a502-5d1e6e9c9689",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "8a19ba02-f4e6-4e56-a7d2-7d91d2d3be8e"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Patients"
+        },
+        "options": {}
+      },
+      "id": "e5498a38-82b1-45f4-9cb2-42767cb5a52c",
+      "name": "Read Patients",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "CNqF1lQxBCTbo24q",
+          "name": "RODOPI_DENT_SERVICE_ACCOUNT"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// --- Patient matching helpers (same logic in upsert + recovery) ---\n// Strip leading status icons (⏳ ✅ 🔔 ...) and stray punctuation from a name\nfunction cleanName(n) {\n  return String(n || '')\n    .replace(/^[^\\p{L}\\p{N}]+/u, '')\n    .replace(/\\s+/g, ' ')\n    .replace(/[\\s.,;:\\-]+$/, '')\n    .trim();\n}\nfunction nameKey(n) {\n  return cleanName(n).toLowerCase();\n}\n// Normalize to +359 international format (text-safe for Google Sheets)\nfunction toInternational(p) {\n  let phone = String(p || '').replace(/[\\s()\\-.\\/]/g, '');\n  if (!phone) return '';\n  if (phone.startsWith('00359')) phone = '+359' + phone.slice(5);\n  else if (phone.startsWith('359')) phone = '+' + phone;\n  else if (phone.startsWith('0') && phone.length >= 10) phone = '+359' + phone.slice(1);\n  else if (/^[89]\\d{8}$/.test(phone)) phone = '+359' + phone;\n  else if (!phone.startsWith('+') && phone.length >= 9) phone = '+359' + phone;\n  return phone;\n}\n// Core digits for comparison: +359887493315 / 0887493315 / 887493315 -> 887493315\nfunction phoneKey(p) {\n  return String(p || '').replace(/\\D/g, '').replace(/^00/, '').replace(/^359/, '').replace(/^0/, '');\n}\nfunction isBlockName(n) {\n  return /блокиран|почивка|отпуск|blocked/i.test(String(n || ''));\n}\n\n// Find the target row. The client sends the row number it saw plus the\n// original name/phone; rows can shift (other deletes), so the row number is\n// only trusted when that row still holds the same patient.\nfunction locate(rows, body) {\n  const wantName = nameKey(body.originalName);\n  const wantPhone = phoneKey(body.originalPhone);\n  const same = r => nameKey(r.name) === wantName && phoneKey(r.phone) === wantPhone;\n  const byNumber = rows.find(r => Number(r.row_number) === Number(body.rowNumber));\n  if (byNumber && same(byNumber)) return byNumber;\n  return rows.find(same) || null;\n}\nconst rows = $('Read Patients').all().map(i => i.json).filter(r => r && r.row_number);\nconst body = $('Webhook').first().json.body || {};\nconst target = locate(rows, body);\n\nif (!target) {\n  return [{ json: { ok: false, error: 'Пациентът не е намерен (може би вече е изтрит). Обновете списъка.' } }];\n}\nreturn [{ json: { ok: true, rowNumber: Number(target.row_number), name: target.name, phone: String(target.phone || '') } }];\n"
+      },
+      "id": "e3e8de7d-f28d-48ae-b87b-d5f90b4eede0",
+      "name": "Locate Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "2777a7eb-5c76-4fae-9379-048c48fa796e",
+              "leftValue": "={{ $json.ok }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a3b3a69b-46b8-4a37-87d9-4821b6b6ffd3",
+      "name": "Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "delete",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Patients"
+        },
+        "toDelete": "rows",
+        "startIndex": "={{ $json.rowNumber }}",
+        "numberToDelete": 1
+      },
+      "id": "4fa9bd31-2625-4ebe-b0c5-7204e985568a",
+      "name": "Delete Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        880,
+        -100
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "CNqF1lQxBCTbo24q",
+          "name": "RODOPI_DENT_SERVICE_ACCOUNT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, deleted: { name: $('Locate Row').first().json.name, phone: $('Locate Row').first().json.phone } }) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "a4146876-e444-415c-9f92-03b4cb2cc696",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: $json.error }) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "cf9a6370-e562-4083-90be-70cafa63fe54",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Read Patients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Patients": {
+      "main": [
+        [
+          {
+            "node": "Locate Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Locate Row": {
+      "main": [
+        [
+          {
+            "node": "Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Found?": {
+      "main": [
+        [
+          {
+            "node": "Delete Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Row": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "tags": []
+}

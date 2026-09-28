@@ -329,6 +329,40 @@ const API = {
   },
 
   /**
+   * Add a patient row (or a new phone for an existing patient)
+   * @param {Object} data - { name, phone }
+   */
+  async addPatient(data) {
+    return this.request(CONFIG.ENDPOINTS.PATIENTS_UPSERT, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  /**
+   * Update one Patients-sheet row. The server re-checks that the row still holds
+   * originalName/originalPhone before writing (rows shift after deletes).
+   * @param {Object} data - { rowNumber, originalName, originalPhone, name, phone }
+   */
+  async updatePatient(data) {
+    return this.request(CONFIG.ENDPOINTS.PATIENTS_UPDATE, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  /**
+   * Delete one Patients-sheet row (same row check as updatePatient)
+   * @param {Object} data - { rowNumber, originalName, originalPhone }
+   */
+  async deletePatient(data) {
+    return this.request(CONFIG.ENDPOINTS.PATIENTS_DELETE, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  /**
    * Send SMS to patient
    * @param {Object} smsData - { phone, message, template?, date?, time?, duration?, patientName? }
    * Templates: booking_received, booking_confirmed, booking_rejected, booking_conflict, booking_expired, reminder

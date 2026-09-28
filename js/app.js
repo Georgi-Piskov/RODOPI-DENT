@@ -1311,7 +1311,7 @@ const App = {
 
   /**
    * Render the Patients page: every patient from the Patients sheet,
-   * alphabetical, with all phones (newest first) and a live search.
+   * alphabetical, with all phones (newest first), live search, edit and delete.
    */
   async renderPatientsPage() {
     const main = document.getElementById('main-content');
@@ -1338,84 +1338,215 @@ const App = {
     this.setupLogout();
     this.setupAdminNav();
 
-    const listEl = document.getElementById('patients-list');
-    const countEl = document.getElementById('patients-count');
     const filterEl = document.getElementById('patients-filter');
+    let timer = null;
+    filterEl.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => this.renderPatientsList(), 150);
+    });
 
+    await this.loadPatients();
+  },
+
+  /**
+   * Fetch the Patients sheet and group rows by name (one card per patient)
+   */
+  async loadPatients() {
+    const countEl = document.getElementById('patients-count');
     const res = await API.getAllPatients();
     const payload = res?.data || {};
     if (!res.success || !Array.isArray(payload.patients)) {
-      countEl.textContent = '❌ Грешка при зареждане на пациентите. Опитайте отново.';
+      if (countEl) countEl.textContent = '❌ Грешка при зареждане на пациентите. Опитайте отново.';
       return;
     }
 
-    // Group rows by name: one card per patient, all phones newest first
     const byName = new Map();
     payload.patients.forEach(p => {
       const name = String(p.name || '').trim();
       if (!name) return;
       const key = name.toLowerCase().replace(/\s+/g, ' ');
-      if (!byName.has(key)) byName.set(key, { name, phones: [] });
-      if (p.phone) byName.get(key).phones.push({ phone: p.phone, createdAt: p.createdAt || '' });
+      if (!byName.has(key)) byName.set(key, { name, rows: [] });
+      byName.get(key).rows.push({ row: p.row, phone: p.phone || '', createdAt: p.createdAt || '' });
     });
-    const patients = [...byName.values()]
-      .map(p => ({ ...p, phones: p.phones.sort((a, b) => b.createdAt.localeCompare(a.createdAt)) }))
+    this.patients = [...byName.values()]
+      .map(p => ({ ...p, rows: p.rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt)) }))
       .sort((a, b) => a.name.localeCompare(b.name, 'bg', { sensitivity: 'base' }));
 
-    const digits = v => String(v || '').replace(/\D/g, '');
-    const phoneKey = v => digits(v).replace(/^359/, '').replace(/^0/, '');
+    this.renderPatientsList();
+  },
 
-    const render = () => {
-      const q = filterEl.value.trim().toLowerCase();
-      const qDigits = phoneKey(q);
-      const shown = !q ? patients : patients.filter(p =>
-        p.name.toLowerCase().includes(q) ||
-        (qDigits.length >= 3 && p.phones.some(ph => phoneKey(ph.phone).includes(qDigits)))
-      );
+  /**
+   * Render the (filtered) patient cards
+   */
+  renderPatientsList() {
+    const listEl = document.getElementById('patients-list');
+    const countEl = document.getElementById('patients-count');
+    const filterEl = document.getElementById('patients-filter');
+    if (!listEl || !this.patients) return;
 
-      countEl.textContent = q
-        ? `Намерени: ${shown.length} от ${patients.length}`
-        : `Общо пациенти: ${patients.length}`;
+    const esc = Utils.escapeHtml;
+    const phoneKey = v => String(v || '').replace(/\D/g, '').replace(/^359/, '').replace(/^0/, '');
+    const q = filterEl.value.trim().toLowerCase();
+    const qDigits = phoneKey(q);
+    const shown = !q ? this.patients : this.patients.filter(p =>
+      p.name.toLowerCase().includes(q) ||
+      (qDigits.length >= 3 && p.rows.some(r => phoneKey(r.phone).includes(qDigits)))
+    );
 
-      if (!shown.length) {
-        listEl.innerHTML = '<p class="patients-page__empty">Няма намерени пациенти.</p>';
-        return;
-      }
+    countEl.textContent = q
+      ? `Намерени: ${shown.length} от ${this.patients.length}`
+      : `Общо пациенти: ${this.patients.length}`;
 
-      listEl.innerHTML = shown.map((p, i) => `
-        <div class="patients-page__item">
-          <div class="patients-page__name">${Utils.escapeHtml(p.name)}</div>
+    if (!shown.length) {
+      listEl.innerHTML = '<p class="patients-page__empty">Няма намерени пациенти.</p>';
+      return;
+    }
+
+    listEl.innerHTML = shown.map((p, i) => {
+      const phones = p.rows.filter(r => r.phone);
+      return `
+        <div class="patients-page__item" data-index="${i}">
+          <div class="patients-page__name">${esc(p.name)}</div>
           <div class="patients-page__phones">
-            ${p.phones.length ? p.phones.map(ph => `
+            ${phones.length ? phones.map(r => `
               <div class="patients-page__phone-row">
-                <a class="patients-page__phone" href="tel:${Utils.escapeHtml(ph.phone)}">📞 ${Utils.escapeHtml(ph.phone)}</a>
-                ${ph.createdAt ? `<span class="patients-page__date">от ${Utils.escapeHtml(Utils.formatPatientDate(ph.createdAt))}</span>` : ''}
+                <a class="patients-page__phone" href="tel:${esc(r.phone)}">📞 ${esc(r.phone)}</a>
+                ${r.createdAt ? `<span class="patients-page__date">от ${esc(Utils.formatPatientDate(r.createdAt))}</span>` : ''}
               </div>
             `).join('') : '<span class="patients-page__date">няма телефон</span>'}
           </div>
-          <button type="button" class="patients-page__visits-btn" data-index="${i}">📅 Часове</button>
+          <div class="patients-page__actions">
+            <button type="button" class="patients-page__btn" data-action="visits">📅 Часове</button>
+            <button type="button" class="patients-page__btn" data-action="edit">✏️ Редактирай</button>
+            <button type="button" class="patients-page__btn patients-page__btn--danger" data-action="delete">🗑️ Изтрий</button>
+          </div>
           <div class="patients-page__visits" hidden></div>
         </div>
-      `).join('');
+      `;
+    }).join('');
 
-      listEl.querySelectorAll('.patients-page__visits-btn').forEach(btn => {
-        btn.addEventListener('click', () => this.togglePatientVisits(btn, shown[Number(btn.dataset.index)].name));
+    listEl.querySelectorAll('.patients-page__btn').forEach(btn => {
+      const card = btn.closest('.patients-page__item');
+      const patient = shown[Number(card.dataset.index)];
+      btn.addEventListener('click', () => {
+        if (btn.dataset.action === 'visits') this.togglePatientVisits(btn, patient.name);
+        if (btn.dataset.action === 'edit') this.openPatientEditor(card, patient);
+        if (btn.dataset.action === 'delete') this.deletePatientCard(patient);
       });
+    });
+  },
+
+  /**
+   * Turn a patient card into an edit form: name, every phone (removable), add phone
+   */
+  openPatientEditor(card, patient) {
+    const esc = Utils.escapeHtml;
+    const phoneRow = (r) => `
+      <div class="patients-edit__phone" data-row="${r ? r.row : ''}">
+        <input type="tel" class="patients-edit__input" value="${r ? esc(r.phone) : ''}" placeholder="0888 123 456">
+        <button type="button" class="patients-page__btn patients-page__btn--danger" data-remove title="Премахни телефона">✕</button>
+      </div>`;
+
+    card.innerHTML = `
+      <div class="patients-edit">
+        <label class="patients-edit__label">Име</label>
+        <input type="text" class="patients-edit__input" id="patients-edit-name" value="${esc(patient.name)}">
+        <label class="patients-edit__label">Телефони</label>
+        <div id="patients-edit-phones">${patient.rows.map(phoneRow).join('')}</div>
+        <button type="button" class="patients-page__btn" id="patients-edit-add">➕ Добави телефон</button>
+        <div class="patients-edit__buttons">
+          <button type="button" class="btn btn--primary" id="patients-edit-save">Запази</button>
+          <button type="button" class="btn btn--outline" id="patients-edit-cancel">Отказ</button>
+        </div>
+      </div>
+    `;
+
+    const phonesEl = card.querySelector('#patients-edit-phones');
+    const bindRemove = (el) => el.querySelector('[data-remove]').addEventListener('click', () => {
+      // Existing rows are only marked; they are deleted on save
+      if (el.dataset.row) { el.hidden = true; el.dataset.removed = '1'; } else { el.remove(); }
+    });
+    phonesEl.querySelectorAll('.patients-edit__phone').forEach(bindRemove);
+
+    card.querySelector('#patients-edit-add').addEventListener('click', () => {
+      phonesEl.insertAdjacentHTML('beforeend', phoneRow(null));
+      bindRemove(phonesEl.lastElementChild);
+      phonesEl.lastElementChild.querySelector('input').focus();
+    });
+    card.querySelector('#patients-edit-cancel').addEventListener('click', () => this.renderPatientsList());
+    card.querySelector('#patients-edit-save').addEventListener('click', (e) => this.savePatientEdits(card, patient, e.target));
+  },
+
+  /**
+   * Apply the edit form: update changed rows, delete removed ones, add new phones
+   */
+  async savePatientEdits(card, patient, saveBtn) {
+    const newName = card.querySelector('#patients-edit-name').value.trim();
+    if (!newName) { Utils.showToast('Името не може да е празно', 'warning'); return; }
+
+    const updates = [];
+    const deletes = [];
+    const adds = [];
+    card.querySelectorAll('.patients-edit__phone').forEach(el => {
+      const phone = el.querySelector('input').value.trim();
+      const original = patient.rows.find(r => String(r.row) === el.dataset.row);
+      if (!original) {
+        if (phone) adds.push(phone);
+      } else if (el.dataset.removed) {
+        deletes.push(original);
+      } else if (newName !== patient.name || phone !== original.phone) {
+        updates.push({ original, phone });
+      }
+    });
+
+    if (!updates.length && !deletes.length && !adds.length) { this.renderPatientsList(); return; }
+    if (deletes.length && !confirm(`Да се изтрият ли ${deletes.length} телефон(а) на ${patient.name}?`)) return;
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Запазване...';
+    const errors = [];
+    const check = (res) => {
+      if (!res.success || res.data?.success === false) errors.push(res.data?.error || res.message || 'Грешка');
     };
 
-    let timer = null;
-    filterEl.addEventListener('input', () => {
-      clearTimeout(timer);
-      timer = setTimeout(render, 150);
-    });
-    render();
+    for (const u of updates) {
+      check(await API.updatePatient({
+        rowNumber: u.original.row, originalName: patient.name, originalPhone: u.original.phone,
+        name: newName, phone: u.phone
+      }));
+    }
+    // Bottom-up so earlier row numbers stay valid (the server re-checks anyway)
+    for (const d of deletes.sort((a, b) => b.row - a.row)) {
+      check(await API.deletePatient({ rowNumber: d.row, originalName: patient.name, originalPhone: d.phone }));
+    }
+    for (const phone of adds) check(await API.addPatient({ name: newName, phone }));
+
+    if (errors.length) Utils.showToast(errors[0], 'error');
+    else Utils.showToast('Пациентът е обновен', 'success');
+    await this.loadPatients();
+  },
+
+  /**
+   * Delete a patient with all their phones (after confirmation)
+   */
+  async deletePatientCard(patient) {
+    const phones = patient.rows.map(r => r.phone).filter(Boolean).join(', ');
+    if (!confirm(`Изтриване на пациент:\n\n${patient.name}\n${phones}\n\nСигурни ли сте?`)) return;
+
+    let failed = 0;
+    for (const r of [...patient.rows].sort((a, b) => b.row - a.row)) {
+      const res = await API.deletePatient({ rowNumber: r.row, originalName: patient.name, originalPhone: r.phone });
+      if (!res.success || res.data?.success === false) failed++;
+    }
+    Utils.showToast(failed ? 'Част от записите не бяха изтрити. Опитайте отново.' : 'Пациентът е изтрит', failed ? 'error' : 'success');
+    await this.loadPatients();
   },
 
   /**
    * Show/hide a patient's appointments (past + upcoming) under their card
    */
   async togglePatientVisits(btn, name) {
-    const box = btn.nextElementSibling;
+    const box = btn.closest('.patients-page__item').querySelector('.patients-page__visits');
     if (!box.hidden) { box.hidden = true; return; }
     box.hidden = false;
     box.innerHTML = '<p class="patients-page__date">⏳ Зареждане...</p>';

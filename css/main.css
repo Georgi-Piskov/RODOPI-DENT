@@ -5804,15 +5804,57 @@ button {
   font-size: 0.8rem;
   color: var(--color-gray-500);
 }
-.patients-page__visits-btn {
+.patients-page__actions {
   grid-column: 2;
   grid-row: 1 / span 2;
-  padding: var(--spacing-2) var(--spacing-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+.patients-page__btn {
+  padding: var(--spacing-1) var(--spacing-3);
   border: 1px solid var(--color-gray-200);
   border-radius: var(--radius-md);
   background: var(--color-gray-100);
   cursor: pointer;
   font-size: 0.85rem;
+  white-space: nowrap;
+  text-align: left;
+}
+.patients-page__btn--danger {
+  color: #b91c1c;
+}
+.patients-edit {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+.patients-edit__label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-gray-600);
+}
+.patients-edit__input {
+  width: 100%;
+  padding: var(--spacing-2);
+  font-size: 1rem;
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+  box-sizing: border-box;
+}
+.patients-edit__phone {
+  display: flex;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-2);
+}
+.patients-edit__phone[hidden] {
+  display: none;
+}
+.patients-edit__buttons {
+  display: flex;
+  gap: var(--spacing-2);
+  margin-top: var(--spacing-2);
 }
 .patients-page__visits {
   grid-column: 1 / -1;
