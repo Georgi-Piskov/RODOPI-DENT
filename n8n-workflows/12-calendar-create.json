@@ -22,7 +22,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parse and validate input\nconst body = $input.first().json.body;\n\n// Support both patientName and title for blocking\nconst eventTitle = body.title || body.patientName;\n\n// Required fields\nif (!eventTitle) {\n  throw new Error('Име на пациент или заглавие е задължително');\n}\nif (!body.date) {\n  throw new Error('Дата е задължителна');\n}\nif (!body.startTime) {\n  throw new Error('Начален час е задължителен');\n}\n\n// Calculate end time based on duration or endTime\nlet endTime;\nif (body.endTime) {\n  endTime = body.endTime;\n} else {\n  const duration = body.duration || 30;\n  const startDate = new Date(`${body.date}T${body.startTime}:00`);\n  const endDate = new Date(startDate.getTime() + duration * 60 * 1000);\n  endTime = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;\n}\n\n// Appointment status handling\nconst statusVal = body.status || 'confirmed';\nconst statusLabels = { 'pending': 'Чакащ', 'confirmed': 'Потвърден', 'completed': 'Завършен' };\nconst statusLabel = statusLabels[statusVal] || 'Потвърден';\n\n// Reminder flag (admin-controlled). Default: off.\nconst sendReminder = body.sendReminder === true || body.sendReminder === 'true';\n\n// Build summary - add ⏳ prefix for pending\nlet summary = eventTitle;\nif (statusVal === 'pending') {\n  summary = '⏳ ' + eventTitle;\n}\n\n// Build description with structured data\nlet description = '';\nif (body.patientPhone) {\n  description += `📞 Тел: ${body.patientPhone}\\n`;\n}\nif (body.patientEmail) {\n  description += `✉️ Имейл: ${body.patientEmail}\\n`;\n}\nif (body.procedure) {\n  description += `🦷 Процедура: ${body.procedure}\\n`;\n}\ndescription += `📋 Статус: ${statusLabel}\\n`;\ndescription += `🔔 Напомняне: ${sendReminder ? 'ДА' : 'НЕ'}\\n`;\nif (body.notes) {\n  description += `📝 Бележки: ${body.notes}\\n`;\n}\n\n// Map color names to Google Calendar colorId (1-11)\nconst colorMap = {\n  'green': '10', 'blue': '9', 'red': '11', 'yellow': '5',\n  'purple': '3', 'orange': '6', 'pink': '4', 'gray': '8'\n};\nconst statusColorDefaults = { 'pending': 'yellow', 'completed': 'gray', 'confirmed': 'green' };\nconst effectiveColor = body.colorId || statusColorDefaults[statusVal] || 'green';\nconst googleColorId = colorMap[effectiveColor] || colorMap['green'];\n\nreturn [{\n  json: {\n    summary: summary,\n    description: description.trim(),\n    startDateTime: `${body.date}T${body.startTime}:00`,\n    endDateTime: `${body.date}T${endTime}:00`,\n    date: body.date,\n    duration: body.duration || 30,\n    patientName: body.patientName || eventTitle,\n    patientPhone: body.patientPhone || '',\n    procedure: body.procedure || '',\n    status: statusVal,\n    sendReminder: sendReminder,\n    colorId: googleColorId\n  }\n}];"
+        "jsCode": "// Parse and validate input\nconst body = $input.first().json.body;\n\n// Support both patientName and title for blocking\nconst eventTitle = body.title || body.patientName;\n\n// Required fields\nif (!eventTitle) {\n  throw new Error('Име на пациент или заглавие е задължително');\n}\nif (!body.date) {\n  throw new Error('Дата е задължителна');\n}\nif (!body.startTime) {\n  throw new Error('Начален час е задължителен');\n}\n\n// Calculate end time based on duration or endTime\nlet endTime;\nif (body.endTime) {\n  endTime = body.endTime;\n} else {\n  const duration = body.duration || 30;\n  const startDate = new Date(`${body.date}T${body.startTime}:00`);\n  const endDate = new Date(startDate.getTime() + duration * 60 * 1000);\n  endTime = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;\n}\n\n// Appointment status handling\nconst statusVal = body.status || 'confirmed';\nconst statusLabels = { 'pending': 'Чакащ', 'confirmed': 'Потвърден', 'completed': 'Завършен' };\nconst statusLabel = statusLabels[statusVal] || 'Потвърден';\n\n// Reminder flag (admin-controlled). Default: off.\nconst sendReminder = body.sendReminder === true || body.sendReminder === 'true';\n\n// Build summary - add ⏳ prefix for pending\nlet summary = eventTitle;\nif (statusVal === 'pending') {\n  summary = '⏳ ' + eventTitle;\n}\n\n// Build description with structured data\nlet description = '';\nif (body.patientPhone) {\n  description += `📞 Тел: ${body.patientPhone}\\n`;\n}\nif (body.patientEmail) {\n  description += `✉️ Имейл: ${body.patientEmail}\\n`;\n}\nif (body.procedure) {\n  description += `🦷 Процедура: ${body.procedure}\\n`;\n}\ndescription += `📋 Статус: ${statusLabel}\\n`;\ndescription += `🔔 Напомняне: ${sendReminder ? 'ДА' : 'НЕ'}\\n`;\nif (body.notes) {\n  description += `📝 Бележки: ${body.notes}\\n`;\n}\n\n// Map color names to Google Calendar colorId (1-11)\nconst colorMap = {\n  'green': '10', 'blue': '9', 'red': '11', 'yellow': '5',\n  'purple': '3', 'orange': '6', 'pink': '4', 'gray': '8'\n};\nconst statusColorDefaults = { 'pending': 'yellow', 'completed': 'gray', 'confirmed': 'green' };\nconst effectiveColor = body.colorId || statusColorDefaults[statusVal] || 'green';\nconst googleColorId = colorMap[effectiveColor] || colorMap['green'];\n\nreturn [{\n  json: {\n    summary: summary,\n    description: description.trim(),\n    startDateTime: `${body.date}T${body.startTime}:00`,\n    endDateTime: `${body.date}T${endTime}:00`,\n    date: body.date,\n    duration: body.duration || 30,\n    patientName: body.patientName || eventTitle,\n    patientPhone: body.patientPhone || '',\n    patientEmail: body.patientEmail || '',\n    // Block events (title set, e.g. 'Блокиран') are not patients\n    savePatient: !body.title && !!body.patientName && !/блокиран/i.test(body.patientName),\n    procedure: body.procedure || '',\n    status: statusVal,\n    sendReminder: sendReminder,\n    colorId: googleColorId\n  }\n}];"
       },
       "id": "prepare",
       "name": "Prepare Event Data",
@@ -80,23 +80,33 @@
     },
     {
       "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ success: true, message: 'Събитието е създадено успешно', event: $json }) }}",
-        "options": {
-          "responseHeaders": {
-            "entries": [
-              {
-                "name": "Access-Control-Allow-Origin",
-                "value": "*"
-              }
-            ]
-          }
-        }
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "d1ad381e-0efa-48ed-b376-d8e9ad241d09",
+              "leftValue": "={{ $('Prepare Event Data').first().json.savePatient }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       },
-      "id": "respond-success",
-      "name": "Respond Success",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
+      "id": "3d4309cd-a2b7-4e95-8b46-0c82048293f1",
+      "name": "Save Patient?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
       "position": [
         880,
         0
@@ -117,18 +127,44 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"name\": \"{{ $('Prepare Event Data').first().json.patientName }}\",\n  \"phone\": \"{{ $('Prepare Event Data').first().json.patientPhone }}\"\n}",
-        "options": {}
+        "jsonBody": "={{ JSON.stringify({ name: $('Prepare Event Data').first().json.patientName, phone: $('Prepare Event Data').first().json.patientPhone || '', email: $('Prepare Event Data').first().json.patientEmail || '' }) }}",
+        "options": {
+          "timeout": 8000
+        }
       },
-      "id": "save-patient",
+      "id": "cee667e9-f0e3-4d73-a291-515802f168a3",
       "name": "Save Patient to Sheet",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        660,
-        150
+        1100,
+        -100
       ],
-      "continueOnFail": true
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'Събитието е създадено успешно', event: $('Format Response').first().json, patientSaved: $json.success === true ? true : ($json.action || $json.error ? false : null), patientAction: $json.action || null }) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        0
+      ]
     }
   ],
   "connections": {
@@ -161,16 +197,40 @@
             "node": "Format Response",
             "type": "main",
             "index": 0
-          },
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
           {
-            "node": "Save Patient to Sheet",
+            "node": "Save Patient?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Format Response": {
+    "Save Patient?": {
+      "main": [
+        [
+          {
+            "node": "Save Patient to Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Patient to Sheet": {
       "main": [
         [
           {

@@ -191,3 +191,30 @@ GET /webhook/appointments-webhook?date=2026-01-27
 3. **SMS изпращането** ще работи само след настройка на Twilio credentials
 
 4. **Backup workflow** изисква папка в Google Drive - трябва да въведеш Folder ID
+
+---
+
+## Patients sheet: upsert + recovery (fix, 2026-09)
+
+**Problem:** `22-patients-upsert` used IF nodes in the old v1 condition format on IF v2,
+which n8n evaluates as an empty filter (always true). Every request went to
+"Respond Invalid", so nothing was written to `Patients` after the one-off backfill
+(all rows have `createdAt = 2026-02-18`). In addition, existing patients were never
+updated, `13-calendar-update` did not sync patients at all, and request bodies were
+built by string interpolation (quotes in a name broke the JSON).
+
+**Fixed workflows** (re-import all of them, then select the Google Sheets / Calendar credentials):
+
+| File | Change |
+|------|--------|
+| `22-patients-upsert.json` | Real upsert: same name + phone → skip; same name with new/missing phone → update row; same phone + other name → new row (family); name-only rows allowed |
+| `12-calendar-create.json` | Saves patient before responding (blocks skipped), safe JSON body, returns `patientSaved` |
+| `13-calendar-update.json` | Now also saves the patient (phone from form or event description) |
+| `16-public-booking.json` | Safe JSON body; a Patients-sheet error never blocks the booking |
+| `23-patients-backfill.json` | Recovery from Google Calendar with a dry run (see below) |
+
+**Recovery (`23-patients-backfill.json`):**
+1. Duplicate the `Patients` tab in Google Sheets as a backup.
+2. Import the workflow, set credentials, click *Execute workflow*.
+   `DRY_RUN = true` (top of the "Plan Changes" node) only shows a report: who will be added and whose phone will change.
+3. Review the report, set `DRY_RUN = false`, execute again.

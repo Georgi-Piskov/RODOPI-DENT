@@ -434,8 +434,10 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"name\": \"{{ $('Check Conflict').first().json.patientName }}\",\n  \"phone\": \"{{ $('Check Conflict').first().json.patientPhone }}\",\n  \"email\": \"{{ $('Check Conflict').first().json.patientEmail }}\",\n  \"notify\": {{ JSON.stringify($('Check Conflict').first().json.notify) }}\n}",
-        "options": {}
+        "jsonBody": "={{ JSON.stringify({ name: $('Check Conflict').first().json.patientName, phone: $('Check Conflict').first().json.patientPhone, email: $('Check Conflict').first().json.patientEmail || '', notify: $('Check Conflict').first().json.notify || [] }) }}",
+        "options": {
+          "timeout": 15000
+        }
       },
       "id": "ff086029-d360-423c-8efb-dfa145d9a1ea",
       "name": "Save Patient to Sheet",
@@ -445,7 +447,8 @@
         -1648,
         1152
       ],
-      "continueOnFail": true
+      "continueOnFail": true,
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {

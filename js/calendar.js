@@ -3068,6 +3068,10 @@ const Calendar = {
       
       if (response.success) {
         Utils.showToast(eventId ? 'Часът е обновен' : 'Часът е добавен', 'success');
+        // The appointment is saved, but the Patients sheet sync failed
+        if (response.data?.patientSaved === false) {
+          setTimeout(() => Utils.showToast('Внимание: пациентът не е записан в базата с пациенти', 'warning'), 1500);
+        }
         this.closeEventModal();
         await this.loadEvents();
         this.renderView();

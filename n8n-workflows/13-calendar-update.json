@@ -22,7 +22,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parse and validate input\nconst body = $input.first().json.body;\n\n// Required: event ID\nif (!body.eventId && !body.id && !body.googleEventId) {\n  throw new Error('ID на събитието е задължително');\n}\n\nconst eventId = body.eventId || body.id || body.googleEventId;\n\n// Map color names to Google Calendar colorId (1-11)\nconst colorMap = {\n  'green': '10', 'blue': '9', 'red': '11', 'yellow': '5',\n  'purple': '3', 'orange': '6', 'pink': '4', 'gray': '8'\n};\n\nconst statusLabels = { 'pending': 'Чакащ', 'confirmed': 'Потвърден', 'completed': 'Завършен' };\nconst statusVal = body.status || 'confirmed';\nconst statusLabel = statusLabels[statusVal] || 'Потвърден';\n\n// Reminder flag (if provided)\nconst hasReminderField = (body.sendReminder !== undefined && body.sendReminder !== null);\nconst sendReminder = body.sendReminder === true || body.sendReminder === 'true';\n\n// Build update fields\nconst updateFields = {};\n\nif (body.date && body.startTime) {\n  const duration = body.duration || 30;\n  const startDate = new Date(`${body.date}T${body.startTime}:00`);\n  const endDate = new Date(startDate.getTime() + duration * 60 * 1000);\n  const endTime = body.endTime || `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;\n  \n  updateFields.startDateTime = `${body.date}T${body.startTime}:00`;\n  updateFields.endDateTime = `${body.date}T${endTime}:00`;\n}\n\nif (body.patientName) {\n  let name = body.patientName.replace(/^⏳\\s*/, '');\n  updateFields.summary = statusVal === 'pending' ? '⏳ ' + name : name;\n}\n\n// Build description with status line AND reminder tag\nlet description;\nif (body.description) {\n  // Caller provided full description — clean known tags then re-append\n  description = body.description\n    .replace(/📋\\s*Статус:.*\\n?/gi, '')\n    .replace(/🔔\\s*Напомняне:.*\\n?/gi, '')\n    .trim();\n  description += '\\n📋 Статус: ' + statusLabel;\n  if (hasReminderField) {\n    description += '\\n🔔 Напомняне: ' + (sendReminder ? 'ДА' : 'НЕ');\n  }\n} else {\n  // Build description from individual fields\n  description = '';\n  if (body.patientPhone) description += `📞 Тел: ${body.patientPhone}\\n`;\n  if (body.patientEmail) description += `✉️ Имейл: ${body.patientEmail}\\n`;\n  if (body.procedure) description += `🦷 Процедура: ${body.procedure}\\n`;\n  description += `📋 Статус: ${statusLabel}\\n`;\n  if (hasReminderField) {\n    description += `🔔 Напомняне: ${sendReminder ? 'ДА' : 'НЕ'}\\n`;\n  }\n  if (body.notes) description += `📝 Бележки: ${body.notes}\\n`;\n}\nupdateFields.description = description.trim();\n\nconst statusColorDefaults = { 'pending': 'yellow', 'completed': 'gray', 'confirmed': 'green' };\nconst effectiveColor = body.colorId || statusColorDefaults[statusVal] || 'green';\nupdateFields.colorId = colorMap[effectiveColor] || colorMap['green'];\n\nreturn [{\n  json: {\n    eventId: eventId,\n    updateFields: updateFields,\n    status: statusVal,\n    sendReminder: sendReminder,\n    originalData: body\n  }\n}];"
+        "jsCode": "// Parse and validate input\nconst body = $input.first().json.body;\n\n// Required: event ID\nif (!body.eventId && !body.id && !body.googleEventId) {\n  throw new Error('ID на събитието е задължително');\n}\n\nconst eventId = body.eventId || body.id || body.googleEventId;\n\n// Map color names to Google Calendar colorId (1-11)\nconst colorMap = {\n  'green': '10', 'blue': '9', 'red': '11', 'yellow': '5',\n  'purple': '3', 'orange': '6', 'pink': '4', 'gray': '8'\n};\n\nconst statusLabels = { 'pending': 'Чакащ', 'confirmed': 'Потвърден', 'completed': 'Завършен' };\nconst statusVal = body.status || 'confirmed';\nconst statusLabel = statusLabels[statusVal] || 'Потвърден';\n\n// Reminder flag (if provided)\nconst hasReminderField = (body.sendReminder !== undefined && body.sendReminder !== null);\nconst sendReminder = body.sendReminder === true || body.sendReminder === 'true';\n\n// Build update fields\nconst updateFields = {};\n\nif (body.date && body.startTime) {\n  const duration = body.duration || 30;\n  const startDate = new Date(`${body.date}T${body.startTime}:00`);\n  const endDate = new Date(startDate.getTime() + duration * 60 * 1000);\n  const endTime = body.endTime || `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;\n  \n  updateFields.startDateTime = `${body.date}T${body.startTime}:00`;\n  updateFields.endDateTime = `${body.date}T${endTime}:00`;\n}\n\nif (body.patientName) {\n  let name = body.patientName.replace(/^⏳\\s*/, '');\n  updateFields.summary = statusVal === 'pending' ? '⏳ ' + name : name;\n}\n\n// Build description with status line AND reminder tag\nlet description;\nif (body.description) {\n  // Caller provided full description — clean known tags then re-append\n  description = body.description\n    .replace(/📋\\s*Статус:.*\\n?/gi, '')\n    .replace(/🔔\\s*Напомняне:.*\\n?/gi, '')\n    .trim();\n  description += '\\n📋 Статус: ' + statusLabel;\n  if (hasReminderField) {\n    description += '\\n🔔 Напомняне: ' + (sendReminder ? 'ДА' : 'НЕ');\n  }\n} else {\n  // Build description from individual fields\n  description = '';\n  if (body.patientPhone) description += `📞 Тел: ${body.patientPhone}\\n`;\n  if (body.patientEmail) description += `✉️ Имейл: ${body.patientEmail}\\n`;\n  if (body.procedure) description += `🦷 Процедура: ${body.procedure}\\n`;\n  description += `📋 Статус: ${statusLabel}\\n`;\n  if (hasReminderField) {\n    description += `🔔 Напомняне: ${sendReminder ? 'ДА' : 'НЕ'}\\n`;\n  }\n  if (body.notes) description += `📝 Бележки: ${body.notes}\\n`;\n}\nupdateFields.description = description.trim();\n\nconst statusColorDefaults = { 'pending': 'yellow', 'completed': 'gray', 'confirmed': 'green' };\nconst effectiveColor = body.colorId || statusColorDefaults[statusVal] || 'green';\nupdateFields.colorId = colorMap[effectiveColor] || colorMap['green'];\n\n// Patient data for the Patients sheet (name without status icons, phone from\n// the form or, for confirm/callback updates, from the event description)\nconst patientName = String(body.patientName || '').replace(/^[^\\p{L}\\p{N}]+/u, '').trim();\nlet patientPhone = String(body.patientPhone || '').trim();\nif (!patientPhone && body.description) {\n  const m = String(body.description).match(/📞\\s*Тел[.:]?\\s*([+\\d\\s()\\-]{7,})/);\n  if (m) patientPhone = m[1].replace(/[\\s()\\-]/g, '');\n}\nconst patientEmail = String(body.patientEmail || '').trim();\nconst savePatient = !!patientName && !/блокиран/i.test(patientName);\n\nreturn [{\n  json: {\n    eventId: eventId,\n    updateFields: updateFields,\n    status: statusVal,\n    sendReminder: sendReminder,\n    patientName: patientName,\n    patientPhone: patientPhone,\n    patientEmail: patientEmail,\n    savePatient: savePatient,\n    originalData: body\n  }\n}];"
       },
       "id": "prepare",
       "name": "Prepare Update Data",
@@ -80,8 +80,72 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "93945d22-1219-4008-96b9-5bd23a706997",
+              "leftValue": "={{ $('Prepare Update Data').first().json.savePatient }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9675497b-472a-4ad4-ab9d-ed7d9bb3238e",
+      "name": "Save Patient?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.simeontsvetanovn8nworkflows.site/webhook/patients-upsert",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ name: $('Prepare Update Data').first().json.patientName, phone: $('Prepare Update Data').first().json.patientPhone || '', email: $('Prepare Update Data').first().json.patientEmail || '' }) }}",
+        "options": {
+          "timeout": 8000
+        }
+      },
+      "id": "76e57614-fba3-4abf-aad2-8c74bdeb4fd0",
+      "name": "Save Patient to Sheet",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        -100
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ success: true, message: 'Събитието е обновено успешно', event: $json }) }}",
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'Събитието е обновено успешно', event: $('Format Response').first().json, patientSaved: $json.success === true ? true : ($json.action || $json.error ? false : null), patientAction: $json.action || null }) }}",
         "options": {
           "responseHeaders": {
             "entries": [
@@ -98,7 +162,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        880,
+        1320,
         0
       ]
     }
@@ -138,6 +202,35 @@
       ]
     },
     "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Save Patient?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Patient?": {
+      "main": [
+        [
+          {
+            "node": "Save Patient to Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Patient to Sheet": {
       "main": [
         [
           {

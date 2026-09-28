@@ -1,23 +1,29 @@
 {
-  "name": "Rodopi Dent - Patients Backfill from Calendar",
+  "name": "Rodopi Dent - Patients Recovery from Calendar",
   "nodes": [
     {
       "parameters": {},
-      "id": "manual-trigger",
+      "id": "084747bb-1eb6-4228-8c06-75eae5e0ac46",
       "name": "Manual Trigger",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Date range: 1 year back to 3 months forward (to catch future appointments)\nconst now = new Date();\nconst oneYearAgo = new Date();\noneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);\nconst threeMonthsAhead = new Date();\nthreeMonthsAhead.setMonth(threeMonthsAhead.getMonth() + 3);\n\nreturn [{\n  json: {\n    startDate: oneYearAgo.toISOString().split('T')[0] + 'T00:00:00+02:00',\n    endDate: threeMonthsAhead.toISOString().split('T')[0] + 'T23:59:59+02:00'\n  }\n}];"
+        "jsCode": "// 3 years back -> 6 months ahead\nconst from = new Date(); from.setFullYear(from.getFullYear() - 3);\nconst to = new Date(); to.setMonth(to.getMonth() + 6);\nreturn [{ json: { startDate: from.toISOString(), endDate: to.toISOString() } }];"
       },
-      "id": "set-date-range",
+      "id": "56be3b4e-933b-4534-98fe-8852a084fd59",
       "name": "Set Date Range",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
@@ -29,37 +35,30 @@
         },
         "returnAll": true,
         "options": {
-          "timeMax": "={{ $json.endDate }}",
           "timeMin": "={{ $json.startDate }}",
+          "timeMax": "={{ $json.endDate }}",
           "singleEvents": true,
           "orderBy": "startTime"
         }
       },
-      "id": "get-calendar-events",
+      "id": "2da70322-615a-47d5-b398-8e2e0fade400",
       "name": "Get All Calendar Events",
       "type": "n8n-nodes-base.googleCalendar",
       "typeVersion": 1.2,
-      "position": [440, 0],
+      "position": [
+        440,
+        0
+      ],
       "credentials": {
         "googleCalendarOAuth2Api": {
           "id": "",
           "name": "Google Calendar"
         }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "// Extract patient name + phone from all calendar events\nconst events = $input.all();\nconst patients = new Map(); // phoneKey -> { name, phone }\n\n// Normalize phone to +359 international format\nfunction toInternational(p) {\n  let phone = String(p || '').replace(/[\\s()\\-.]/g, '');\n  if (phone.startsWith('00359')) phone = '+359' + phone.slice(5);\n  else if (phone.startsWith('0') && phone.length >= 10) phone = '+359' + phone.slice(1);\n  else if (/^[89]\\d{8}$/.test(phone)) phone = '+359' + phone;\n  else if (!phone.startsWith('+') && phone.length >= 9) phone = '+359' + phone;\n  return phone;\n}\n\n// Extract core 9-digit number for deduplication\nfunction phoneKey(p) {\n  return String(p || '').replace(/[\\s()\\-.+]/g, '').replace(/^359/, '').replace(/^0/, '');\n}\n\nfor (const item of events) {\n  const event = item.json;\n  const summary = (event.summary || '').trim();\n  // Strip any HTML tags from description\n  const description = (event.description || '').replace(/<[^>]*>/g, ' ');\n  \n  // Skip all-day events, events without title\n  if (!summary || event.start?.date) continue;\n  \n  // Skip blocked/system events\n  const lower = summary.toLowerCase();\n  if (lower.includes('блокиран') || lower.includes('почивка') || lower.includes('blocked') || lower.includes('block')) continue;\n  \n  // Extract phone from description - multiple patterns from most to least specific\n  let phone = '';\n  const phonePatterns = [\n    /(?:📞\\s*)?(?:тел|phone|tel)[.:\\s]+([+\\d\\s()\\-]{7,})/i,\n    /(?:📱\\s*)([+\\d\\s()\\-]{7,})/,\n    /((?:\\+359|00359)\\d{8,9})/,\n    /(0[89]\\d{7,8})/,\n    /\\b(\\d{9,10})\\b/\n  ];\n  \n  for (const pattern of phonePatterns) {\n    const match = description.match(pattern);\n    if (match) {\n      phone = match[1].replace(/[\\s()\\-]/g, '').trim();\n      break;\n    }\n  }\n  \n  if (!phone || phone.length < 7) continue;\n  \n  // Store in international format\n  const intlPhone = toInternational(phone);\n  const key = phoneKey(phone);\n  \n  // Keep first occurrence of each patient\n  if (!patients.has(key)) {\n    patients.set(key, {\n      name: summary,\n      phone: intlPhone\n    });\n  }\n}\n\nconst patientList = Array.from(patients.values());\n\nreturn [{\n  json: {\n    extractedCount: patientList.length,\n    totalEvents: events.length,\n    patients: patientList\n  }\n}];"
       },
-      "id": "extract-patients",
-      "name": "Extract Patients from Events",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [660, 0]
+      "alwaysOutputData": true
     },
     {
       "parameters": {
-        "operation": "read",
         "documentId": {
           "__rl": true,
           "mode": "id",
@@ -70,59 +69,70 @@
           "mode": "name",
           "value": "Patients"
         },
-        "options": {
-          "returnAllMatches": true
-        }
+        "options": {}
       },
-      "id": "read-existing-patients",
+      "id": "c0d793a7-deca-4b46-bfb9-b41f522b978a",
       "name": "Read Existing Patients",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [660, 200],
+      "position": [
+        660,
+        0
+      ],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "",
           "name": "Google Sheets"
         }
-      }
+      },
+      "alwaysOutputData": true,
+      "executeOnce": true
     },
     {
       "parameters": {
-        "mode": "chooseBranch",
-        "output": "wait"
+        "jsCode": "// ============================================================\n// PATIENTS RECOVERY from Google Calendar\n// DRY_RUN = true  -> nothing is written, only a report is shown\n// DRY_RUN = false -> new patients are appended, changed phones are updated\n// ============================================================\nconst DRY_RUN = true;\n\n// --- Patient matching helpers (same logic in upsert + recovery) ---\n// Strip leading status icons (⏳ ✅ 🔔 ...) and stray punctuation from a name\nfunction cleanName(n) {\n  return String(n || '')\n    .replace(/^[^\\p{L}\\p{N}]+/u, '')\n    .replace(/\\s+/g, ' ')\n    .replace(/[\\s.,;:\\-]+$/, '')\n    .trim();\n}\nfunction nameKey(n) {\n  return cleanName(n).toLowerCase();\n}\n// Normalize to +359 international format (text-safe for Google Sheets)\nfunction toInternational(p) {\n  let phone = String(p || '').replace(/[\\s()\\-.\\/]/g, '');\n  if (!phone) return '';\n  if (phone.startsWith('00359')) phone = '+359' + phone.slice(5);\n  else if (phone.startsWith('359')) phone = '+' + phone;\n  else if (phone.startsWith('0') && phone.length >= 10) phone = '+359' + phone.slice(1);\n  else if (/^[89]\\d{8}$/.test(phone)) phone = '+359' + phone;\n  else if (!phone.startsWith('+') && phone.length >= 9) phone = '+359' + phone;\n  return phone;\n}\n// Core digits for comparison: +359887493315 / 0887493315 / 887493315 -> 887493315\nfunction phoneKey(p) {\n  return String(p || '').replace(/\\D/g, '').replace(/^00/, '').replace(/^359/, '').replace(/^0/, '');\n}\nfunction isBlockName(n) {\n  return /блокиран|почивка|отпуск|blocked/i.test(String(n || ''));\n}\n\nfunction extractPhone(description) {\n  const text = String(description || '').replace(/<[^>]*>/g, ' ');\n  const patterns = [\n    /📞\\s*Тел[.:]?\\s*([+\\d\\s()\\-]{7,})/i,\n    /(?:тел|phone|tel)[.:\\s]+([+\\d\\s()\\-]{7,})/i,\n    /((?:\\+359|00359)[\\d\\s]{8,12})/,\n    /\\b(0[2-9][\\d\\s]{7,10})\\b/\n  ];\n  for (const re of patterns) {\n    const m = text.match(re);\n    if (m) {\n      const phone = toInternational(m[1]);\n      if (/^\\+359\\d{8,9}$/.test(phone)) return phone;\n    }\n  }\n  return '';\n}\n\n// 1) Latest known data per patient name from the calendar (oldest -> newest)\nconst events = $('Get All Calendar Events').all()\n  .map(i => i.json)\n  .filter(e => e && e.id && e.start && e.start.dateTime && e.status !== 'cancelled')\n  .sort((a, b) => String(a.start.dateTime).localeCompare(String(b.start.dateTime)));\n\nconst fromCalendar = new Map();\nfor (const ev of events) {\n  const name = cleanName(ev.summary);\n  if (!name || name.length < 2 || isBlockName(name)) continue;\n  const key = nameKey(name);\n  const phone = extractPhone(ev.description);\n  const prev = fromCalendar.get(key) || { name, phone: '', lastDate: '' };\n  prev.name = name;\n  if (phone) prev.phone = phone;            // newest phone wins\n  prev.lastDate = ev.start.dateTime.slice(0, 10);\n  fromCalendar.set(key, prev);\n}\n\n// 2) Existing sheet rows\nconst rows = $('Read Existing Patients').all()\n  .map(i => i.json)\n  .filter(r => r && r.row_number && (r.name || r.phone));\nconst rowsByName = new Map();\nfor (const r of rows) {\n  const k = nameKey(r.name);\n  if (!rowsByName.has(k)) rowsByName.set(k, []);\n  rowsByName.get(k).push(r);\n}\n\n// 3) Plan\nconst today = new Date().toISOString().split('T')[0];\nconst toAdd = [];\nconst toUpdate = [];\nfor (const [key, p] of fromCalendar) {\n  const existing = rowsByName.get(key) || [];\n  if (existing.length === 0) {\n    toAdd.push({ op: 'append', name: p.name, phone: p.phone, createdAt: today, lastVisit: p.lastDate });\n    continue;\n  }\n  if (!p.phone) continue;\n  if (existing.some(r => phoneKey(r.phone) === phoneKey(p.phone))) continue;\n  const noPhoneRow = existing.find(r => !phoneKey(r.phone));\n  const target = noPhoneRow || (existing.length === 1 ? existing[0] : null);\n  if (target) {\n    toUpdate.push({ op: 'update', rowNumber: target.row_number, name: target.name,\n                    oldPhone: String(target.phone || ''), phone: p.phone, lastVisit: p.lastDate });\n  } else {\n    toAdd.push({ op: 'append', name: p.name, phone: p.phone, createdAt: today, lastVisit: p.lastDate });\n  }\n}\n\nconst report = {\n  op: 'report',\n  dryRun: DRY_RUN,\n  summary: `${DRY_RUN ? 'ПРОБА (нищо не е записано)' : 'ЗАПИСАНО'}: ` +\n    `събития ${events.length}, пациенти в календара ${fromCalendar.size}, ` +\n    `редове в таблицата ${rows.length}, нови ${toAdd.length}, обновени телефони ${toUpdate.length}`,\n  toAdd: toAdd.map(p => `${p.name} | ${p.phone || '(без телефон)'} | последен час ${p.lastVisit}`),\n  toUpdate: toUpdate.map(p => `ред ${p.rowNumber}: ${p.name} | ${p.oldPhone || '(празно)'} -> ${p.phone}`)\n};\n\nif (DRY_RUN) return [{ json: report }];\nreturn [{ json: report }, ...toAdd.map(p => ({ json: p })), ...toUpdate.map(p => ({ json: p }))];\n"
       },
-      "id": "wait-for-both",
-      "name": "Wait for Both",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
-      "position": [880, 100]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Compare extracted patients with existing and find new ones\nconst extracted = $('Extract Patients from Events').first().json;\nconst existingRows = $('Read Existing Patients').all().map(item => item.json);\n\n// Core 9-digit number for comparison\nfunction phoneKey(p) {\n  return String(p || '').replace(/[\\s()\\-.+]/g, '').replace(/^359/, '').replace(/^0/, '');\n}\n\n// Build sets for lookup\nconst existingPhoneKeys = new Set();\nconst existingNames = new Set();\n\nexistingRows.forEach(p => {\n  if (p.phone) existingPhoneKeys.add(phoneKey(p.phone));\n  if (p.name) existingNames.add(p.name.toLowerCase().trim());\n});\n\n// Filter out already existing patients (by phone OR by name)\nconst newPatients = extracted.patients.filter(p => {\n  const key = phoneKey(p.phone);\n  const normName = p.name.toLowerCase().trim();\n  return !existingPhoneKeys.has(key) && !existingNames.has(normName);\n});\n\nif (newPatients.length === 0) {\n  return [{\n    json: {\n      noNewPatients: true,\n      summary: `Общо събития: ${extracted.totalEvents}, Извлечени пациенти: ${extracted.extractedCount}, Вече в таблицата: ${existingRows.length}, Нови: 0`\n    }\n  }];\n}\n\nreturn newPatients.map(p => ({\n  json: {\n    noNewPatients: false,\n    name: p.name,\n    phone: p.phone,\n    createdAt: new Date().toISOString().split('T')[0]\n  }\n}));"
-      },
-      "id": "find-new-patients",
-      "name": "Find New Patients",
+      "id": "a5fcc211-eb71-486d-9515-f6cd572b3823",
+      "name": "Plan Changes",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1100, 100]
+      "position": [
+        880,
+        0
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "boolean": [
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
             {
-              "value1": "={{ $json.noNewPatients }}",
-              "value2": true
+              "id": "02007893-e582-4579-9294-143a916b2870",
+              "leftValue": "={{ $json.op }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "append"
             }
-          ]
-        }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       },
-      "id": "has-new-patients",
-      "name": "Has New Patients?",
+      "id": "79e22398-1665-4f6d-9768-9cf96bff86ed",
+      "name": "Append?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1320, 100]
+      "position": [
+        1100,
+        0
+      ]
     },
     {
       "parameters": {
@@ -141,17 +151,73 @@
           "mappingMode": "defineBelow",
           "value": {
             "name": "={{ $json.name }}",
-            "phone": "={{ \"'\" + $json.phone }}",
+            "phone": "={{ $json.phone ? \"'\" + $json.phone : '' }}",
             "createdAt": "={{ $json.createdAt }}"
-          }
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "createdAt",
+              "displayName": "createdAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "notify",
+              "displayName": "notify",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ]
         },
         "options": {}
       },
-      "id": "append-patients",
-      "name": "Append New Patients",
+      "id": "20b9ce72-de52-4099-b87b-1d60ecdc76ef",
+      "name": "Append Patients",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [1540, 200],
+      "position": [
+        1320,
+        -100
+      ],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "",
@@ -161,13 +227,139 @@
     },
     {
       "parameters": {
-        "jsCode": "// Final summary\nconst items = $input.all();\nreturn [{\n  json: {\n    success: true,\n    message: `✅ Добавени ${items.length} нови пациенти в Patients sheet`,\n    addedCount: items.length,\n    patients: items.map(i => ({ name: i.json.name, phone: i.json.phone }))\n  }\n}];"
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "74a2c72f-739a-4e3b-ad64-0080e79f97c4",
+              "leftValue": "={{ $json.op }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "update"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       },
-      "id": "summary",
-      "name": "Summary",
-      "type": "n8n-nodes-base.code",
+      "id": "332736e5-b4b1-4f81-be2c-bbbf443aa8b3",
+      "name": "Update?",
+      "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1760, 200]
+      "position": [
+        1320,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Patients"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $json.rowNumber }}",
+            "phone": "={{ \"'\" + $json.phone }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "createdAt",
+              "displayName": "createdAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "notify",
+              "displayName": "notify",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7752e49d-ed47-4805-ab6c-389f1318ee4d",
+      "name": "Update Phones",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1540,
+        60
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets"
+        }
+      }
     }
   ],
   "connections": {
@@ -189,11 +381,6 @@
             "node": "Get All Calendar Events",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Read Existing Patients",
-            "type": "main",
-            "index": 0
           }
         ]
       ]
@@ -202,18 +389,7 @@
       "main": [
         [
           {
-            "node": "Extract Patients from Events",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Extract Patients from Events": {
-      "main": [
-        [
-          {
-            "node": "Wait for Both",
+            "node": "Read Existing Patients",
             "type": "main",
             "index": 0
           }
@@ -224,56 +400,52 @@
       "main": [
         [
           {
-            "node": "Wait for Both",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Wait for Both": {
-      "main": [
-        [
-          {
-            "node": "Find New Patients",
+            "node": "Plan Changes",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Find New Patients": {
+    "Plan Changes": {
       "main": [
         [
           {
-            "node": "Has New Patients?",
+            "node": "Append?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Has New Patients?": {
+    "Append?": {
       "main": [
-        [],
         [
           {
-            "node": "Append New Patients",
+            "node": "Append Patients",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Append New Patients": {
+    "Update?": {
       "main": [
         [
           {
-            "node": "Summary",
+            "node": "Update Phones",
             "type": "main",
             "index": 0
           }
-        ]
+        ],
+        []
       ]
     }
   },

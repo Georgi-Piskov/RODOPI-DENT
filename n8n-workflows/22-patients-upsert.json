@@ -22,9 +22,9 @@
     },
     {
       "parameters": {
-        "jsCode": "// Validate input\nconst body = $input.first().json.body;\n\nif (!body.name || !body.phone) {\n  return [{\n    json: {\n      valid: false,\n      error: 'Липсва име или телефон'\n    }\n  }];\n}\n\n// Normalize phone to international +359 format\n// This prevents Google Sheets from stripping the leading 0\nlet phone = String(body.phone).replace(/[\\s()\\-.]/g, '');\nif (phone.startsWith('00359')) phone = '+359' + phone.slice(5);\nelse if (phone.startsWith('0') && phone.length >= 10) phone = '+359' + phone.slice(1);\nelse if (/^[89]\\d{8}$/.test(phone)) phone = '+359' + phone;\nelse if (!phone.startsWith('+') && phone.length >= 9) phone = '+359' + phone;\n\n// Optional email (saved alongside other patient info in Google Sheets)\nconst email = (body.email || '').toString().trim();\n\n// Optional notification preferences (sms | email | viber | telegram)\nlet notify = [];\nif (Array.isArray(body.notify)) {\n  notify = body.notify;\n} else if (typeof body.notify === 'string') {\n  // Allow comma-separated string too\n  notify = body.notify.split(',').map(s => s.trim()).filter(Boolean);\n}\nconst allowed = ['sms', 'email', 'viber', 'telegram'];\nnotify = notify.filter(c => allowed.includes(c));\nconst notifyStr = notify.join(',');\n\nreturn [{\n  json: {\n    valid: true,\n    name: body.name.trim(),\n    phone: phone,\n    email: email,\n    notify: notifyStr\n  }\n}];"
+        "jsCode": "// Validate input. Name is required; phone is optional\n// (a name-only row still makes the patient searchable, the phone is filled in later).\nconst body = $input.first().json.body || {};\n\n// --- Patient matching helpers (same logic in upsert + recovery) ---\n// Strip leading status icons (⏳ ✅ 🔔 ...) and stray punctuation from a name\nfunction cleanName(n) {\n  return String(n || '')\n    .replace(/^[^\\p{L}\\p{N}]+/u, '')\n    .replace(/\\s+/g, ' ')\n    .replace(/[\\s.,;:\\-]+$/, '')\n    .trim();\n}\nfunction nameKey(n) {\n  return cleanName(n).toLowerCase();\n}\n// Normalize to +359 international format (text-safe for Google Sheets)\nfunction toInternational(p) {\n  let phone = String(p || '').replace(/[\\s()\\-.\\/]/g, '');\n  if (!phone) return '';\n  if (phone.startsWith('00359')) phone = '+359' + phone.slice(5);\n  else if (phone.startsWith('359')) phone = '+' + phone;\n  else if (phone.startsWith('0') && phone.length >= 10) phone = '+359' + phone.slice(1);\n  else if (/^[89]\\d{8}$/.test(phone)) phone = '+359' + phone;\n  else if (!phone.startsWith('+') && phone.length >= 9) phone = '+359' + phone;\n  return phone;\n}\n// Core digits for comparison: +359887493315 / 0887493315 / 887493315 -> 887493315\nfunction phoneKey(p) {\n  return String(p || '').replace(/\\D/g, '').replace(/^00/, '').replace(/^359/, '').replace(/^0/, '');\n}\nfunction isBlockName(n) {\n  return /блокиран|почивка|отпуск|blocked/i.test(String(n || ''));\n}\n\nconst name = cleanName(body.name);\nif (!name) {\n  return [{ json: { valid: false, error: 'Липсва име' } }];\n}\nif (isBlockName(name)) {\n  return [{ json: { valid: false, error: 'Блокиран час, не е пациент' } }];\n}\n\nconst phone = toInternational(body.phone);\nconst email = String(body.email || '').trim();\n\n// Optional notification preferences (sms | email | viber | telegram)\nlet notify = [];\nif (Array.isArray(body.notify)) notify = body.notify;\nelse if (typeof body.notify === 'string') notify = body.notify.split(',').map(s => s.trim()).filter(Boolean);\nconst allowed = ['sms', 'email', 'viber', 'telegram'];\nnotify = notify.filter(c => allowed.includes(c));\n\nreturn [{ json: { valid: true, name, phone, email, notify: notify.join(',') } }];\n"
       },
-      "id": "validate",
+      "id": "4b9026e0-0267-4081-b5ee-ffafa3aa6ca8",
       "name": "Validate Input",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -36,15 +36,29 @@
     {
       "parameters": {
         "conditions": {
-          "boolean": [
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
             {
-              "value1": "={{ $json.valid }}",
-              "value2": true
+              "id": "182714da-38dc-4655-b0ad-c7cd0fd644f7",
+              "leftValue": "={{ $json.valid }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
             }
-          ]
-        }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       },
-      "id": "is-valid",
+      "id": "f54271b1-8df7-4452-8942-6dc0be59fb86",
       "name": "Is Valid?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
@@ -68,18 +82,17 @@
           }
         }
       },
-      "id": "respond-invalid",
+      "id": "c72e42cb-1000-4699-a83b-af6953f9408a",
       "name": "Respond Invalid",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
         660,
-        -100
+        160
       ]
     },
     {
       "parameters": {
-        "operation": "read",
         "documentId": {
           "__rl": true,
           "mode": "id",
@@ -90,80 +103,68 @@
           "mode": "name",
           "value": "Patients"
         },
-        "options": {
-          "returnAllMatches": true
-        }
+        "options": {}
       },
-      "id": "read-patients",
+      "id": "ca818217-46f9-47f0-b7fe-c1a6f312cdac",
       "name": "Read Patients",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
         660,
-        100
+        -80
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "",
           "name": "Google Sheets"
         }
-      }
+      },
+      "alwaysOutputData": true
     },
     {
       "parameters": {
-        "jsCode": "// Check if patient with this phone already exists\nconst inputData = $('Validate Input').first().json;\nconst existingPatients = $('Read Patients').all().map(item => item.json);\n\n// Extract core 9-digit number for robust comparison across formats\n// +359887493315 / 0887493315 / 887493315 all map to 887493315\nconst phoneKey = (p) => String(p || '').replace(/[\\s()\\-.+]/g, '').replace(/^359/, '').replace(/^0/, '');\n\nconst inputKey = phoneKey(inputData.phone);\nconst phoneExists = existingPatients.some(patient => phoneKey(patient.phone) === inputKey);\n\n// Also check by name (case-insensitive)\nconst nameExists = existingPatients.some(patient =>\n  (patient.name || '').toLowerCase().trim() === (inputData.name || '').toLowerCase().trim()\n);\n\nreturn [{\n  json: {\n    exists: phoneExists || nameExists,\n    name: inputData.name,\n    phone: inputData.phone,\n    email: inputData.email,\n    notify: inputData.notify\n  }\n}];"
+        "jsCode": "// Decide what to do with the incoming patient: create, update or skip.\n// Rules:\n//  - same name + same phone            -> skip (only fill missing email/notify)\n//  - same name, row without phone      -> update that row with the phone\n//  - same name (single row), new phone -> update phone (patient changed number)\n//  - same phone, different name        -> create (family members share phones)\n//  - unknown name                      -> create\nconst input = $('Validate Input').first().json;\nconst rows = $('Read Patients').all()\n  .map(i => i.json)\n  .filter(r => r && r.row_number && (r.name || r.phone));\n\n// --- Patient matching helpers (same logic in upsert + recovery) ---\n// Strip leading status icons (⏳ ✅ 🔔 ...) and stray punctuation from a name\nfunction cleanName(n) {\n  return String(n || '')\n    .replace(/^[^\\p{L}\\p{N}]+/u, '')\n    .replace(/\\s+/g, ' ')\n    .replace(/[\\s.,;:\\-]+$/, '')\n    .trim();\n}\nfunction nameKey(n) {\n  return cleanName(n).toLowerCase();\n}\n// Normalize to +359 international format (text-safe for Google Sheets)\nfunction toInternational(p) {\n  let phone = String(p || '').replace(/[\\s()\\-.\\/]/g, '');\n  if (!phone) return '';\n  if (phone.startsWith('00359')) phone = '+359' + phone.slice(5);\n  else if (phone.startsWith('359')) phone = '+' + phone;\n  else if (phone.startsWith('0') && phone.length >= 10) phone = '+359' + phone.slice(1);\n  else if (/^[89]\\d{8}$/.test(phone)) phone = '+359' + phone;\n  else if (!phone.startsWith('+') && phone.length >= 9) phone = '+359' + phone;\n  return phone;\n}\n// Core digits for comparison: +359887493315 / 0887493315 / 887493315 -> 887493315\nfunction phoneKey(p) {\n  return String(p || '').replace(/\\D/g, '').replace(/^00/, '').replace(/^359/, '').replace(/^0/, '');\n}\nfunction isBlockName(n) {\n  return /блокиран|почивка|отпуск|blocked/i.test(String(n || ''));\n}\n\nconst inKey = nameKey(input.name);\nconst inPhone = phoneKey(input.phone);\nconst sameName = rows.filter(r => nameKey(r.name) === inKey);\n\nfunction merged(row, action, extra = {}) {\n  return {\n    action,\n    rowNumber: row.row_number,\n    name: row.name,\n    phone: input.phone || String(row.phone || '').replace(/^'/, ''),\n    email: input.email || row.email || '',\n    notify: input.notify || row.notify || '',\n    ...extra\n  };\n}\n\nlet result;\nconst exact = inPhone\n  ? sameName.find(r => phoneKey(r.phone) === inPhone)\n  : sameName[0];\n\nif (exact) {\n  const needEmail = input.email && input.email !== String(exact.email || '');\n  const needNotify = input.notify && input.notify !== String(exact.notify || '');\n  result = (needEmail || needNotify)\n    ? merged(exact, 'updated')\n    : { action: 'skipped', name: exact.name, phone: String(exact.phone || '') };\n} else if (inPhone && sameName.length > 0) {\n  const noPhoneRow = sameName.find(r => !phoneKey(r.phone));\n  if (noPhoneRow) {\n    result = merged(noPhoneRow, 'updated', { previousPhone: '' });\n  } else if (sameName.length === 1) {\n    result = merged(sameName[0], 'updated', { previousPhone: String(sameName[0].phone || '') });\n  } else {\n    // Several different people with this name and none has this phone -> new person\n    result = { action: 'created', name: input.name, phone: input.phone, email: input.email, notify: input.notify };\n  }\n} else {\n  result = { action: 'created', name: input.name, phone: input.phone, email: input.email, notify: input.notify };\n}\n\nreturn [{ json: result }];\n"
       },
-      "id": "check-exists",
-      "name": "Check If Exists",
+      "id": "5047eba7-e626-424f-b785-9d100be34417",
+      "name": "Decide Action",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         880,
-        100
+        -80
       ]
     },
     {
       "parameters": {
         "conditions": {
-          "boolean": [
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
             {
-              "value1": "={{ $json.exists }}",
-              "value2": true
+              "id": "9e16dd6f-1c82-44a4-b85e-dede68b9affc",
+              "leftValue": "={{ $json.action }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "created"
             }
-          ]
-        }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       },
-      "id": "already-exists",
-      "name": "Already Exists?",
+      "id": "018e4e47-1c8f-4c57-bf33-24fb80c4e377",
+      "name": "Create?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
         1100,
-        100
-      ]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ success: true, message: 'Пациентът вече съществува', action: 'skipped', name: $json.name, phone: $json.phone }) }}",
-        "options": {
-          "responseHeaders": {
-            "entries": [
-              {
-                "name": "Access-Control-Allow-Origin",
-                "value": "*"
-              }
-            ]
-          }
-        }
-      },
-      "id": "respond-exists",
-      "name": "Respond Already Exists",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [
-        1320,
-        0
+        -80
       ]
     },
     {
@@ -183,21 +184,212 @@
           "mappingMode": "defineBelow",
           "value": {
             "name": "={{ $json.name }}",
-            "phone": "={{ \"'\" + $json.phone }}",
+            "phone": "={{ $json.phone ? \"'\" + $json.phone : '' }}",
             "email": "={{ $json.email }}",
             "notify": "={{ $json.notify }}",
             "createdAt": "={{ new Date().toISOString().split('T')[0] }}"
-          }
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "createdAt",
+              "displayName": "createdAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "notify",
+              "displayName": "notify",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ]
         },
         "options": {}
       },
-      "id": "append-patient",
+      "id": "03a3abdc-2090-4364-983d-ffc090725b6b",
       "name": "Append New Patient",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
         1320,
-        200
+        -200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "678f3773-9781-422f-a5db-dc645bf754bf",
+              "leftValue": "={{ $json.action }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "updated"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c572143d-475c-4897-9549-5e36abe0e0af",
+      "name": "Update?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1hv4XAfHhScA40Bm1kQ3I-Ih4SJuCBpOJxTOYDNb167g"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Patients"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $json.rowNumber }}",
+            "phone": "={{ $json.phone ? \"'\" + $json.phone : '' }}",
+            "email": "={{ $json.email }}",
+            "notify": "={{ $json.notify }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "createdAt",
+              "displayName": "createdAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "notify",
+              "displayName": "notify",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5a129854-c21d-4833-8062-3d8c3017ec18",
+      "name": "Update Patient",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1540,
+        -40
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
@@ -209,7 +401,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ success: true, message: 'Пациентът е добавен', action: 'created', name: $('Check If Exists').first().json.name, phone: $('Check If Exists').first().json.phone }) }}",
+        "responseBody": "={{ JSON.stringify({ success: true, action: $('Decide Action').first().json.action, name: $('Decide Action').first().json.name, phone: $('Decide Action').first().json.phone, previousPhone: $('Decide Action').first().json.previousPhone }) }}",
         "options": {
           "responseHeaders": {
             "entries": [
@@ -221,13 +413,13 @@
           }
         }
       },
-      "id": "respond-created",
-      "name": "Respond Created",
+      "id": "89b89b7b-f808-4b0e-ba6b-599f94626d32",
+      "name": "Respond Result",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        1540,
-        200
+        1760,
+        -80
       ]
     }
   ],
@@ -258,14 +450,14 @@
       "main": [
         [
           {
-            "node": "Respond Invalid",
+            "node": "Read Patients",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Read Patients",
+            "node": "Respond Invalid",
             "type": "main",
             "index": 0
           }
@@ -276,36 +468,54 @@
       "main": [
         [
           {
-            "node": "Check If Exists",
+            "node": "Decide Action",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Check If Exists": {
+    "Decide Action": {
       "main": [
         [
           {
-            "node": "Already Exists?",
+            "node": "Create?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Already Exists?": {
+    "Create?": {
       "main": [
         [
           {
-            "node": "Respond Already Exists",
+            "node": "Append New Patient",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Append New Patient",
+            "node": "Update?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update?": {
+      "main": [
+        [
+          {
+            "node": "Update Patient",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Result",
             "type": "main",
             "index": 0
           }
@@ -316,7 +526,18 @@
       "main": [
         [
           {
-            "node": "Respond Created",
+            "node": "Respond Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Patient": {
+      "main": [
+        [
+          {
+            "node": "Respond Result",
             "type": "main",
             "index": 0
           }
