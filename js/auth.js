@@ -6,10 +6,11 @@ const Auth = {
   USER_KEY: 'rodopi_auth_user',
   
   // Allowed admin emails (add your email here)
+  // Only these Google accounts may open the admin panel
+  // (Gmail ignores dots, so rodopi.dent@gmail.com matches too)
   ALLOWED_ADMINS: [
     'rodopident@gmail.com',
-    'admin@rodopident.bg',
-    'georgi.piskov@gmail.com' // Add your actual email
+    'georgipiskov@gmail.com'
   ],
 
   /**
@@ -143,9 +144,15 @@ const Auth = {
    * Check if email is allowed admin
    */
   isAllowedAdmin(email) {
-    // Allow all for now (remove this in production and use ALLOWED_ADMINS)
-    return true;
-    // return this.ALLOWED_ADMINS.includes(email.toLowerCase());
+    const normalize = (value) => {
+      const [local, domain] = String(value || '').trim().toLowerCase().split('@');
+      if (!local || !domain) return '';
+      // Gmail treats dots and "+tag" in the local part as the same mailbox
+      const isGmail = domain === 'gmail.com' || domain === 'googlemail.com';
+      return isGmail ? `${local.split('+')[0].replace(/\./g, '')}@gmail.com` : `${local}@${domain}`;
+    };
+    const wanted = normalize(email);
+    return !!wanted && this.ALLOWED_ADMINS.some(allowed => normalize(allowed) === wanted);
   },
 
   /**
@@ -181,7 +188,8 @@ const Auth = {
    * Check if user is authenticated
    */
   isAuthenticated() {
-    return !!this.getToken() && !!this.getUser();
+    // A session saved before the allowlist was enforced must not keep access
+    return !!this.getToken() && !!this.getUser() && this.isAllowedAdmin(this.getUser().email);
   },
 
   /**
