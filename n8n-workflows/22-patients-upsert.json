@@ -10,13 +10,13 @@
           "allowedOrigins": "*"
         }
       },
-      "id": "webhook",
+      "id": "aa7d830f-0626-4dc4-9ae0-43ee4097fd46",
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        0,
-        0
+        -4128,
+        1712
       ],
       "webhookId": "patients-upsert"
     },
@@ -24,7 +24,7 @@
       "parameters": {
         "jsCode": "// Validate input. Name is required; phone is optional\n// (a name-only row still makes the patient searchable, the phone is filled in later).\nconst body = $input.first().json.body || {};\n\n// --- Patient matching helpers (same logic in upsert + recovery) ---\n// Strip leading status icons (⏳ ✅ 🔔 ...) and stray punctuation from a name\nfunction cleanName(n) {\n  return String(n || '')\n    .replace(/^[^\\p{L}\\p{N}]+/u, '')\n    .replace(/\\s+/g, ' ')\n    .replace(/[\\s.,;:\\-]+$/, '')\n    .trim();\n}\nfunction nameKey(n) {\n  return cleanName(n).toLowerCase();\n}\n// Normalize to +359 international format (text-safe for Google Sheets)\nfunction toInternational(p) {\n  let phone = String(p || '').replace(/[\\s()\\-.\\/]/g, '');\n  if (!phone) return '';\n  if (phone.startsWith('00359')) phone = '+359' + phone.slice(5);\n  else if (phone.startsWith('359')) phone = '+' + phone;\n  else if (phone.startsWith('0') && phone.length >= 10) phone = '+359' + phone.slice(1);\n  else if (/^[89]\\d{8}$/.test(phone)) phone = '+359' + phone;\n  else if (!phone.startsWith('+') && phone.length >= 9) phone = '+359' + phone;\n  return phone;\n}\n// Core digits for comparison: +359887493315 / 0887493315 / 887493315 -> 887493315\nfunction phoneKey(p) {\n  return String(p || '').replace(/\\D/g, '').replace(/^00/, '').replace(/^359/, '').replace(/^0/, '');\n}\nfunction isBlockName(n) {\n  return /блокиран|почивка|отпуск|blocked/i.test(String(n || ''));\n}\n\nconst name = cleanName(body.name);\nif (!name) {\n  return [{ json: { valid: false, error: 'Липсва име' } }];\n}\nif (isBlockName(name)) {\n  return [{ json: { valid: false, error: 'Блокиран час, не е пациент' } }];\n}\n\nconst phone = toInternational(body.phone);\nconst email = String(body.email || '').trim();\n\n// Optional notification preferences (sms | email | viber | telegram)\nlet notify = [];\nif (Array.isArray(body.notify)) notify = body.notify;\nelse if (typeof body.notify === 'string') notify = body.notify.split(',').map(s => s.trim()).filter(Boolean);\nconst allowed = ['sms', 'email', 'viber', 'telegram'];\nnotify = notify.filter(c => allowed.includes(c));\n\nreturn [{ json: { valid: true, name, phone, email, notify: notify.join(',') } }];\n"
       },
-      "id": "4b9026e0-0267-4081-b5ee-ffafa3aa6ca8",
+      "id": "9d5c0363-316e-4af1-97ce-37e9c6d72ec7",
       "name": "Validate Input",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -44,7 +44,7 @@
           },
           "conditions": [
             {
-              "id": "182714da-38dc-4655-b0ad-c7cd0fd644f7",
+              "id": "71d32622-72ee-4dd4-a047-ec7d8e6ea38b",
               "leftValue": "={{ $json.valid }}",
               "operator": {
                 "type": "boolean",
@@ -58,7 +58,7 @@
         },
         "options": {}
       },
-      "id": "f54271b1-8df7-4452-8942-6dc0be59fb86",
+      "id": "7aeb0f4f-caf8-4e72-8d66-ed5aa38c0c23",
       "name": "Is Valid?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
@@ -82,7 +82,7 @@
           }
         }
       },
-      "id": "c72e42cb-1000-4699-a83b-af6953f9408a",
+      "id": "3d867062-1196-4860-9c87-3a878f806bc1",
       "name": "Respond Invalid",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -93,6 +93,7 @@
     },
     {
       "parameters": {
+        "authentication": "serviceAccount",
         "documentId": {
           "__rl": true,
           "mode": "id",
@@ -105,7 +106,7 @@
         },
         "options": {}
       },
-      "id": "ca818217-46f9-47f0-b7fe-c1a6f312cdac",
+      "id": "9c4b26a5-3e6f-401c-8b23-09344aa4e990",
       "name": "Read Patients",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
@@ -114,9 +115,9 @@
         -80
       ],
       "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "",
-          "name": "Google Sheets"
+        "googleApi": {
+          "id": "CNqF1lQxBCTbo24q",
+          "name": "RODOPI_DENT_SERVICE_ACCOUNT"
         }
       },
       "alwaysOutputData": true
@@ -125,7 +126,7 @@
       "parameters": {
         "jsCode": "// Decide what to do with the incoming patient: create, update or skip.\n// Rules:\n//  - same name + same phone            -> skip (only fill missing email/notify)\n//  - same name, row without phone      -> update that row with the phone\n//  - same name (single row), new phone -> update phone (patient changed number)\n//  - same phone, different name        -> create (family members share phones)\n//  - unknown name                      -> create\nconst input = $('Validate Input').first().json;\nconst rows = $('Read Patients').all()\n  .map(i => i.json)\n  .filter(r => r && r.row_number && (r.name || r.phone));\n\n// --- Patient matching helpers (same logic in upsert + recovery) ---\n// Strip leading status icons (⏳ ✅ 🔔 ...) and stray punctuation from a name\nfunction cleanName(n) {\n  return String(n || '')\n    .replace(/^[^\\p{L}\\p{N}]+/u, '')\n    .replace(/\\s+/g, ' ')\n    .replace(/[\\s.,;:\\-]+$/, '')\n    .trim();\n}\nfunction nameKey(n) {\n  return cleanName(n).toLowerCase();\n}\n// Normalize to +359 international format (text-safe for Google Sheets)\nfunction toInternational(p) {\n  let phone = String(p || '').replace(/[\\s()\\-.\\/]/g, '');\n  if (!phone) return '';\n  if (phone.startsWith('00359')) phone = '+359' + phone.slice(5);\n  else if (phone.startsWith('359')) phone = '+' + phone;\n  else if (phone.startsWith('0') && phone.length >= 10) phone = '+359' + phone.slice(1);\n  else if (/^[89]\\d{8}$/.test(phone)) phone = '+359' + phone;\n  else if (!phone.startsWith('+') && phone.length >= 9) phone = '+359' + phone;\n  return phone;\n}\n// Core digits for comparison: +359887493315 / 0887493315 / 887493315 -> 887493315\nfunction phoneKey(p) {\n  return String(p || '').replace(/\\D/g, '').replace(/^00/, '').replace(/^359/, '').replace(/^0/, '');\n}\nfunction isBlockName(n) {\n  return /блокиран|почивка|отпуск|blocked/i.test(String(n || ''));\n}\n\nconst inKey = nameKey(input.name);\nconst inPhone = phoneKey(input.phone);\nconst sameName = rows.filter(r => nameKey(r.name) === inKey);\n\nfunction merged(row, action, extra = {}) {\n  return {\n    action,\n    rowNumber: row.row_number,\n    name: row.name,\n    phone: input.phone || String(row.phone || '').replace(/^'/, ''),\n    email: input.email || row.email || '',\n    notify: input.notify || row.notify || '',\n    ...extra\n  };\n}\n\nlet result;\nconst exact = inPhone\n  ? sameName.find(r => phoneKey(r.phone) === inPhone)\n  : sameName[0];\n\nif (exact) {\n  const needEmail = input.email && input.email !== String(exact.email || '');\n  const needNotify = input.notify && input.notify !== String(exact.notify || '');\n  result = (needEmail || needNotify)\n    ? merged(exact, 'updated')\n    : { action: 'skipped', name: exact.name, phone: String(exact.phone || '') };\n} else if (inPhone && sameName.length > 0) {\n  const noPhoneRow = sameName.find(r => !phoneKey(r.phone));\n  if (noPhoneRow) {\n    result = merged(noPhoneRow, 'updated', { previousPhone: '' });\n  } else if (sameName.length === 1) {\n    result = merged(sameName[0], 'updated', { previousPhone: String(sameName[0].phone || '') });\n  } else {\n    // Several different people with this name and none has this phone -> new person\n    result = { action: 'created', name: input.name, phone: input.phone, email: input.email, notify: input.notify };\n  }\n} else {\n  result = { action: 'created', name: input.name, phone: input.phone, email: input.email, notify: input.notify };\n}\n\nreturn [{ json: result }];\n"
       },
-      "id": "5047eba7-e626-424f-b785-9d100be34417",
+      "id": "c9441473-65fb-4770-9bc0-1b843653eceb",
       "name": "Decide Action",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -145,7 +146,7 @@
           },
           "conditions": [
             {
-              "id": "9e16dd6f-1c82-44a4-b85e-dede68b9affc",
+              "id": "48adb9c9-1a91-4fdf-b2d0-79268b2da1b0",
               "leftValue": "={{ $json.action }}",
               "operator": {
                 "type": "string",
@@ -158,7 +159,7 @@
         },
         "options": {}
       },
-      "id": "018e4e47-1c8f-4c57-bf33-24fb80c4e377",
+      "id": "370b5fcd-5784-4f12-b7fc-af5808376cf6",
       "name": "Create?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
@@ -169,6 +170,7 @@
     },
     {
       "parameters": {
+        "authentication": "serviceAccount",
         "operation": "append",
         "documentId": {
           "__rl": true,
@@ -245,7 +247,7 @@
         },
         "options": {}
       },
-      "id": "03a3abdc-2090-4364-983d-ffc090725b6b",
+      "id": "9fc6b7fc-95a6-4eb4-a253-334667a56a9e",
       "name": "Append New Patient",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
@@ -254,9 +256,9 @@
         -200
       ],
       "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "",
-          "name": "Google Sheets"
+        "googleApi": {
+          "id": "CNqF1lQxBCTbo24q",
+          "name": "RODOPI_DENT_SERVICE_ACCOUNT"
         }
       }
     },
@@ -271,7 +273,7 @@
           },
           "conditions": [
             {
-              "id": "678f3773-9781-422f-a5db-dc645bf754bf",
+              "id": "56e1f11a-a3a2-40b2-893c-2c660b924fdd",
               "leftValue": "={{ $json.action }}",
               "operator": {
                 "type": "string",
@@ -284,7 +286,7 @@
         },
         "options": {}
       },
-      "id": "c572143d-475c-4897-9549-5e36abe0e0af",
+      "id": "2c3e0f8f-4ceb-421a-8b1f-0b32c74731d0",
       "name": "Update?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
@@ -295,6 +297,7 @@
     },
     {
       "parameters": {
+        "authentication": "serviceAccount",
         "operation": "update",
         "documentId": {
           "__rl": true,
@@ -383,7 +386,7 @@
         },
         "options": {}
       },
-      "id": "5a129854-c21d-4833-8062-3d8c3017ec18",
+      "id": "5634e92b-1cf3-41da-8cb3-302c2a397f80",
       "name": "Update Patient",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
@@ -392,9 +395,9 @@
         -40
       ],
       "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "",
-          "name": "Google Sheets"
+        "googleApi": {
+          "id": "CNqF1lQxBCTbo24q",
+          "name": "RODOPI_DENT_SERVICE_ACCOUNT"
         }
       }
     },
@@ -413,7 +416,7 @@
           }
         }
       },
-      "id": "89b89b7b-f808-4b0e-ba6b-599f94626d32",
+      "id": "f22018d1-732c-4312-baa6-20d1bb191821",
       "name": "Respond Result",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -548,8 +551,13 @@
   "settings": {
     "executionOrder": "v1"
   },
+  "active": true,
+  "id": "Il81C3hCh6qleiwQ",
   "tags": [
     {
+      "updatedAt": "2026-01-26T20:40:00.044Z",
+      "createdAt": "2026-01-26T20:40:00.044Z",
+      "id": "U4AUJ7Gip9wo0aTE",
       "name": "Rodopi Dent"
     }
   ]

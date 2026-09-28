@@ -3,20 +3,20 @@
   "nodes": [
     {
       "parameters": {},
-      "id": "084747bb-1eb6-4228-8c06-75eae5e0ac46",
+      "id": "13e0b76f-7e0f-4105-a7ca-bef1d8091c5f",
       "name": "Manual Trigger",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        0,
-        0
+        -416,
+        1600
       ]
     },
     {
       "parameters": {
         "jsCode": "// 3 years back -> 6 months ahead\nconst from = new Date(); from.setFullYear(from.getFullYear() - 3);\nconst to = new Date(); to.setMonth(to.getMonth() + 6);\nreturn [{ json: { startDate: from.toISOString(), endDate: to.toISOString() } }];"
       },
-      "id": "56be3b4e-933b-4534-98fe-8852a084fd59",
+      "id": "91db92e5-0711-415e-8f6a-55a26e5bd421",
       "name": "Set Date Range",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -41,7 +41,7 @@
           "orderBy": "startTime"
         }
       },
-      "id": "2da70322-615a-47d5-b398-8e2e0fade400",
+      "id": "4d27b044-117f-4792-ba86-aa04ea53e7dd",
       "name": "Get All Calendar Events",
       "type": "n8n-nodes-base.googleCalendar",
       "typeVersion": 1.2,
@@ -51,14 +51,15 @@
       ],
       "credentials": {
         "googleCalendarOAuth2Api": {
-          "id": "",
-          "name": "Google Calendar"
+          "id": "5pwZjn7dCINLfgpU",
+          "name": "RODOPI DENT-4"
         }
       },
       "alwaysOutputData": true
     },
     {
       "parameters": {
+        "authentication": "serviceAccount",
         "documentId": {
           "__rl": true,
           "mode": "id",
@@ -71,7 +72,7 @@
         },
         "options": {}
       },
-      "id": "c0d793a7-deca-4b46-bfb9-b41f522b978a",
+      "id": "3601ba8e-0faa-47ce-8af1-73da81afa448",
       "name": "Read Existing Patients",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
@@ -80,9 +81,9 @@
         0
       ],
       "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "",
-          "name": "Google Sheets"
+        "googleApi": {
+          "id": "CNqF1lQxBCTbo24q",
+          "name": "RODOPI_DENT_SERVICE_ACCOUNT"
         }
       },
       "alwaysOutputData": true,
@@ -92,7 +93,7 @@
       "parameters": {
         "jsCode": "// ============================================================\n// PATIENTS RECOVERY from Google Calendar\n// DRY_RUN = true  -> nothing is written, only a report is shown\n// DRY_RUN = false -> new patients are appended, changed phones are updated\n// ============================================================\nconst DRY_RUN = true;\n\n// --- Patient matching helpers (same logic in upsert + recovery) ---\n// Strip leading status icons (⏳ ✅ 🔔 ...) and stray punctuation from a name\nfunction cleanName(n) {\n  return String(n || '')\n    .replace(/^[^\\p{L}\\p{N}]+/u, '')\n    .replace(/\\s+/g, ' ')\n    .replace(/[\\s.,;:\\-]+$/, '')\n    .trim();\n}\nfunction nameKey(n) {\n  return cleanName(n).toLowerCase();\n}\n// Normalize to +359 international format (text-safe for Google Sheets)\nfunction toInternational(p) {\n  let phone = String(p || '').replace(/[\\s()\\-.\\/]/g, '');\n  if (!phone) return '';\n  if (phone.startsWith('00359')) phone = '+359' + phone.slice(5);\n  else if (phone.startsWith('359')) phone = '+' + phone;\n  else if (phone.startsWith('0') && phone.length >= 10) phone = '+359' + phone.slice(1);\n  else if (/^[89]\\d{8}$/.test(phone)) phone = '+359' + phone;\n  else if (!phone.startsWith('+') && phone.length >= 9) phone = '+359' + phone;\n  return phone;\n}\n// Core digits for comparison: +359887493315 / 0887493315 / 887493315 -> 887493315\nfunction phoneKey(p) {\n  return String(p || '').replace(/\\D/g, '').replace(/^00/, '').replace(/^359/, '').replace(/^0/, '');\n}\nfunction isBlockName(n) {\n  return /блокиран|почивка|отпуск|blocked/i.test(String(n || ''));\n}\n\nfunction extractPhone(description) {\n  const text = String(description || '').replace(/<[^>]*>/g, ' ');\n  const patterns = [\n    /📞\\s*Тел[.:]?\\s*([+\\d\\s()\\-]{7,})/i,\n    /(?:тел|phone|tel)[.:\\s]+([+\\d\\s()\\-]{7,})/i,\n    /((?:\\+359|00359)[\\d\\s]{8,12})/,\n    /\\b(0[2-9][\\d\\s]{7,10})\\b/\n  ];\n  for (const re of patterns) {\n    const m = text.match(re);\n    if (m) {\n      const phone = toInternational(m[1]);\n      if (/^\\+359\\d{8,9}$/.test(phone)) return phone;\n    }\n  }\n  return '';\n}\n\n// 1) Latest known data per patient name from the calendar (oldest -> newest)\nconst events = $('Get All Calendar Events').all()\n  .map(i => i.json)\n  .filter(e => e && e.id && e.start && e.start.dateTime && e.status !== 'cancelled')\n  .sort((a, b) => String(a.start.dateTime).localeCompare(String(b.start.dateTime)));\n\nconst fromCalendar = new Map();\nfor (const ev of events) {\n  const name = cleanName(ev.summary);\n  if (!name || name.length < 2 || isBlockName(name)) continue;\n  const key = nameKey(name);\n  const phone = extractPhone(ev.description);\n  const prev = fromCalendar.get(key) || { name, phone: '', lastDate: '' };\n  prev.name = name;\n  if (phone) prev.phone = phone;            // newest phone wins\n  prev.lastDate = ev.start.dateTime.slice(0, 10);\n  fromCalendar.set(key, prev);\n}\n\n// 2) Existing sheet rows\nconst rows = $('Read Existing Patients').all()\n  .map(i => i.json)\n  .filter(r => r && r.row_number && (r.name || r.phone));\nconst rowsByName = new Map();\nfor (const r of rows) {\n  const k = nameKey(r.name);\n  if (!rowsByName.has(k)) rowsByName.set(k, []);\n  rowsByName.get(k).push(r);\n}\n\n// 3) Plan\nconst today = new Date().toISOString().split('T')[0];\nconst toAdd = [];\nconst toUpdate = [];\nfor (const [key, p] of fromCalendar) {\n  const existing = rowsByName.get(key) || [];\n  if (existing.length === 0) {\n    toAdd.push({ op: 'append', name: p.name, phone: p.phone, createdAt: today, lastVisit: p.lastDate });\n    continue;\n  }\n  if (!p.phone) continue;\n  if (existing.some(r => phoneKey(r.phone) === phoneKey(p.phone))) continue;\n  const noPhoneRow = existing.find(r => !phoneKey(r.phone));\n  const target = noPhoneRow || (existing.length === 1 ? existing[0] : null);\n  if (target) {\n    toUpdate.push({ op: 'update', rowNumber: target.row_number, name: target.name,\n                    oldPhone: String(target.phone || ''), phone: p.phone, lastVisit: p.lastDate });\n  } else {\n    toAdd.push({ op: 'append', name: p.name, phone: p.phone, createdAt: today, lastVisit: p.lastDate });\n  }\n}\n\nconst report = {\n  op: 'report',\n  dryRun: DRY_RUN,\n  summary: `${DRY_RUN ? 'ПРОБА (нищо не е записано)' : 'ЗАПИСАНО'}: ` +\n    `събития ${events.length}, пациенти в календара ${fromCalendar.size}, ` +\n    `редове в таблицата ${rows.length}, нови ${toAdd.length}, обновени телефони ${toUpdate.length}`,\n  toAdd: toAdd.map(p => `${p.name} | ${p.phone || '(без телефон)'} | последен час ${p.lastVisit}`),\n  toUpdate: toUpdate.map(p => `ред ${p.rowNumber}: ${p.name} | ${p.oldPhone || '(празно)'} -> ${p.phone}`)\n};\n\nif (DRY_RUN) return [{ json: report }];\nreturn [{ json: report }, ...toAdd.map(p => ({ json: p })), ...toUpdate.map(p => ({ json: p }))];\n"
       },
-      "id": "a5fcc211-eb71-486d-9515-f6cd572b3823",
+      "id": "6ab52129-5356-4133-90c4-f728f94f3236",
       "name": "Plan Changes",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -112,7 +113,7 @@
           },
           "conditions": [
             {
-              "id": "02007893-e582-4579-9294-143a916b2870",
+              "id": "c4e6aa3a-3343-4500-b657-92e0298e131c",
               "leftValue": "={{ $json.op }}",
               "operator": {
                 "type": "string",
@@ -125,7 +126,7 @@
         },
         "options": {}
       },
-      "id": "79e22398-1665-4f6d-9768-9cf96bff86ed",
+      "id": "38e1cb6f-fc9e-44e4-96bd-68935302f88f",
       "name": "Append?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
@@ -136,6 +137,7 @@
     },
     {
       "parameters": {
+        "authentication": "serviceAccount",
         "operation": "append",
         "documentId": {
           "__rl": true,
@@ -210,7 +212,7 @@
         },
         "options": {}
       },
-      "id": "20b9ce72-de52-4099-b87b-1d60ecdc76ef",
+      "id": "003824b4-59d6-4929-8d43-f4f3a9ee79d5",
       "name": "Append Patients",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
@@ -219,9 +221,9 @@
         -100
       ],
       "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "",
-          "name": "Google Sheets"
+        "googleApi": {
+          "id": "CNqF1lQxBCTbo24q",
+          "name": "RODOPI_DENT_SERVICE_ACCOUNT"
         }
       }
     },
@@ -236,7 +238,7 @@
           },
           "conditions": [
             {
-              "id": "74a2c72f-739a-4e3b-ad64-0080e79f97c4",
+              "id": "fd71cc44-3208-4395-9ed2-9fb26142b202",
               "leftValue": "={{ $json.op }}",
               "operator": {
                 "type": "string",
@@ -249,7 +251,7 @@
         },
         "options": {}
       },
-      "id": "332736e5-b4b1-4f81-be2c-bbbf443aa8b3",
+      "id": "c3ffc3ca-77dd-4e7b-af38-856296332de0",
       "name": "Update?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
@@ -260,6 +262,7 @@
     },
     {
       "parameters": {
+        "authentication": "serviceAccount",
         "operation": "update",
         "documentId": {
           "__rl": true,
@@ -346,7 +349,7 @@
         },
         "options": {}
       },
-      "id": "7752e49d-ed47-4805-ab6c-389f1318ee4d",
+      "id": "6bce0297-1c70-43a5-aadf-11dfcae3cf27",
       "name": "Update Phones",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
@@ -355,9 +358,9 @@
         60
       ],
       "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "",
-          "name": "Google Sheets"
+        "googleApi": {
+          "id": "CNqF1lQxBCTbo24q",
+          "name": "RODOPI_DENT_SERVICE_ACCOUNT"
         }
       }
     }
@@ -452,8 +455,13 @@
   "settings": {
     "executionOrder": "v1"
   },
+  "active": true,
+  "id": "gfKVfVgGYz6j3Bel",
   "tags": [
     {
+      "updatedAt": "2026-01-26T20:40:00.044Z",
+      "createdAt": "2026-01-26T20:40:00.044Z",
+      "id": "U4AUJ7Gip9wo0aTE",
       "name": "Rodopi Dent"
     }
   ]

@@ -10,13 +10,13 @@
           "allowedOrigins": "*"
         }
       },
-      "id": "webhook",
+      "id": "1be96029-1107-4ca2-940c-a06a9bab7479",
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        0,
-        0
+        -1104,
+        1408
       ],
       "webhookId": "calendar-update"
     },
@@ -24,13 +24,13 @@
       "parameters": {
         "jsCode": "// Parse and validate input\nconst body = $input.first().json.body;\n\n// Required: event ID\nif (!body.eventId && !body.id && !body.googleEventId) {\n  throw new Error('ID на събитието е задължително');\n}\n\nconst eventId = body.eventId || body.id || body.googleEventId;\n\n// Map color names to Google Calendar colorId (1-11)\nconst colorMap = {\n  'green': '10', 'blue': '9', 'red': '11', 'yellow': '5',\n  'purple': '3', 'orange': '6', 'pink': '4', 'gray': '8'\n};\n\nconst statusLabels = { 'pending': 'Чакащ', 'confirmed': 'Потвърден', 'completed': 'Завършен' };\nconst statusVal = body.status || 'confirmed';\nconst statusLabel = statusLabels[statusVal] || 'Потвърден';\n\n// Reminder flag (if provided)\nconst hasReminderField = (body.sendReminder !== undefined && body.sendReminder !== null);\nconst sendReminder = body.sendReminder === true || body.sendReminder === 'true';\n\n// Build update fields\nconst updateFields = {};\n\nif (body.date && body.startTime) {\n  const duration = body.duration || 30;\n  const startDate = new Date(`${body.date}T${body.startTime}:00`);\n  const endDate = new Date(startDate.getTime() + duration * 60 * 1000);\n  const endTime = body.endTime || `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;\n  \n  updateFields.startDateTime = `${body.date}T${body.startTime}:00`;\n  updateFields.endDateTime = `${body.date}T${endTime}:00`;\n}\n\nif (body.patientName) {\n  let name = body.patientName.replace(/^⏳\\s*/, '');\n  updateFields.summary = statusVal === 'pending' ? '⏳ ' + name : name;\n}\n\n// Build description with status line AND reminder tag\nlet description;\nif (body.description) {\n  // Caller provided full description — clean known tags then re-append\n  description = body.description\n    .replace(/📋\\s*Статус:.*\\n?/gi, '')\n    .replace(/🔔\\s*Напомняне:.*\\n?/gi, '')\n    .trim();\n  description += '\\n📋 Статус: ' + statusLabel;\n  if (hasReminderField) {\n    description += '\\n🔔 Напомняне: ' + (sendReminder ? 'ДА' : 'НЕ');\n  }\n} else {\n  // Build description from individual fields\n  description = '';\n  if (body.patientPhone) description += `📞 Тел: ${body.patientPhone}\\n`;\n  if (body.patientEmail) description += `✉️ Имейл: ${body.patientEmail}\\n`;\n  if (body.procedure) description += `🦷 Процедура: ${body.procedure}\\n`;\n  description += `📋 Статус: ${statusLabel}\\n`;\n  if (hasReminderField) {\n    description += `🔔 Напомняне: ${sendReminder ? 'ДА' : 'НЕ'}\\n`;\n  }\n  if (body.notes) description += `📝 Бележки: ${body.notes}\\n`;\n}\nupdateFields.description = description.trim();\n\nconst statusColorDefaults = { 'pending': 'yellow', 'completed': 'gray', 'confirmed': 'green' };\nconst effectiveColor = body.colorId || statusColorDefaults[statusVal] || 'green';\nupdateFields.colorId = colorMap[effectiveColor] || colorMap['green'];\n\n// Patient data for the Patients sheet (name without status icons, phone from\n// the form or, for confirm/callback updates, from the event description)\nconst patientName = String(body.patientName || '').replace(/^[^\\p{L}\\p{N}]+/u, '').trim();\nlet patientPhone = String(body.patientPhone || '').trim();\nif (!patientPhone && body.description) {\n  const m = String(body.description).match(/📞\\s*Тел[.:]?\\s*([+\\d\\s()\\-]{7,})/);\n  if (m) patientPhone = m[1].replace(/[\\s()\\-]/g, '');\n}\nconst patientEmail = String(body.patientEmail || '').trim();\nconst savePatient = !!patientName && !/блокиран/i.test(patientName);\n\nreturn [{\n  json: {\n    eventId: eventId,\n    updateFields: updateFields,\n    status: statusVal,\n    sendReminder: sendReminder,\n    patientName: patientName,\n    patientPhone: patientPhone,\n    patientEmail: patientEmail,\n    savePatient: savePatient,\n    originalData: body\n  }\n}];"
       },
-      "id": "prepare",
+      "id": "773b1dca-66f9-4b24-bd4e-a5e509e961a2",
       "name": "Prepare Update Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        220,
-        0
+        -880,
+        1408
       ]
     },
     {
@@ -43,25 +43,25 @@
         },
         "eventId": "={{ $json.eventId }}",
         "updateFields": {
-          "start": "={{ $json.updateFields.startDateTime }}",
-          "end": "={{ $json.updateFields.endDateTime }}",
-          "summary": "={{ $json.updateFields.summary }}",
           "description": "={{ $json.updateFields.description }}",
+          "end": "={{ $json.updateFields.endDateTime }}",
+          "start": "={{ $json.updateFields.startDateTime }}",
+          "summary": "={{ $json.updateFields.summary }}",
           "color": "={{ $json.updateFields.colorId || '' }}"
         }
       },
-      "id": "update-event",
+      "id": "c0152d7d-906f-4b5d-8f86-a17d6baf95b2",
       "name": "Update Calendar Event",
       "type": "n8n-nodes-base.googleCalendar",
       "typeVersion": 1.2,
       "position": [
-        440,
-        0
+        -672,
+        1408
       ],
       "credentials": {
         "googleCalendarOAuth2Api": {
-          "id": "",
-          "name": "Google Calendar"
+          "id": "5pwZjn7dCINLfgpU",
+          "name": "RODOPI DENT-4"
         }
       }
     },
@@ -69,13 +69,13 @@
       "parameters": {
         "jsCode": "// Get updated event details\nconst event = $input.first().json;\nconst prevData = $('Prepare Update Data').first().json;\n\n// Helper function to convert to Europe/Sofia timezone\nfunction toSofiaTime(isoString) {\n  if (!isoString) return null;\n  const d = new Date(isoString);\n  const options = {\n    timeZone: 'Europe/Sofia',\n    year: 'numeric',\n    month: '2-digit',\n    day: '2-digit',\n    hour: '2-digit',\n    minute: '2-digit',\n    hour12: false\n  };\n  const formatter = new Intl.DateTimeFormat('en-CA', options);\n  const parts = formatter.formatToParts(d);\n  const getPart = (type) => parts.find(p => p.type === type)?.value || '00';\n  return {\n    date: `${getPart('year')}-${getPart('month')}-${getPart('day')}`,\n    time: `${getPart('hour')}:${getPart('minute')}`\n  };\n}\n\n// Parse times - CONVERT TO SOFIA TIMEZONE\nconst startDateTime = event.start?.dateTime || event.start?.date;\nconst endDateTime = event.end?.dateTime || event.end?.date;\nlet startDate, startTime, endTime;\n\nif (startDateTime) {\n  const startSofia = toSofiaTime(startDateTime);\n  const endSofia = toSofiaTime(endDateTime);\n  startDate = startSofia.date;\n  startTime = startSofia.time;\n  endTime = endSofia.time;\n}\n\nreturn [{\n  json: {\n    id: event.id,\n    googleEventId: event.id,\n    title: event.summary,\n    date: startDate,\n    startTime: startTime,\n    endTime: endTime,\n    description: event.description,\n    status: prevData.status || 'confirmed',\n    htmlLink: event.htmlLink,\n    updated: event.updated\n  }\n}];"
       },
-      "id": "format-response",
+      "id": "3b69f64a-54ec-4f2d-b86d-0a081957b1d4",
       "name": "Format Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        660,
-        0
+        -448,
+        1408
       ]
     },
     {
@@ -89,7 +89,7 @@
           },
           "conditions": [
             {
-              "id": "93945d22-1219-4008-96b9-5bd23a706997",
+              "id": "a7e751ae-96b5-490d-aba9-691980634e4b",
               "leftValue": "={{ $('Prepare Update Data').first().json.savePatient }}",
               "operator": {
                 "type": "boolean",
@@ -103,7 +103,7 @@
         },
         "options": {}
       },
-      "id": "9675497b-472a-4ad4-ab9d-ed7d9bb3238e",
+      "id": "519ce365-b6a5-490e-94d4-ba41ff9104f3",
       "name": "Save Patient?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
@@ -129,10 +129,10 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ name: $('Prepare Update Data').first().json.patientName, phone: $('Prepare Update Data').first().json.patientPhone || '', email: $('Prepare Update Data').first().json.patientEmail || '' }) }}",
         "options": {
-          "timeout": 8000
+          "timeout": 15000
         }
       },
-      "id": "76e57614-fba3-4abf-aad2-8c74bdeb4fd0",
+      "id": "30c0a1dd-1846-412f-b8fe-ed27e5c8ca4a",
       "name": "Save Patient to Sheet",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -140,7 +140,10 @@
         1100,
         -100
       ],
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
     },
     {
       "parameters": {
@@ -157,7 +160,7 @@
           }
         }
       },
-      "id": "respond-success",
+      "id": "fcb42c50-6b24-4291-a990-51678c8b982e",
       "name": "Respond Success",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -245,8 +248,13 @@
   "settings": {
     "executionOrder": "v1"
   },
+  "active": true,
+  "id": "nWwwEFZV1PeRSav0",
   "tags": [
     {
+      "updatedAt": "2026-01-26T20:40:00.044Z",
+      "createdAt": "2026-01-26T20:40:00.044Z",
+      "id": "U4AUJ7Gip9wo0aTE",
       "name": "Rodopi Dent"
     }
   ]
