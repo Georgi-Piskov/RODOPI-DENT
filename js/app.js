@@ -13,10 +13,42 @@ const App = {
     this.setupEventListeners();
     this.setupOfflineDetection();
     
+    // The installed app must open on the schedule, never on the money dashboard
+    // (patients can see the screen). Any admin page on launch -> calendar.
+    this.redirectLaunchToCalendar();
+
     // Start router
     Router.init();
     
     console.log('App initialized successfully');
+  },
+
+  /**
+   * On launch, send a signed-in user to the calendar instead of the last
+   * opened admin page (the installed PWA restores e.g. #/admin/dashboard).
+   */
+  redirectLaunchToCalendar() {
+    if (!Auth.isAuthenticated()) return;
+    const hash = window.location.hash;
+    const standalone = window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    const isAdmin = hash.startsWith('#/admin');
+    const isStart = hash === '' || hash === '#' || hash === '#/';
+    if ((isAdmin || (standalone && isStart)) && hash !== '#/admin/calendar') {
+      history.replaceState(null, '', '#/admin/calendar');
+    }
+  },
+
+  /**
+   * Admin navigation bar (single source for every admin page)
+   */
+  adminNavHtml() {
+    return `
+        <nav class="admin-nav">
+          <a href="#/admin/calendar" class="admin-nav__link">📆 Календар</a>
+          <a href="#/admin/patients" class="admin-nav__link">👥 Пациенти</a>
+          <a href="#/admin/workday" class="admin-nav__link">Работен ден</a>
+          <a href="#/admin/dashboard" class="admin-nav__link">Табло</a>
+        </nav>`;
   },
 
   /**
@@ -35,7 +67,9 @@ const App = {
     Router.register('/admin/workday', Router.requireAuth(async () => await this.renderWorkday()));
     Router.register('/admin/calendar', Router.requireAuth(async () => await this.renderCalendarPage()));
     Router.register('/admin/finance', Router.requireAuth(async () => await this.renderWorkday())); // Redirect to workday
-    Router.register('/admin/settings', Router.requireAuth(async () => await this.renderSettings()));
+    Router.register('/admin/patients', Router.requireAuth(async () => await this.renderPatientsPage()));
+    // Settings page was never wired to a backend - send old links to the calendar
+    Router.register('/admin/settings', Router.requireAuth(async () => Router.navigate('/admin/calendar')));
   },
 
   /**
@@ -1253,12 +1287,7 @@ const App = {
             <button id="logout-btn" class="btn btn--outline">Изход</button>
           </div>
         </div>
-        <nav class="admin-nav">
-          <a href="#/admin/calendar" class="admin-nav__link active">Календар</a>
-          <a href="#/admin/dashboard" class="admin-nav__link">Табло</a>
-          <a href="#/admin/workday" class="admin-nav__link">Работен ден</a>
-          <a href="#/admin/settings" class="admin-nav__link">Настройки</a>
-        </nav>
+        ${this.adminNavHtml()}
         
         <div id="calendar-container" class="calendar-page-container">
           <p class="text-muted">Зареждане на календар...</p>
@@ -1267,12 +1296,142 @@ const App = {
     `;
     
     this.setupLogout();
+    this.setupAdminNav();
     
     // Initialize full calendar view
     const container = document.getElementById('calendar-container');
     if (container && window.Calendar) {
       await Calendar.render(container, 'week');
     }
+  },
+
+  // ============================================
+  // PATIENTS PAGE - searchable alphabetical list
+  // ============================================
+
+  /**
+   * Render the Patients page: every patient from the Patients sheet,
+   * alphabetical, with all phones (newest first) and a live search.
+   */
+  async renderPatientsPage() {
+    const main = document.getElementById('main-content');
+
+    main.innerHTML = `
+      <div class="page page--admin page--patients">
+        <div class="admin-header">
+          <h1>👥 Пациенти</h1>
+          <div class="header-actions">
+            <button id="logout-btn" class="btn btn--outline">Изход</button>
+          </div>
+        </div>
+        ${this.adminNavHtml()}
+
+        <div class="patients-page">
+          <input type="search" id="patients-filter" class="patients-page__search"
+                 placeholder="🔍 Търси по име или телефон..." autocomplete="off">
+          <p id="patients-count" class="patients-page__count">Зареждане...</p>
+          <div id="patients-list" class="patients-page__list"></div>
+        </div>
+      </div>
+    `;
+
+    this.setupLogout();
+    this.setupAdminNav();
+
+    const listEl = document.getElementById('patients-list');
+    const countEl = document.getElementById('patients-count');
+    const filterEl = document.getElementById('patients-filter');
+
+    const res = await API.getAllPatients();
+    const payload = res?.data || {};
+    if (!res.success || !Array.isArray(payload.patients)) {
+      countEl.textContent = '❌ Грешка при зареждане на пациентите. Опитайте отново.';
+      return;
+    }
+
+    // Group rows by name: one card per patient, all phones newest first
+    const byName = new Map();
+    payload.patients.forEach(p => {
+      const name = String(p.name || '').trim();
+      if (!name) return;
+      const key = name.toLowerCase().replace(/\s+/g, ' ');
+      if (!byName.has(key)) byName.set(key, { name, phones: [] });
+      if (p.phone) byName.get(key).phones.push({ phone: p.phone, createdAt: p.createdAt || '' });
+    });
+    const patients = [...byName.values()]
+      .map(p => ({ ...p, phones: p.phones.sort((a, b) => b.createdAt.localeCompare(a.createdAt)) }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'bg', { sensitivity: 'base' }));
+
+    const digits = v => String(v || '').replace(/\D/g, '');
+    const phoneKey = v => digits(v).replace(/^359/, '').replace(/^0/, '');
+
+    const render = () => {
+      const q = filterEl.value.trim().toLowerCase();
+      const qDigits = phoneKey(q);
+      const shown = !q ? patients : patients.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        (qDigits.length >= 3 && p.phones.some(ph => phoneKey(ph.phone).includes(qDigits)))
+      );
+
+      countEl.textContent = q
+        ? `Намерени: ${shown.length} от ${patients.length}`
+        : `Общо пациенти: ${patients.length}`;
+
+      if (!shown.length) {
+        listEl.innerHTML = '<p class="patients-page__empty">Няма намерени пациенти.</p>';
+        return;
+      }
+
+      listEl.innerHTML = shown.map((p, i) => `
+        <div class="patients-page__item">
+          <div class="patients-page__name">${Utils.escapeHtml(p.name)}</div>
+          <div class="patients-page__phones">
+            ${p.phones.length ? p.phones.map(ph => `
+              <div class="patients-page__phone-row">
+                <a class="patients-page__phone" href="tel:${Utils.escapeHtml(ph.phone)}">📞 ${Utils.escapeHtml(ph.phone)}</a>
+                ${ph.createdAt ? `<span class="patients-page__date">от ${Utils.escapeHtml(Utils.formatPatientDate(ph.createdAt))}</span>` : ''}
+              </div>
+            `).join('') : '<span class="patients-page__date">няма телефон</span>'}
+          </div>
+          <button type="button" class="patients-page__visits-btn" data-index="${i}">📅 Часове</button>
+          <div class="patients-page__visits" hidden></div>
+        </div>
+      `).join('');
+
+      listEl.querySelectorAll('.patients-page__visits-btn').forEach(btn => {
+        btn.addEventListener('click', () => this.togglePatientVisits(btn, shown[Number(btn.dataset.index)].name));
+      });
+    };
+
+    let timer = null;
+    filterEl.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(render, 150);
+    });
+    render();
+  },
+
+  /**
+   * Show/hide a patient's appointments (past + upcoming) under their card
+   */
+  async togglePatientVisits(btn, name) {
+    const box = btn.nextElementSibling;
+    if (!box.hidden) { box.hidden = true; return; }
+    box.hidden = false;
+    box.innerHTML = '<p class="patients-page__date">⏳ Зареждане...</p>';
+
+    const res = await API.searchPatientAppointments(name);
+    const appointments = (res?.data || {}).appointments || [];
+    if (!appointments.length) {
+      box.innerHTML = '<p class="patients-page__date">Няма часове в календара.</p>';
+      return;
+    }
+    box.innerHTML = appointments.map(a => `
+      <div class="patients-page__visit${a.isPast ? '' : ' patients-page__visit--upcoming'}">
+        ${Utils.escapeHtml(Utils.formatPatientDate(a.date))} · ${Utils.escapeHtml(a.startTime || '')}
+        ${a.procedure ? ` · 🦷 ${Utils.escapeHtml(a.procedure)}` : ''}
+      </div>
+    `).join('');
   },
 
   // ============================================
@@ -1296,12 +1455,7 @@ const App = {
             <button id="logout-btn" class="btn btn--outline">Изход</button>
           </div>
         </div>
-        <nav class="admin-nav">
-          <a href="#/admin/calendar" class="admin-nav__link">📆 Календар</a>
-          <a href="#/admin/dashboard" class="admin-nav__link">Табло</a>
-          <a href="#/admin/workday" class="admin-nav__link active">Работен ден</a>
-          <a href="#/admin/settings" class="admin-nav__link">Настройки</a>
-        </nav>
+        ${this.adminNavHtml()}
         
         <div class="workday-layout">
           <!-- Left: Calendar -->
@@ -1587,6 +1741,7 @@ const App = {
     `;
 
     this.setupLogout();
+    this.setupAdminNav();
     this.setupWorkdayListeners();
     this.initAdminCalendar();
     

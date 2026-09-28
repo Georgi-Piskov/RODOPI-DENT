@@ -1066,6 +1066,7 @@ button {
 .admin-nav {
   display: flex;
   gap: var(--spacing-2);
+  overflow-x: auto;
   margin-bottom: var(--spacing-6);
   padding: var(--spacing-2);
   background: var(--color-gray-100);
@@ -1073,6 +1074,8 @@ button {
 }
 
 .admin-nav__link {
+  flex-shrink: 0;
+  white-space: nowrap;
   padding: var(--spacing-2) var(--spacing-4);
   border-radius: var(--radius-md);
   color: var(--color-gray-600);
@@ -5740,4 +5743,93 @@ button {
   color: var(--color-primary);
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+/* ============================================
+   PATIENTS PAGE (admin)
+   ============================================ */
+.patients-page {
+  max-width: 760px;
+}
+.patients-page__search {
+  width: 100%;
+  padding: var(--spacing-3);
+  font-size: 1rem;
+  border: 2px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+  box-sizing: border-box;
+}
+.patients-page__search:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+.patients-page__count {
+  margin: var(--spacing-3) 0;
+  font-size: 0.875rem;
+  color: var(--color-gray-500);
+}
+.patients-page__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+.patients-page__item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--spacing-1) var(--spacing-3);
+  align-items: start;
+  padding: var(--spacing-3);
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+}
+.patients-page__name {
+  font-weight: 600;
+  color: var(--color-gray-800);
+}
+.patients-page__phones {
+  grid-column: 1;
+  line-height: 1.8;
+}
+.patients-page__phone-row {
+  white-space: nowrap;
+}
+.patients-page__phone {
+  color: var(--color-primary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.patients-page__date {
+  margin-left: var(--spacing-2);
+  font-size: 0.8rem;
+  color: var(--color-gray-500);
+}
+.patients-page__visits-btn {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  padding: var(--spacing-2) var(--spacing-3);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+  background: var(--color-gray-100);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.patients-page__visits {
+  grid-column: 1 / -1;
+  padding-top: var(--spacing-2);
+  border-top: 1px dashed var(--color-gray-200);
+  font-size: 0.85rem;
+}
+.patients-page__visit {
+  padding: 2px 0;
+  color: var(--color-gray-600);
+}
+.patients-page__visit--upcoming {
+  color: var(--color-primary);
+  font-weight: 500;
+}
+.patients-page__empty {
+  text-align: center;
+  color: var(--color-gray-500);
+  padding: var(--spacing-4);
 }

@@ -321,6 +321,14 @@ const API = {
   },
 
   /**
+   * Full patient list (every row of the Patients sheet, one row per phone).
+   * @returns {Promise<{success, patients: [{name, phone, createdAt}], count}>}
+   */
+  async getAllPatients() {
+    return this.request(`${CONFIG.ENDPOINTS.PATIENTS_SEARCH}?all=1`);
+  },
+
+  /**
    * Send SMS to patient
    * @param {Object} smsData - { phone, message, template?, date?, time?, duration?, patientName? }
    * Templates: booking_received, booking_confirmed, booking_rejected, booking_conflict, booking_expired, reminder

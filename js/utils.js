@@ -174,6 +174,15 @@ const Utils = {
   },
 
   /**
+   * Escape text for safe insertion into HTML
+   */
+  escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+  },
+
+  /**
    * Format a Patients-sheet date (YYYY-MM-DD) as DD.MM.YYYY
    */
   formatPatientDate(value) {
