@@ -1922,14 +1922,14 @@ const App = {
     if (!this.nhifPrices || Object.keys(this.nhifPrices).length === 0) {
       this.nhifPrices = {
         // ДО 18 ГОДИНИ
-        '101_u18': { code: '101', name: 'Обстоен преглед със снемане на орален статус (до 18г.)', priceUnder18: 16.76, priceOver18: 0, patientPayUnder18: 0, patientPayOver18: 0, category: 'Преглед' },
+        '101_u18': { code: '101', name: 'Обстоен преглед със снемане на орален статус (до 18г.)', priceUnder18: 22.00, priceOver18: 0, patientPayUnder18: 0, patientPayOver18: 0, category: 'Преглед' },
         '301_u18': { code: '301', name: 'Обтурация с химичен композит (до 18г.)', priceUnder18: 45.67, priceOver18: 0, patientPayUnder18: 0, patientPayOver18: 0, category: 'Лечение' },
         '508': { code: '508', name: 'Екстракция на временен зъб с анестезия', priceUnder18: 18.35, priceOver18: 0, patientPayUnder18: 0, patientPayOver18: 0, category: 'Хирургия' },
         '509_u18': { code: '509', name: 'Екстракция на постоянен зъб с анестезия (до 18г.)', priceUnder18: 45.67, priceOver18: 0, patientPayUnder18: 0, patientPayOver18: 0, category: 'Хирургия' },
         '332': { code: '332', name: 'Лечение на пулпит или периодонтит на временен зъб', priceUnder18: 24.58, priceOver18: 0, patientPayUnder18: 0, patientPayOver18: 0, category: 'Ендодонтия' },
         '333': { code: '333', name: 'Лечение на пулпит или периодонтит на постоянен зъб', priceUnder18: 79.27, priceOver18: 0, patientPayUnder18: 0, patientPayOver18: 0, category: 'Ендодонтия' },
         // НАД 18 ГОДИНИ
-        '101_o18': { code: '101', name: 'Обстоен преглед със снемане на орален статус (над 18г.)', priceUnder18: 0, priceOver18: 16.76, patientPayUnder18: 0, patientPayOver18: 0, category: 'Преглед' },
+        '101_o18': { code: '101', name: 'Обстоен преглед със снемане на орален статус (над 18г.)', priceUnder18: 0, priceOver18: 22.00, patientPayUnder18: 0, patientPayOver18: 0, category: 'Преглед' },
         '301_o18': { code: '301', name: 'Обтурация с химичен композит (над 18г.)', priceUnder18: 0, priceOver18: 43.63, patientPayUnder18: 0, patientPayOver18: 0, category: 'Лечение' },
         '509_o18': { code: '509', name: 'Екстракция на постоянен зъб с анестезия (над 18г.)', priceUnder18: 0, priceOver18: 43.63, patientPayUnder18: 0, patientPayOver18: 0, category: 'Хирургия' },
         '832': { code: '832', name: 'Горна цяла протеза', priceUnder18: 0, priceOver18: 146.88, patientPayUnder18: 0, patientPayOver18: 0, category: 'Протетика' },
